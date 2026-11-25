@@ -354,6 +354,21 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     expect(w.header.title).toBe("Since Monday's check");
   });
 
+  it('F2: an account whose only results are a staging copy’s is on its first run, and does not throw', () => {
+    const copy = structuredClone(bad);
+    // Every check of the four primary sites failed; the staging copy keeps its two results.
+    const staging = new Set(
+      copy.sites.filter((s) => s.staging_of_site_id !== null).map((s) => s.id),
+    );
+    for (const c of copy.checks) if (!staging.has(c.site_id)) c.status = 'failed';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.firstRun).toBe(true);
+    // No primary result: no "audited" and no "last check"; the first site's schedule and the trial.
+    expect(w.header.line).toBe(
+      'Fri 30 Oct · 4 sites · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
+    );
+  });
+
   it('(8) day 0 with every listed row done says so, not "Worth doing while Pro is on"', () => {
     expect(day0().setup!.items.map((i) => i.done)).toEqual([true]);
     expect(day0().setup!.title).toBe('Everything is set up');
