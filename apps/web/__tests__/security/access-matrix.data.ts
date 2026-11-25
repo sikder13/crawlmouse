@@ -649,6 +649,20 @@ const ROUTES: readonly Spec[] = [
     calls: 1,
   },
   {
+    path: 'api/hooks/deploy/[hook]',
+    v2: true,
+    identity: 'a deploy pipeline holding the staging site’s hook address',
+    gate: 'signature',
+    detail:
+      'Queues a deploy check of a live staging site after `verifyDeployHook` checks the address’s HMAC in constant time; no such site, a wrong signature and a site that is not a live staging site get the same 404.',
+    check: at('app/api/hooks/deploy/[hook]/route.ts', 'verifyDeployHook'),
+    proof: by(
+      'app/api/hooks/deploy/[hook]/route.test.ts',
+      'a wrong signature is the same 404 as no site, and queues nothing',
+    ),
+    calls: 1,
+  },
+  {
     path: 'api/me',
     v2: true,
     identity: 'signed-in person',
@@ -2024,6 +2038,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/contact/agency-plus/route.ts',
       'apps/web/app/api/developers/route.ts',
       'apps/web/app/api/fixes/[id]/email-developer/route.ts',
+      'apps/web/app/api/hooks/deploy/[hook]/route.ts',
       'apps/web/app/api/internal/accounts/[id]/sign-in-link/route.ts',
       'apps/web/app/api/report-files/[id]/share/route.ts',
       'apps/web/app/api/report-files/confirm/route.ts',
@@ -2138,6 +2153,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/fixes/[id]/done/route.ts',
       'apps/web/app/api/fixes/[id]/email-developer/route.ts',
       'apps/web/app/api/fixes/[id]/packet/route.ts',
+      'apps/web/app/api/hooks/deploy/[hook]/route.ts',
       'apps/web/app/api/me/route.ts',
       'apps/web/app/api/report-files/[id]/download/route.ts',
       'apps/web/app/api/report-files/[id]/share/route.ts',

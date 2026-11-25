@@ -4,6 +4,7 @@
  */
 import type { AlertRule } from '@crawlmouse/types/v2';
 import type { Addition, CopyChange } from '../copy-registry';
+import { DEPLOY_BUCKET_S } from '../pipeline/deploy-bucket';
 import { RECHECK_MINUTES } from '../recheck';
 import { RESTORE_DAYS } from './restore-window';
 import { SUPPORT_EMAIL } from './support';
@@ -14,7 +15,17 @@ import { railChanges } from './dashboard';
 export const TAGGED_UA_LINE =
   'Tested with tagged user agents from published IPs — crawlmouse.com/bot.';
 
+const DEPLOY_BUCKET_MINUTES = DEPLOY_BUCKET_S / 60;
+
 export const SITE_COPY = {
+  /**
+   * The staging site's deploy hook: what a deploy sends, and where (Goal 1 row 20). Deploys in one
+   * clock-aligned DEPLOY_BUCKET_S window find one check (`bucketEnd`, sites-store.ts): a later one
+   * in it gets that check while it is queued, and a 409 or 429 once it has started (CTO 057).
+   */
+  deployHook: 'Deploy hook',
+  deployHookValue: (url: string) =>
+    `POST ${url} after each staging deploy · deploys in the same ${DEPLOY_BUCKET_MINUTES}-minute window share one check`,
   fixesSub: `Mark one done and it is re-checked in about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}; it closes only when the next crawl agrees.`,
   copyAll: 'Copy all as one prompt',
   /** The expiry's purge step deletes a removed site's checks after RESTORE_DAYS (CC-GL D2). */

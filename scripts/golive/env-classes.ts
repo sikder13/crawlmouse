@@ -62,6 +62,8 @@ export const OPTIONAL_ENV: Why = {
   V2_HIDE_FEATURES:
     'unset shows every feature; names features not yet proven to hide them everywhere (Goal 1 rule 2, lib/feature-switch.ts)',
   ADMIN_SECRET: 'unset, the admin takedown route refuses every request (closed by default)',
+  DEPLOY_HOOK_SECRET:
+    'unset or under 32 characters, every deploy hook answers 503 not_configured (closed by default)',
   AI_READINESS_EXTRACTION: 'engine switch; unset keeps the default extraction',
   CRAWL_PAUSED: 'the global crawl pause, set only to pause (PROJECT_OVERVIEW §6)',
   CRAWL_WALL_CLOCK_MS: "engine budget override; unset uses the engine's default",

@@ -160,6 +160,42 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(text).not.toContain('Vercel Drain');
   });
 
+  it('ticks staging only once a deploy has been audited, not when the URL is saved (F-097)', () => {
+    const staging = bad.sites.find((x) => x.staging_of_site_id !== null)!;
+    const tick = (d: typeof bad) =>
+      dashboardView(d, { accountId: BAD_ACCOUNT, now: bad.as_of }).setup!.items.find(
+        (i) => i.key === 'staging',
+      )!.done;
+    expect(tick(bad)).toBe(true);
+    // The same account with the staging site's deploy checks taken away: saved, never audited.
+    const saved = {
+      ...bad,
+      checks: bad.checks.filter((c) => !(c.site_id === staging.id && c.trigger === 'deploy')),
+    };
+    expect(saved.sites).toContain(staging);
+    expect(tick(saved)).toBe(false);
+    // A check of the staging site that is not a deploy's does not tick it: turn the deploys into
+    // manual re-checks.
+    const manual = {
+      ...bad,
+      checks: bad.checks.map((c) =>
+        c.site_id === staging.id && c.trigger === 'deploy'
+          ? { ...c, trigger: 'manual' as const }
+          : c,
+      ),
+    };
+    expect(manual.checks.some((c) => c.site_id === staging.id)).toBe(true);
+    expect(tick(manual)).toBe(false);
+    // Nor does a deploy check without a result: one that failed, or one still queued.
+    for (const status of ['failed', 'queued'] as const) {
+      const unfinished = {
+        ...bad,
+        checks: bad.checks.map((c) => (c.site_id === staging.id ? { ...c, status } : c)),
+      };
+      expect(tick(unfinished), status).toBe(false);
+    }
+  });
+
   it('carries the trial card that follows the first run', () => {
     // Fri 30 Oct to Sat 7 Nov in Indiana: eight dates (Q4).
     expect(v.shell.trial).toMatchObject({

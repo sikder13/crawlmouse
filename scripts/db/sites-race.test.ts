@@ -49,8 +49,11 @@ function urlFor(base: string, database: string): string {
   return u.toString();
 }
 
-/** A fresh database with the Supabase stand-ins and every migration, this one's text edited by `edit`. */
-async function migrated(admin: Sql, name: string, edit: (sql: string) => string = (s) => s) {
+/**
+ * A fresh database with the Supabase stand-ins and every migration, with `edit` made in the last
+ * migration that holds its text: the one whose definition of the function is the one in force.
+ */
+async function migrated(admin: Sql, name: string, edit?: Edit) {
   const { PLATFORM_SHIM, migrationFiles, readMigration } =
     await import('../../apps/web/__tests__/helpers/pglite-migrations');
   await admin.unsafe(`create database ${name}`);
@@ -62,20 +65,23 @@ async function migrated(admin: Sql, name: string, edit: (sql: string) => string 
       `do $r$ begin if not exists (select 1 from pg_roles where rolname = '${role}') then create role ${role}${opts}; end if; end $r$;`,
   );
   await sql.unsafe(shim).simple();
-  for (const f of migrationFiles()) {
+  const files = migrationFiles();
+  const target = edit
+    ? [...files].reverse().find((f) => readMigration(f).includes(edit.lock))
+    : undefined;
+  // Refuse to build when the text is not there to edit, or not in the file whose section A this tests.
+  if (edit && (target === undefined || target < MIGRATION))
+    throw new Error(`the lock to remove is not in ${MIGRATION} or a later migration`);
+  for (const f of files) {
     const text = readMigration(f);
-    await sql.unsafe(f === MIGRATION ? edit(text) : text).simple();
+    await sql.unsafe(f === target ? text.replace(edit!.lock, edit!.replacement) : text).simple();
   }
   return sql;
 }
 
-/** The migration with `lock` taken out, refusing to build when the text is not there to edit. */
-const without =
-  (lock: string, replacement: string) =>
-  (text: string): string => {
-    if (!text.includes(lock)) throw new Error(`the lock to remove is not in ${MIGRATION}`);
-    return text.replace(lock, replacement);
-  };
+/** `lock` taken out of the migration, replaced by `replacement`. */
+type Edit = { lock: string; replacement: string };
+const without = (lock: string, replacement: string): Edit => ({ lock, replacement });
 
 /** A signed-up user's personal account and its owner seat. */
 async function account(sql: Sql) {

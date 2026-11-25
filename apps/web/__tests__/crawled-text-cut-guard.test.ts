@@ -743,6 +743,10 @@ const INVENTORY: [entry: string, why: string][] = [
       'An id the provider issued, not crawled text.',
   ],
   [
+    'apps/web/lib/v2/account/deploy-hook.ts :: .slice(0, SIGNATURE_LENGTH);',
+    'The first 32 characters of a base64url HMAC-SHA-256, the deploy hook address signature (row 20): base64url is ASCII, no crawled text.',
+  ],
+  [
     'apps/web/lib/v2/mail/headers.ts :: const local = value.slice(0, at);',
     'An address split at its one `@` after `isPlainAddress` accepted it (CC-28 security r1 N2): the address is the recipient, not crawled text, and is neither persisted nor rendered; the split point is an ASCII character.',
   ],

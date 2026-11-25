@@ -48,3 +48,27 @@ describe.each(['home', 'clean', 'withheld'] as const)('Site, %s', (name) => {
     ).toHaveLength(1);
   });
 });
+
+describe('a credential in the site’s settings', () => {
+  it('is left out of session recordings: masked and not captured (Goal 1 row 20)', () => {
+    const data = sitePreview('home');
+    const row = {
+      label: 'Deploy hook',
+      value: 'POST https://crawlmouse.com/api/hooks/deploy/x.y after each staging deploy',
+      mono: true,
+      muted: false,
+      action: null,
+      secret: true as const,
+    };
+    const html = renderToStaticMarkup(
+      <SiteScreen
+        data={{ ...data, settings: { ...data.settings, rows: [...data.settings.rows, row] } }}
+        shell={shellPreview('home')}
+      />,
+    );
+    const doc = new JSDOM(html).window.document;
+    const masked = [...doc.querySelectorAll('[data-ph-mask]')];
+    expect(masked.map((e) => e.textContent)).toEqual([row.value]);
+    expect(masked[0]!.classList.contains('ph-no-capture')).toBe(true);
+  });
+});

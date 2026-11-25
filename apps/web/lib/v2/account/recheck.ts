@@ -3,7 +3,7 @@
  * 20261112000001's capped insert and `requestCheck`; the mark-done route (B) calls it with
  * `fix_recheck`. The caller has already established membership and read the site's entitlement.
  */
-export type RecheckTrigger = 'manual' | 'fix_recheck';
+export type RecheckTrigger = 'manual' | 'fix_recheck' | 'deploy';
 
 export type RecheckOutcome =
   /** A check was queued now, or this 2-minute bucket's check is still queued. */
@@ -24,9 +24,13 @@ export type RecheckOutcome =
 export interface RecheckRequest {
   siteId: string;
   trigger: RecheckTrigger;
-  /** `GATES[tier].manualChecksPerSiteDay` of the site's own account. */
+  /**
+   * `GATES[tier].manualChecksPerSiteDay` of the site's own account; for a deploy, `checksPerSiteDay`,
+   * counted over deploy checks alone.
+   */
   cap: number;
-  requestedByUserId: string;
+  /** The member who asked; none for a deploy, which a hook asks for. */
+  requestedByUserId?: string;
 }
 
 export type RequestRecheck = (req: RecheckRequest) => Promise<RecheckOutcome>;

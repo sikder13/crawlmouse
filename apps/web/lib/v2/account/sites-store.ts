@@ -25,11 +25,11 @@ import { normalizeDomain } from '../../domain';
 import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } from '../../limits';
 import { MAX_RATE_LIMIT_WINDOW_MS, rateLimitWindowStart } from '../../rate-limit-window';
 import { bucketedKey, checkIdOfKey, freshKey } from '../pipeline/ids';
-import { MANUAL_BUCKET_S } from '../pipeline/limits';
+import { DEPLOY_BUCKET_S, MANUAL_BUCKET_S } from '../pipeline/limits';
 import { readAccountClock } from '../pipeline/load-for';
 import { homepageOf, requestCheck, type RequestDeps } from '../pipeline/request';
 import { supabasePipelineStore, type QueuedCheck } from '../pipeline/store';
-import type { RecheckOutcome, RequestRecheck } from './recheck';
+import type { RecheckOutcome, RecheckRequest, RequestRecheck } from './recheck';
 
 type Send = RequestDeps['send'];
 
@@ -81,9 +81,9 @@ const CappedAnswer = z.discriminatedUnion('outcome', [
   z.strictObject({ outcome: z.literal('paused'), paused_reason: z.string() }),
 ]);
 
-/** When the 2-minute bucket that `atMs` falls in ends (`bucketedKey`'s manual and re-check bucket). */
-const bucketEnd = (atMs: number): string => {
-  const ms = MANUAL_BUCKET_S * 1000;
+/** When the bucket that `atMs` falls in ends: `bucketedKey`'s deploy bucket, or its 2-minute one. */
+const bucketEnd = (atMs: number, trigger: RecheckRequest['trigger']): string => {
+  const ms = (trigger === 'deploy' ? DEPLOY_BUCKET_S : MANUAL_BUCKET_S) * 1000;
   return new Date((Math.floor(atMs / ms) + 1) * ms).toISOString();
 };
 
@@ -133,7 +133,7 @@ export function supabaseRequestRecheck(
               throw new NotQueued({
                 queued: false,
                 reason: 'recently_checked',
-                nextAllowedAt: bucketEnd(Date.parse(row.queued_at)),
+                nextAllowedAt: bucketEnd(Date.parse(row.queued_at), req.trigger),
               });
             case 'capped':
               throw new NotQueued({

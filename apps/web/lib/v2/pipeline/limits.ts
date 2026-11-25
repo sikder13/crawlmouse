@@ -109,8 +109,8 @@ export const REAP_AFTER_S = 95 * 60;
 export const ANONYMOUS_EXPIRY_HOURS = 24;
 /** Manual and fix re-check requests in one 2-minute bucket are one check (ARCH-2 §4.1). */
 export const MANUAL_BUCKET_S = 120;
-/** Deploy hooks in one 10-minute bucket are one check (ARCH-2 §4.1, J9). */
-export const DEPLOY_BUCKET_S = 600;
+/** Deploy hooks in one 10-minute bucket are one check: its own module, so client copy can read it. */
+export { DEPLOY_BUCKET_S } from './deploy-bucket';
 
 /**
  * A crawl batch's budget; `max_seconds` is its most, cut to the time left. Requests: 50 URLs with up

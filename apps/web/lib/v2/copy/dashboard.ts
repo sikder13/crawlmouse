@@ -562,7 +562,7 @@ const HOME: CopyChange[] = [
       "One competitor added 2 min Connect Search Console to lay Google's AI-feature impressions over these pages Connect 1 min",
     rendered: 'One competitor added done Staging audited on each deploy',
     source:
-      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them; staging is done (a staging site exists); the efforts "2 min" and "1 min" are in no record and are left out',
+      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them; staging is done (a deploy check of the staging site has a result, row 20); the efforts "2 min" and "1 min" are in no record and are left out',
   },
   {
     screen: 'dashboard',

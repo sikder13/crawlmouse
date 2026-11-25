@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { deployHookPath } from '../v2/account/deploy-hook';
 import { isShareToken } from '../v2/reports/share';
 import { scrubDoorSecrets, sentryBrowserOptions, sentryServerOptions } from './sentry-scrub';
 
@@ -127,6 +128,46 @@ describe('scrubDoorSecrets, a share link’s token in its path', () => {
     ]) {
       expect(scrubDoorSecrets({ text }).text).toBe(text);
     }
+  });
+});
+
+describe('scrubDoorSecrets, a staging site’s deploy hook', () => {
+  // A sample of the signature's shape, 32 base64url characters, built so that no scanner reads it.
+  const SIG = 'Ab3_-'.repeat(6) + 'xy';
+  const HOOK = `${ID}.${SIG}`;
+
+  it('the sample is shaped as the address the page shows', () => {
+    expect(deployHookPath(ID, '2026-11-10T00:00:00.000Z', 'k'.repeat(32))).toMatch(
+      new RegExp(`^/api/hooks/deploy/${ID}\\.[A-Za-z0-9_-]{32}$`),
+    );
+  });
+
+  it.each([
+    ['the address', `/api/hooks/deploy/${HOOK}`, '/api/hooks/deploy/[Filtered]'],
+    ['a POST', `POST /api/hooks/deploy/${HOOK}`, 'POST /api/hooks/deploy/[Filtered]'],
+    [
+      'a full address with a query',
+      `${ORIGIN}/api/hooks/deploy/${HOOK}?x=1`,
+      `${ORIGIN}/api/hooks/deploy/[Filtered]?x=1`,
+    ],
+    [
+      'encoded slashes',
+      `to=%2Fapi%2Fhooks%2Fdeploy%2F${HOOK}`,
+      'to=%2Fapi%2Fhooks%2Fdeploy%2F[Filtered]',
+    ],
+    ['upper case', `/API/HOOKS/DEPLOY/${HOOK}`, '/API/HOOKS/DEPLOY/[Filtered]'],
+  ])('%s', (_, text, scrubbed) => {
+    expect(scrubDoorSecrets({ text }).text).toBe(scrubbed);
+  });
+
+  it('goes from the request URL the SDK attaches', () => {
+    const event = { request: { url: `${ORIGIN}/api/hooks/deploy/${HOOK}` } };
+    expect(scrubDoorSecrets(event).request.url).toBe(`${ORIGIN}/api/hooks/deploy/[Filtered]`);
+  });
+
+  it('leaves the route’s own name', () => {
+    const text = 'POST /api/hooks/deploy/[hook]';
+    expect(scrubDoorSecrets({ text }).text).toBe(text);
   });
 });
 

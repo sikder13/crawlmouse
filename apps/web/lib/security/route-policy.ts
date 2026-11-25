@@ -342,6 +342,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     verifier: 'constructEvent',
     origin: 'any',
   },
+  {
+    route: 'api/hooks/deploy/[hook]',
+    methods: ['POST'],
+    class: 'public',
+    reason:
+      "a deploy pipeline calls it with no session; the address's HMAC, which covers the staging site's id and created_at and so is checked after that row is read, is the credential, and no such site, a wrong signature and a site that is not a live staging site all get the same 404 (Goal 1 row 20)",
+    origin: 'any',
+  },
   // Outside /api. The middleware's origin guard reads API rows only; /login/verify checks its own.
   {
     route: '(account)/account/email/[token]',

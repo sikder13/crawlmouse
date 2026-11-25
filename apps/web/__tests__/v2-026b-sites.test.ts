@@ -21,6 +21,9 @@ import { personalAccount, signUp } from './helpers/v2-check-tables';
 
 const MIGRATION = '20261112000001_v2_026b_sites_fixes.sql';
 const ROLLBACK = '20261112000001_v2_026b_sites_fixes.revert.sql';
+/** A later migration that redefines request_capped_check: re-applied after this one, as on a database. */
+const DEPLOY = '20261124000001_v2_a1_deploy_check.sql';
+const DEPLOY_ROLLBACK = '20261124000001_v2_a1_deploy_check.revert.sql';
 const FUNCTIONS = ['add_site', 'edit_site', 'remove_site', 'request_capped_check'];
 const HELPERS = ['take_rate_slot'];
 
@@ -135,6 +138,65 @@ const fill = (s: Slot, n: number) =>
     `insert into public.rate_limits (bucket_key, window_start, request_count) values ($1, $2, $3)`,
     [s.bucket, s.window_start, n],
   );
+
+describe('request_capped_check, a deploy check (migration 20261124000001, Goal 1 row 20)', () => {
+  it('queues a deploy check for a staging site', async () => {
+    const { accountId } = await account();
+    const primary = await site(accountId);
+    const staging = await site(accountId, { staging_of_site_id: primary });
+    const r = row(staging, 'deploy');
+    expect(await call('request_capped_check', [r, 12, slot()])).toEqual({ outcome: 'created' });
+    expect(await checksOf(staging)).toEqual([{ id: r.id, status: 'queued', trigger: 'deploy' }]);
+  });
+
+  it('refuses a deploy check for a site that is not a staging site', async () => {
+    const { accountId } = await account();
+    const primary = await site(accountId);
+    await expect(
+      call('request_capped_check', [row(primary, 'deploy'), 12, slot()]),
+    ).rejects.toThrow(/a deploy check is for a staging site/);
+    expect(await checksOf(primary)).toEqual([]);
+  });
+
+  it('counts deploys against their own cap, apart from manual re-checks', async () => {
+    const { accountId } = await account();
+    const primary = await site(accountId);
+    const staging = await site(accountId, { staging_of_site_id: primary });
+    await pastCheck(staging, 'manual', 1);
+    await pastCheck(staging, 'manual', 1);
+    // Two manual re-checks fill a manual cap of two, and leave the deploys untouched.
+    expect((await call('request_capped_check', [row(staging), 2, slot()])).outcome).toBe('capped');
+    expect((await call('request_capped_check', [row(staging, 'deploy'), 2, slot()])).outcome).toBe(
+      'created',
+    );
+    await pastCheck(staging, 'deploy', 1);
+    // Now two deploys fill a deploy cap of two.
+    expect((await call('request_capped_check', [row(staging, 'deploy'), 2, slot()])).outcome).toBe(
+      'capped',
+    );
+  });
+
+  it('leaves manual re-checks untouched by deploys', async () => {
+    const { accountId } = await account();
+    const primary = await site(accountId);
+    const staging = await site(accountId, { staging_of_site_id: primary });
+    await pastCheck(staging, 'deploy', 1);
+    await pastCheck(staging, 'deploy', 1);
+    // Two deploys fill a deploy cap of two, and a manual re-check under a cap of two still goes.
+    expect((await call('request_capped_check', [row(staging, 'deploy'), 2, slot()])).outcome).toBe(
+      'capped',
+    );
+    expect((await call('request_capped_check', [row(staging), 2, slot()])).outcome).toBe('created');
+  });
+
+  it('still refuses a trigger it does not take', async () => {
+    const { accountId } = await account();
+    const s = await site(accountId);
+    await expect(call('request_capped_check', [row(s, 'scheduled'), 2, slot()])).rejects.toThrow(
+      /not a re-check row/,
+    );
+  });
+});
 
 describe('request_capped_check', () => {
   it('records a re-check below the cap as a queued check, exactly as given', async () => {
@@ -774,6 +836,7 @@ describe('the section applies twice and its revert removes it', () => {
   it('the migration file applied again leaves the functions as they were', async () => {
     const before = await definitions(db);
     await db.exec(readMigration(MIGRATION));
+    await db.exec(readMigration(DEPLOY));
     expect(await definitions(db)).toEqual(before);
     expect(before.map((d) => d.proname)).toEqual([...FUNCTIONS, ...HELPERS].sort());
   });
@@ -790,7 +853,27 @@ describe('the section applies twice and its revert removes it', () => {
       await own.exec(revert);
       expect(await definitions(own)).toEqual([]);
       await own.exec(readMigration(MIGRATION));
+      await own.exec(readMigration(DEPLOY));
       expect(await definitions(own)).toEqual(before);
+    } finally {
+      await own.close();
+    }
+  }, 300_000);
+
+  it('the deploy migration’s rollback restores request_capped_check as this migration defined it', async () => {
+    const own = await freshDb();
+    try {
+      await applyAllMigrations(own);
+      const latest = await definitions(own);
+      await own.exec(readRollback(DEPLOY_ROLLBACK));
+      await own.exec(readRollback(DEPLOY_ROLLBACK));
+      const reverted = await definitions(own);
+      await own.exec(readMigration(MIGRATION));
+      expect(await definitions(own)).toEqual(reverted);
+      expect(reverted).not.toEqual(latest);
+      await own.exec(readMigration(DEPLOY));
+      await own.exec(readMigration(DEPLOY));
+      expect(await definitions(own)).toEqual(latest);
     } finally {
       await own.close();
     }

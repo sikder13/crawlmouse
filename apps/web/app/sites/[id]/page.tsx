@@ -5,6 +5,8 @@ import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { siteOrigin } from '@/lib/site-url';
+import { deployHookPath, deployHookSecret } from '@/lib/v2/account/deploy-hook';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { seedDefaultAlertRules } from '@/lib/v2/monitor/alert-defaults';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -16,6 +18,7 @@ import { chosenFromRequest, readViewer } from '@/lib/v2/account/viewer';
 import { readerRole, viewAt } from '@/lib/v2/view/account';
 import { accountShellView, withSwitcher } from '@/lib/v2/view/account-shell';
 import { sitePage, wantsAllFixes } from '@/lib/v2/view/site';
+import { featureShown } from '@/lib/feature-switch';
 import { noticeLine } from '@/lib/v2/copy/notices';
 
 export const dynamic = 'force-dynamic';
@@ -70,12 +73,20 @@ export default async function SitePage({
       : null;
   // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
   const query = await searchParams;
+  // The staging site's deploy hook, signed here: the view never sees the secret (Goal 1 row 20).
+  // Hidden by the RISK switch (`V2_HIDE_FEATURES=staging_deploys`), as until its migration is applied.
+  const secret = featureShown('staging_deploys') ? deployHookSecret() : null;
+  const staging = d.sites.find((s) => s.staging_of_site_id === id);
   const host = d.sites.find((s) => s.id === id)?.host;
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]), {
     allFixes: wantsAllFixes(query),
     link: host
       ? await siteLinkGate(supabaseAdmin(), site.accountId, { id, host })
       : { gate: 'unknown', hiddenCheckIds: [] },
+    deployHookUrl:
+      staging && secret
+        ? `${siteOrigin()}${deployHookPath(staging.id, staging.created_at, secret)}`
+        : null,
   });
   const notice = noticeLine(query, d.accounts[0]!.timezone);
   const account = viewAt(d, viewer);

@@ -219,13 +219,21 @@ export function SiteScreen({
               muted: r.muted,
               cells: [
                 r.label,
+                // A credential (the deploy hook) is left out of session recordings: `ph-no-capture` is
+                // the recorder's class for an element it leaves out of a recording and of autocapture;
+                // `data-ph-mask` is the selector this project's recorder masks (instrumentation-client.ts).
                 <span
                   key="v"
                   className={
-                    [r.mono ? shared.mono : '', r.publicLink ? styles.linkValue : '']
+                    [
+                      r.mono ? shared.mono : '',
+                      r.publicLink ? styles.linkValue : '',
+                      r.secret ? 'ph-no-capture' : '',
+                    ]
                       .filter(Boolean)
                       .join(' ') || undefined
                   }
+                  {...(r.secret ? { 'data-ph-mask': '' } : {})}
                 >
                   {r.value}
                 </span>,

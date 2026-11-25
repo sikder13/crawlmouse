@@ -48,8 +48,12 @@ describe('the help articles’ pinned facts', () => {
         'create or replace function public.request_capped_check',
       ),
     );
-    expect(defining).toEqual(['20261112000001_v2_026b_sites_fixes.sql']);
-    const sql = readFileSync(join(dir, defining[0]!), 'utf8');
+    expect(defining).toEqual([
+      '20261112000001_v2_026b_sites_fixes.sql',
+      '20261124000001_v2_a1_deploy_check.sql',
+    ]);
+    // The newest definition is the one a database holds.
+    const sql = readFileSync(join(dir, defining.at(-1)!), 'utf8');
     const start = sql.indexOf('create or replace function public.request_capped_check');
     const body = sql.slice(start, sql.indexOf('$$;', start));
     expect(start).toBeGreaterThan(-1);

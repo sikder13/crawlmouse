@@ -692,7 +692,11 @@ function setup(
     );
   }
   if (g.stagingAndDeployHooks) {
-    const done = v.d.sites.some((s) => s.staging_of_site_id === site.id);
+    // Done once a deploy check has a result, not when a staging URL is merely saved, nor while a
+    // deploy check waits or after one failed (F-097).
+    const done = v.d.sites
+      .filter((s) => s.staging_of_site_id === site.id)
+      .some((s) => resultChecks(v, s.id).some((c) => c.trigger === 'deploy'));
     item(
       'staging',
       done,

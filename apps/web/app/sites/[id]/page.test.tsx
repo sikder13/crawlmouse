@@ -49,8 +49,10 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
 
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
+import { parseDeployHook, verifyDeployHook } from '@/lib/v2/account/deploy-hook';
 import { SITE_COPY } from '@/lib/v2/copy/site';
 import { siteOfCaller } from '@/lib/v2/account/pages';
+import { makePaid } from '@/lib/v2/account/sites-test-support';
 import { agencyAccount } from '@/lib/v2/agency/test-support';
 import type { ShellView } from '@/lib/v2/view/account-shell';
 import { dayDate, hourMinute } from '@/lib/v2/format';
@@ -147,6 +149,72 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     const page = children(await open(kept));
     expect(page.type).toBe(SiteScreen);
+  });
+
+  it('shows a deploy hook the route accepts, signed over the staging row as the route reads it', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    vi.stubEnv('DEPLOY_HOOK_SECRET', 'h'.repeat(40));
+    const staging = randomUUID();
+    // The hook is a paid plan's: the account is Pro for this case, and put back as it was after.
+    const COLUMNS =
+      'state, tier, site_limit, seat_limit, competitor_limit, current_subscription_id, state_history';
+    const { rows: acct } = await db.query<{ id: string }>(
+      `select account_id as id from public.sites where id = $1`,
+      [kept],
+    );
+    const accountId = acct[0]!.id;
+    const { rows: before } = await db.query<Record<string, unknown>>(
+      `select ${COLUMNS} from public.accounts where id = $1`,
+      [accountId],
+    );
+    await makePaid(db, accountId, 'pro');
+    // Microseconds, as Postgres keeps them: the page and the route must round them the same way.
+    await db.query(
+      `insert into public.sites (id, account_id, host, staging_of_site_id, created_at)
+       select $1, account_id, 'staging.example', id, '2026-11-10 12:34:56.123999+00'
+         from public.sites where id = $2`,
+      [staging, kept],
+    );
+    try {
+      const page = children(await open(kept)) as ReactElement<{
+        data: { settings: { rows: { label: string; value: string }[] } };
+      }>;
+      const row = page.props.data.settings.rows.find((r) => r.label === 'Deploy hook');
+      const path = /\/api\/hooks\/deploy\/(\S+)/.exec(row?.value ?? '')?.[1];
+      const hook = parseDeployHook(path ?? '');
+      expect(hook?.siteId).toBe(staging);
+      // The row the route reads, through the same client.
+      const { data } = await postgrestOver(db)
+        .from('sites')
+        .select('id, created_at')
+        .eq('id', staging)
+        .maybeSingle();
+      expect(
+        verifyDeployHook(hook!.signature, staging, data!.created_at as string, 'h'.repeat(40)),
+      ).toBe(true);
+      // With the RISK switch hiding staging deploys, the row is not drawn at all.
+      vi.stubEnv('V2_HIDE_FEATURES', 'staging_deploys');
+      const hidden = children(await open(kept)) as ReactElement<{
+        data: { settings: { rows: { label: string }[] } };
+      }>;
+      expect(hidden.props.data.settings.rows.map((r) => r.label)).not.toContain('Deploy hook');
+    } finally {
+      await db.query(`delete from public.sites where id = $1`, [staging]);
+      const b = before[0]!;
+      await db.query(
+        `update public.accounts set (${COLUMNS}) = ($2, $3, $4, $5, $6, $7, $8) where id = $1`,
+        [
+          accountId,
+          b.state,
+          b.tier,
+          b.site_limit,
+          b.seat_limit,
+          b.competitor_limit,
+          b.current_subscription_id,
+          JSON.stringify(b.state_history),
+        ],
+      );
+    }
   });
 
   it('a taken-down report of this host: the page offers no new public link', async () => {

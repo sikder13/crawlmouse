@@ -37,6 +37,7 @@
         "V2_CHECKS_PUBLIC",
         "TRIAL_LEDGER_PEPPER",
         "EMAIL_LINK_SECRET",
+        "DEPLOY_HOOK_SECRET",
         "V2_BILLING",
         "V2_AGENCY_SALES",
         "V2_BILLING_ONLY_USER",

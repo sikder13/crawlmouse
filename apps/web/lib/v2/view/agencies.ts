@@ -214,8 +214,14 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   staging: {
     status: 'coming',
     risk: 'staging_deploys',
-    what: 'Auditing a staging or preview URL before a deploy: a staging host is stored, but no check is requested for a deploy.',
-    proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: /trigger:\s*['"]deploy['"]/ },
+    // The deploy hook is built (row 20), but its row stays behind the RISK switch until its
+    // migration is applied. The step that takes the page's gate away flips this to `built`.
+    what: 'Auditing a staging URL on each deploy: the deploy hook is built, and the site page shows it only once `staging_deploys` is no longer hidden.',
+    proof: {
+      kind: 'holds',
+      path: 'apps/web/app/sites/[id]/page.tsx',
+      text: "featureShown('staging_deploys')",
+    },
     named: /staging|preview URLs?|before you deploy/i,
   },
   renders: {

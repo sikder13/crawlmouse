@@ -152,6 +152,8 @@ export interface SiteView {
       mono: boolean;
       muted: boolean;
       action: ActionView | null;
+      /** A credential in the value: the screen leaves it out of session recordings. */
+      secret?: true;
       /** The public link row's controls (F-123). */
       publicLink?: SitePublicLink;
     }[];
@@ -469,6 +471,11 @@ export interface SiteOptions {
   allFixes?: boolean;
   /** Whether a new public link may be offered (`siteLinkGate`). */
   link?: { gate: 'open' | 'withdrawn' | 'unknown'; hiddenCheckIds: readonly string[] };
+  /**
+   * The staging site's deploy hook address, which the page signs (lib/v2/account/deploy-hook);
+   * null when there is no staging site or no secret to sign it with.
+   */
+  deployHookUrl?: string | null;
 }
 
 export function siteView(
@@ -476,7 +483,11 @@ export function siteView(
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
-  { allFixes = false, link = { gate: 'open', hiddenCheckIds: [] } }: SiteOptions = {},
+  {
+    allFixes = false,
+    link = { gate: 'open', hiddenCheckIds: [] },
+    deployHookUrl = null,
+  }: SiteOptions = {},
 ): SiteView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
@@ -731,6 +742,19 @@ export function siteView(
                   },
                 ]),
               },
+              // Shown to the roles that run sites: the address is the credential that starts a check.
+              ...(staging && deployHookUrl && manage
+                ? [
+                    {
+                      label: SITE_COPY.deployHook,
+                      value: SITE_COPY.deployHookValue(deployHookUrl),
+                      mono: true,
+                      muted: false,
+                      action: null,
+                      secret: true as const,
+                    },
+                  ]
+                : []),
             ]
           : []),
         ...(publicLink?.public_slug ||

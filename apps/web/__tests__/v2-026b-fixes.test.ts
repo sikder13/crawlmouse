@@ -9,7 +9,7 @@ import {
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
-import { before, seedWorld, type World } from './helpers/v2-check-tables';
+import { before, seedWorld, through, type World } from './helpers/v2-check-tables';
 
 /**
  * Migration 20261112000001 section B (CC-26b D5): is_member_for_fix, mark_fix_done, and the grants of
@@ -273,7 +273,9 @@ describe('the migration applies twice and reverts section B to migration 008', (
   it('re-applying it changes nothing in the catalog', async () => {
     const d = await freshDb();
     try {
-      await applyAllMigrations(d);
+      // Up to and including this migration: a later one redefines request_capped_check (row 20's
+      // deploy checks), which re-applying this file would take back to its own definition.
+      await applyAllMigrations(d, undefined, through(MIGRATION));
       const once = await catalogSnapshot(d);
       await d.exec(readMigration(MIGRATION));
       expect(await catalogSnapshot(d)).toEqual(once);

@@ -252,6 +252,7 @@ describe('the finders see what they claim to see', () => {
       'app/api/fixes/[id]/done/route.ts',
       'app/api/fixes/[id]/email-developer/route.ts',
       'app/api/fixes/[id]/packet/route.ts',
+      'app/api/hooks/deploy/[hook]/route.ts',
       'app/api/me/route.ts',
       'app/api/report-files/[id]/download/route.ts',
       'app/api/report-files/[id]/share/route.ts',
