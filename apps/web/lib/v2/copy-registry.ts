@@ -89,6 +89,11 @@ export interface CopyChange {
    * 2026-11-08), so only the phone-width comparison applies the entry.
    */
   onlyOnPhone?: boolean;
+  /**
+   * Another reading of the same locked text, for a state the fixture the lock comparison renders
+   * does not reach (another plan, a switch hidden): listed with its source, never applied.
+   */
+  otherReading?: boolean;
 }
 
 /** Why a screen shows Agency's price where its artboard says $69 (CC-39 ruling 4). */
@@ -557,7 +562,10 @@ export function applyChanges(
 ): string {
   let text = locked;
   const applies = (x: CopyChange) =>
-    x.screen === screen && !(phone && x.hiddenOnPhone) && !(!phone && x.onlyOnPhone);
+    x.screen === screen &&
+    !x.otherReading &&
+    !(phone && x.hiddenOnPhone) &&
+    !(!phone && x.onlyOnPhone);
   for (const c of COPY_CHANGES.filter(applies)) {
     const from = squash(c.locked);
     if (!text.includes(from))
