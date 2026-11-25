@@ -241,6 +241,8 @@ describe('what each door rests on', () => {
       'Crawler access': { pages: { tested: 50, total: 214, groups: 4 } },
       'Readable without JavaScript': { pages: { tested: 50, total: 214, groups: 4 } },
       'Site structure': { pages: { tested: 214, total: 214, groups: 4 } },
+      // The audit's record holds 16 of the pages crawled, and says so.
+      'Broken links and page basics': { read: 'Checked 16 of the 214 pages crawled' },
       'Content an answer engine can quote': { pages: { tested: 214, total: 214, groups: 4 } },
       'Agent-readiness signals': { read: 'Tested 6 of 7 signals' },
       'What changed since last time': { read: 'No earlier audit of this site to compare with' },

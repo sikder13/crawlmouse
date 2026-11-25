@@ -245,6 +245,8 @@ export const ACCOUNT_NAV = [
   { label: 'Competitors', href: '/competitors' },
   { label: 'Reports', href: '/reports' },
   { label: 'Integrations', href: '/settings/integrations' },
+  // Not on the locked rail: /seats was reached only by typing it (D-24, F-287).
+  { label: 'Seats', href: '/seats' },
   { label: 'Settings', href: '/settings' },
 ] as const;
 

@@ -21,6 +21,7 @@ import { screenSignals } from '../view/screen-signals';
 import { accessView } from '../view/segment/access';
 import { changesView, type ChangeRowView } from '../view/segment/changes';
 import { contentView } from '../view/segment/content';
+import { linksView, type BasicsColumnView, type ErrorRowView } from '../view/segment/links';
 import { nojsView } from '../view/segment/nojs';
 import { signalsView } from '../view/segment/signals';
 import { structureView } from '../view/segment/structure';
@@ -48,6 +49,7 @@ function pagesOf({ dataset: d, checkId }: CheckRecords) {
     nojs: nojsView(d, checkId, PLAN),
     // No drawing: a document has the link map's figures, not its picture.
     structure: structureView(d, checkId, PLAN, null),
+    links: linksView(d, checkId, PLAN),
     content: contentView(d, checkId, PLAN),
     signals: signalsView(d, checkId, PLAN),
     partial: partialNotice(d, checkId),
@@ -150,6 +152,78 @@ function signalsSection({ signals: s }: Pages): DocSection {
   };
 }
 
+/** A title or description column: the first ten missing pages and shared texts, and the rest's count. */
+function basicsBlocks(col: BasicsColumnView): DocBlock[] {
+  return [
+    text(col.heading),
+    ...(col.missing.shown.length
+      ? [
+          {
+            type: 'table',
+            caption: col.missingLine,
+            columns: [COPY.page],
+            rows: col.missing.shown.map((p) => [p.path]),
+          } satisfies DocBlock,
+        ]
+      : [text(col.missingLine)]),
+    ...(col.missing.moreInApp ? [text(col.missing.moreInApp)] : []),
+    ...(col.shared.shown.length
+      ? [
+          {
+            type: 'table',
+            caption: col.sharedLine,
+            columns: [COPY.sharedText, COPY.pages],
+            rows: col.shared.shown.map((g) => [g.text, String(g.pageCount)]),
+          } satisfies DocBlock,
+        ]
+      : [text(col.sharedLine)]),
+    ...(col.shared.moreInApp ? [text(col.shared.moreInApp)] : []),
+  ];
+}
+
+/** A table of pages that answered an error: the page (and what redirects to it), status, links in. */
+const errorTable = (caption: string, pageHeader: string, rows: ErrorRowView[]): DocBlock => ({
+  type: 'table',
+  caption,
+  columns: [pageHeader, COPY.status, COPY.linkedFrom],
+  rows: rows.map((r) => [r.pageText, String(r.status), r.linkedAll]),
+});
+
+/**
+ * Broken links and page basics: the missing pages a link in the record leads to, with the pages of
+ * the record that link to them; the missing pages the record links to from 0 pages, and the pages
+ * that answered another error, each when there is one; the redirects; and the missing and shared titles and descriptions, ten of each.
+ */
+function linksSection({ links: l }: Pages): DocSection {
+  return {
+    heading: COPY.links,
+    blocks: [
+      text(l.headline.title),
+      text(l.body),
+      ...facts(l.tiles),
+      text(l.coverage.read),
+      l.broken.empty === null
+        ? errorTable(COPY.brokenLinks, COPY.missingPage, l.broken.rows)
+        : text(l.broken.empty),
+      ...(l.unlinked.rows.length
+        ? [errorTable(l.unlinked.heading, COPY.missingPage, l.unlinked.rows)]
+        : []),
+      ...(l.errors.rows.length ? [errorTable(l.errors.heading, COPY.page, l.errors.rows)] : []),
+      l.redirects.empty === null
+        ? {
+            type: 'table',
+            caption: COPY.redirects,
+            columns: [COPY.requestedAs, COPY.hops, COPY.endsAt],
+            rows: l.redirects.rows.map((r) => [r.path, r.hops, r.endsText]),
+          }
+        : text(l.redirects.empty),
+      ...basicsBlocks(l.titles),
+      ...basicsBlocks(l.descriptions),
+      text(l.headings),
+    ],
+  };
+}
+
 /** Each live fix in the audit's order, with its effect; null when the check found none. */
 function fixesSection(p: Pages): DocSection | null {
   if (p.result.fixes === null) return null;
@@ -212,6 +286,7 @@ export function auditDoc(records: CheckRecords, options: DocOptions): ReportDoc 
       accessSection(p),
       headOf(p.nojs.frame.title, p.nojs.headline, p.nojs.tiles),
       headOf(p.structure.frame.title, p.structure.headline, p.structure.tiles),
+      linksSection(p),
       headOf(p.content.frame.title, p.content.headline, p.content.tiles),
       signalsSection(p),
       ...(fixes ? [fixes] : []),

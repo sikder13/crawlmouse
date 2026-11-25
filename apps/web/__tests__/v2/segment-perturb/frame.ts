@@ -1,4 +1,5 @@
 import { siteOf } from '../../../lib/v2/fixtures';
+import { pageOf } from './links';
 import type { PerturbTable } from './types';
 
 export const FRAME_PERTURB: PerturbTable = {
@@ -10,6 +11,7 @@ export const FRAME_PERTURB: PerturbTable = {
           access: ['example-outdoors.com'],
           nojs: ['example-outdoors.com'],
           structure: ['example-outdoors.com'],
+          links: ['example-outdoors.com'],
           content: ['example-outdoors.com'],
           signals: ['example-outdoors.com'],
           changes: ['example-outdoors.com'],
@@ -26,6 +28,7 @@ export const FRAME_PERTURB: PerturbTable = {
           access: ['kept until 28 Oct, 09:00 UTC'],
           nojs: ['kept until 28 Oct, 09:00 UTC'],
           structure: ['kept until 28 Oct, 09:00 UTC'],
+          links: ['kept until 28 Oct, 09:00 UTC'],
           content: ['kept until 28 Oct, 09:00 UTC'],
           signals: ['kept until 28 Oct, 09:00 UTC'],
           changes: ['kept until 28 Oct, 09:00 UTC'],
@@ -39,6 +42,7 @@ export const FRAME_PERTURB: PerturbTable = {
           access: ['kept until 26 Oct, 02:36 UTC'],
           nojs: ['kept until 26 Oct, 02:36 UTC'],
           structure: ['kept until 26 Oct, 02:36 UTC'],
+          links: ['kept until 26 Oct, 02:36 UTC'],
           content: ['kept until 26 Oct, 02:36 UTC'],
           signals: ['kept until 26 Oct, 02:36 UTC'],
           changes: ['kept until 26 Oct, 02:36 UTC'],
@@ -62,11 +66,29 @@ export const FRAME_PERTURB: PerturbTable = {
       },
     ],
   },
+  'segment-next-links': {
+    'page_results[].status_code': [
+      {
+        change: (c, d) => (pageOf(c, d, '/products/trail-mug').status_code = 404),
+        expect: { structure: ['Next: Links and pages · 1 missing page'] },
+      },
+    ],
+    'link_edges[]': [
+      {
+        // A missing page whose links the record no longer holds is linked from 0 of its pages.
+        change: (c, d) => {
+          pageOf(c, d, '/products/trail-mug').status_code = 404;
+          d.link_edges = d.link_edges.filter((e) => e.check_id !== c.id);
+        },
+        expect: { structure: ['Next: Links and pages · 1 missing page'] },
+      },
+    ],
+  },
   'segment-next-content': {
     'checks[].content.score': [
       {
         change: (c) => (c.content!.score = 61),
-        expect: { structure: ['Next: Content an answer engine can quote · 61'] },
+        expect: { links: ['Next: Content an answer engine can quote · 61'] },
       },
     ],
   },

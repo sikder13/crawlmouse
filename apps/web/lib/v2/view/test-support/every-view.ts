@@ -15,6 +15,7 @@ import { contentView } from '../segment/content';
 import { nojsView } from '../segment/nojs';
 import { signalsView } from '../segment/signals';
 import { structureView } from '../segment/structure';
+import { linksView } from '../segment/links';
 
 export function everyView(d: ViewDataset, checkId: string) {
   const pages = d.page_results.filter((p) => p.check_id === checkId);
@@ -31,6 +32,7 @@ export function everyView(d: ViewDataset, checkId: string) {
     content: contentView(d, checkId),
     structure: structureView(d, checkId, {}, drawing),
     structureUndrawn: structureView(d, checkId, {}, null),
+    links: linksView(d, checkId),
     changes: changesView(d, checkId),
     mapHubs: linkMapView(d, checkId, { scope: 'hubs', drawing }),
     mapAll: linkMapView(d, checkId, { scope: 'all' }),

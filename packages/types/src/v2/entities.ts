@@ -158,6 +158,7 @@ export const ENTITIES: readonly EntityDoc[] = [
       'coverage.gradeable': 'brief',
       'coverage.excluded': 'brief',
       'coverage.excluded_by_robots': 'brief',
+      'coverage.stopped': 'Final-Result',
       'signals[].recommendation_class': 'PR #48',
       'stack.frontend.framework': 'PR #49',
       'technical_seo.site_structure_score': 'Final-Seg-Structure',
