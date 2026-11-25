@@ -10,7 +10,7 @@ import {
   BRAND_NAME_RULE,
   BRAND_SAVES_PER_HOUR,
 } from '@/lib/v2/agency/brand-rules';
-import { LOGO_BUCKET } from '@/lib/report-brand';
+import { LOGO_BUCKET, logoPublicUrl } from '@/lib/report-brand';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId, notFound, refuse } from '@/lib/v2/account/route';
@@ -96,9 +96,20 @@ function isDuplicate(e: { statusCode?: unknown; status?: unknown }): boolean {
 }
 
 /**
+ * The stored logo's public URL, as the account dataset derives it (lib/v2/account/rows.ts): null
+ * with no logo, and null unless `logoPublicUrl` builds an https URL for it.
+ */
+function storedLogoUrl(path: string | null): string | null {
+  if (path === null) return null;
+  const url = logoPublicUrl(path);
+  return url !== null && url.startsWith('https://') ? url : null;
+}
+
+/**
  * Set an Agency account's white-label brand (Goal 1 row 24). The account is named in the query
  * string (`?account=<uuid>`); the multipart body carries `agencyName` and an optional `logo` file,
- * and any `accountId` field in it is never read. Each step refuses before the next runs, the body is
+ * and any `accountId` field in it is never read. A save answers `{ agencyName, logoPath, logoUrl }`,
+ * `logoUrl` the stored logo's https URL or null. Each step refuses before the next runs, the body is
  * not read until the caller's role, tier and rate limit have passed, and nothing is written until
  * every check has. The middleware has already refused a cross-site request (route-policy: strict).
  */
@@ -222,5 +233,9 @@ export async function POST(req: Request) {
     return refuse(500, 'save_failed');
   }
   const saved = data as { agency_name: string; logo_path: string | null };
-  return Response.json({ agencyName: saved.agency_name, logoPath: saved.logo_path });
+  return Response.json({
+    agencyName: saved.agency_name,
+    logoPath: saved.logo_path,
+    logoUrl: storedLogoUrl(saved.logo_path),
+  });
 }

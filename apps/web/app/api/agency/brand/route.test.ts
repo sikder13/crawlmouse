@@ -282,8 +282,12 @@ function expectNoWrite() {
   expect(h.upserts).toEqual([]);
 }
 
+/** The storage base the stored logo's URL is built on (lib/report-brand.ts `logoPublicUrl`). */
+const STORAGE = 'https://ref.supabase.co/storage/v1/object/public/report-logos';
+
 beforeEach(() => {
   vi.stubEnv('V2_ACCOUNT_DOOR', '1');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://ref.supabase.co');
   h.user = { id: 'u-1', email: 'a@b.co' };
   h.roles = { [ACCOUNT]: 'owner' };
   h.roleError = null;
@@ -756,7 +760,11 @@ describe('9. write', () => {
         opts: { onConflict: 'account_id' },
       },
     ]);
-    expect(await res.json()).toEqual({ agencyName: 'Acme Agency', logoPath: expected });
+    expect(await res.json()).toEqual({
+      agencyName: 'Acme Agency',
+      logoPath: expected,
+      logoUrl: `${STORAGE}/${expected}`,
+    });
   });
 
   it('reuses a path that already holds the same bytes rather than overwriting it', async () => {
@@ -772,6 +780,7 @@ describe('9. write', () => {
     expect(await res.json()).toEqual({
       agencyName: 'Acme Agency',
       logoPath: `agency/${ACCOUNT}/${sha16(bytes)}.png`,
+      logoUrl: `${STORAGE}/agency/${ACCOUNT}/${sha16(bytes)}.png`,
     });
   });
 
@@ -781,7 +790,28 @@ describe('9. write', () => {
     expect(res.status).toBe(200);
     expect(h.uploads).toEqual([]);
     expect(h.upserts[0]?.row).not.toHaveProperty('logo_path');
-    expect(await res.json()).toEqual({ agencyName: 'Acme Agency', logoPath: h.storedLogo });
+    expect(await res.json()).toEqual({
+      agencyName: 'Acme Agency',
+      logoPath: h.storedLogo,
+      logoUrl: `${STORAGE}/${h.storedLogo}`,
+    });
+  });
+
+  it('answers logoUrl null with no stored logo, and when no https URL can be built', async () => {
+    h.storedLogo = null;
+    expect(await (await post()).json()).toEqual({
+      agencyName: 'Acme Agency',
+      logoPath: null,
+      logoUrl: null,
+    });
+    h.buckets = new Map();
+    h.storedLogo = `agency/${ACCOUNT}/0123456789abcdef.webp`;
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://127.0.0.1:54321');
+    expect(await (await post()).json()).toEqual({
+      agencyName: 'Acme Agency',
+      logoPath: h.storedLogo,
+      logoUrl: null,
+    });
   });
 
   it('an empty file field (no bytes, no file name) is no logo: the name is saved, not a 400', async () => {
@@ -799,7 +829,11 @@ describe('9. write', () => {
     expect(h.uploads).toEqual([]);
     expect(h.validateCalls).toBe(0);
     expect(h.upserts[0]?.row).not.toHaveProperty('logo_path');
-    expect(await res.json()).toEqual({ agencyName: 'Acme Agency', logoPath: h.storedLogo });
+    expect(await res.json()).toEqual({
+      agencyName: 'Acme Agency',
+      logoPath: h.storedLogo,
+      logoUrl: `${STORAGE}/${h.storedLogo}`,
+    });
   });
 
   it('an empty file that has a name is still refused by the validator (the control)', async () => {
