@@ -49,12 +49,12 @@ describe('the site page', () => {
 
   it('the dashboard’s set-up line says the same time', () => {
     const line = dashboardView(bad, viewer, next).setup!.schedule!.label;
-    expect(line).toBe('Choose the day and hour the weekly check runs (now Fri around 06:37)');
+    expect(line).toBe('Choose the day and hour the weekly check runs (now Fri around 06:37 EST)');
   });
 
   it('the dashboard’s set-up line keeps the chosen hour with no scheduler time', () => {
     expect(dashboardView(bad, viewer).setup!.schedule!.label).toBe(
-      'Choose the day and hour the weekly check runs (now Fri around 06:00)',
+      'Choose the day and hour the weekly check runs (now Fri around 06:00 EST)',
     );
   });
 

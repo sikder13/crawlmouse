@@ -11,6 +11,9 @@ import {
   SHAPES,
   BUSY_PER_POST_MAX,
   MAX_SECONDS,
+  MODEL_FINISH_S,
+  MODEL_PAGE_CAP,
+  MODEL_PLAN,
   SEARCH,
   checkExecutions,
   cronPerDay,
@@ -78,7 +81,7 @@ describe('the function rows against the code', () => {
       const declared = count(code(readFileSync(join(ROOT, file), 'utf8')), ON_FAILURE);
       expect(FUNCTIONS.filter((f) => f.file === file && f.onFailure).length, file).toBe(declared);
     }
-    // Independent of the regex: inngest/audit.ts:411, inngest/check.ts:376 and CC-33's three in
+    // Independent of the regex: inngest/audit.ts:411, inngest/check.ts:551 and CC-33's three in
     // inngest/founder.ts (66, 92, 105) declare it, nothing else.
     expect(
       FUNCTIONS.filter((f) => f.onFailure)
@@ -145,7 +148,7 @@ describe('the function rows against the code', () => {
   const HAND: Record<string, number> = {
     'inngest/audit.ts': 5, // 357 361 376 378 386
     'inngest/billing.ts': 5, // 65 77 95 116 120
-    'inngest/check.ts': 16, // 264 268 276 336 380 389 444 485 550 551 561 562 563 564 617 619
+    'inngest/check.ts': 16, // 293 297 305 367 411 420 475 516 581 582 592 593 594 595 648 650
     'inngest/check-reaper.ts': 1, // 39
     'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113
@@ -313,7 +316,7 @@ describe('a check against a worker that answers busy, runs long or loses a batch
     expect(await checkExecutions({ ...one, readFailsFirst: true })).toBe(18 + 2 * 4);
   });
 
-  it('stops counting at the sleep that passes the finish timeout', async () => {
+  it('stops counting at the sleep that passes the check’s own finish', async () => {
     // Hand count: run 1; claim 1 and five waits of 60 s (sleep + claim) 10, now 300 s; discover 1;
     // crawl-1-post busy 30 times (30 posts, 30 sleeps of 30 s) and taken at the 31st post: 61, now
     // 1,200 s; polls 5, 15, 35, 65, …, 305 s after the post (12 sleeps, 12 polls), done at the
@@ -326,7 +329,7 @@ describe('a check against a worker that answers busy, runs long or loses a batch
       busyPerPost: BUSY_PER_POST_MAX,
       batchSeconds: MAX_SECONDS + PACE.pollGraceS - 1,
     };
-    expect(PACE.finishS).toBe(2220);
+    expect(MODEL_FINISH_S).toBe(2220);
     expect(await checkExecutions(cut)).toBe(147);
   });
 
@@ -341,6 +344,19 @@ describe('a check against a worker that answers busy, runs long or loses a batch
       }
     expect(shape.why).toMatch(/Not a bound/);
     expect(shape.why).not.toMatch(/the constants' bound/);
+  });
+
+  it("copies a 500-page check's plan from the pipeline's limits, and cuts the run at its end", () => {
+    const limits = readFileSync(join(ROOT, 'apps/web/lib/v2/pipeline/limits.ts'), 'utf8');
+    const named = (name: string) =>
+      Number(new RegExp(`export const ${name} = (\\d+);`).exec(limits)?.[1]);
+    expect(MODEL_PLAN).toEqual({
+      crawlS: named('CRAWL_CEILING_S'),
+      accessS: named('ACCESS_SLICE_S'),
+      reserveS: named('RESERVE_S'),
+    });
+    expect(MODEL_FINISH_S).toBe(2220);
+    expect(MODEL_PAGE_CAP).toBe(named('DEFAULT_PAGE_CAP'));
   });
 
   it("copies max_seconds from the pipeline's limits", () => {

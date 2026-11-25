@@ -202,12 +202,15 @@ flyctl logs --app crawlmouse-worker-staging
 ```
 
 The worker logs JSON lines: `reader_started` (the page reader thread is up; the worker does not
-listen without it), `listening`, `batch_accepted`, `batch_done` (with requests and any partial
-reasons), `batch_failed`, `request_failed`, `stopping`. It does not log URLs, headers,
+listen without it), `measure_reader_started` (the same, for the thread rendered pages are measured
+on), `listening`, `batch_accepted`, `batch_done` (with requests and any partial
+reasons), `batch_failed`, `request_failed`, `measure_threw` (a rendered page's read threw on the measure thread), `stopping`. It does not log URLs, headers,
 secrets or JWTs. `GET /metrics` is signed with the signing secret, purpose `metrics`; it gives
 memory (resident now, peak resident since the process started, heap used), event-loop lag p99 since
 start, batches running and stored, requests started per site, and `reader_restarts`: page reader threads
-started to replace one that died or passed a read's deadline.
+started to replace one that died or passed a read's deadline. `measure_reader_restarts` counts the
+same for the measure thread, which POST /render/measure reads on so that a slow rendered page never
+holds up a crawl read. Each thread's old space is `READER_HEAP_MB` (192 MiB, `src/reader/thread-reader.ts`).
 To read it without handling the secret, sign it inside the machine:
 
 ```bash
@@ -326,16 +329,43 @@ Levels run: 4, 8, 16. The largest result the load test measured is 8.36 MiB; 16 
 ### The done signal (PR 5a)
 
 The worker can tell the app when a batch ends, so a check reads it at once instead of at its next poll.
-Set the app's route as a secret on each worker. The address differs per worker, so it cannot live in
-`fly.toml`, which must match `fly.production.toml`:
+
+**Production: nothing to set.** `fly.toml` and `fly.production.toml` both carry
+`APP_SIGNAL_URL = "https://crawlmouse.com/api/webhooks/worker"` under `[env]`. It is an address, not a
+secret, and the two files may differ only in `app` (`src/fly-production.test.ts`). It is the apex, because
+the worker refuses a redirect and `www` answers 308. The app verifies each note with
+`WORKER_SIGNING_SECRET`, which production's app already holds to sign batch posts (F-332). Until the
+production worker is redeployed from a commit with the line, it sends nothing and checks poll.
+
+**Staging: its own address, as a Fly secret.** A Fly secret takes precedence over an `[env]` variable of
+the same name, so the staging worker keeps the route of its staging app:
 
 ```bash
-flyctl secrets set APP_SIGNAL_URL=https://<the app's host>/api/webhooks/worker --app <the worker's app>
+flyctl secrets set APP_SIGNAL_URL=https://<the staging app's host>/api/webhooks/worker --app crawlmouse-worker-staging
 ```
 
-Until it is set the worker sends nothing and checks poll as before, so the app and the worker can deploy
-in either order. To turn it off, unset the secret. Verify:
-`pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts src/signal-config.test.ts`.
+Unset on staging, that secret would let the `[env]` value through: the staging worker would send its
+notes to production's route, which verifies each with production's `WORKER_SIGNING_SECRET`, and a note
+names a staging check, which no production run waits on. To turn the signal off on a worker, set
+`APP_SIGNAL_URL` to a Fly secret that is not an https address, `off` say: the worker reads it as unset
+(`httpsUrl`, `src/config.ts`). Verify:
+`pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts src/signal-config.test.ts src/deploy-files.test.ts src/fly-production.test.ts`.
+
+**When batches are slow, look in this order** (F-331, F-332):
+
+1. **Per crawl batch, compare `finished_at − posted_at` with the summary's `idle_ms_total + fetch_ms_total`:**
+   `select batch, extract(epoch from finished_at - posted_at) as wall_s, ((summary->'timing'->>'idle_ms_total')::numeric + (summary->'timing'->>'fetch_ms_total')::numeric)/1000 as worker_s from crawl_batches where check_id = '<id>' and kind = 'crawl' order by batch;`
+   With the signal heard, the gap is about a second.
+2. **A gap that lands on the poll times means the run polled** (`cadenceFor` and the wait in `inngest/check.ts`):
+   - **For a check of 500 pages or fewer,** the run asks at 5, 15, 35 and 65 s after the post, then every 30 s.
+   - **Above 500 pages,** it asks at 10, 30, 70 and 130 s, then every 60 s.
+   - **A first batch that waited the full timeout before its first poll** (30 s, or 60 s above 500 pages) and every later batch polled is a signal that did not reach the run.
+3. **The route's requests in Vercel, for `/api/webhooks/worker` on that deployment:** two per batch (the repeat), answered 204.
+   - **None:** the worker sends nothing. Check its `APP_SIGNAL_URL` (`fly secrets list` and `fly config show` for its app).
+   - **401:** the two `WORKER_SIGNING_SECRET`s differ.
+   - **400:** a note the parser refuses.
+4. **The worker's own log:** `signal_refused` with the status it got, or `signal_failed` when nothing answered within 3 s. An accepted signal is not logged.
+5. **Requests answered 204 and the run still polls:** read Inngest's status page (status.inngest.com) for delayed `waitForEvent` resumes, then the run's timeline. For each batch the step `crawl-<n>-done-<k>` either timed out or matched.
 
 **Staging only.** The staging app is behind Vercel Deployment Protection, which answers the worker's
 POST with 401 before it reaches the route. Give the staging worker the automation bypass as its own

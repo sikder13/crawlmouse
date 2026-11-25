@@ -335,7 +335,13 @@
             "count": 6
           }
         ],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": true
+        }
       },
       "technical_seo": {
         "score": 67,
@@ -722,7 +728,13 @@
             "count": 6
           }
         ],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": true
+        }
       },
       "technical_seo": {
         "score": 66,
@@ -1158,7 +1170,13 @@
         },
         "gradeable": 52,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 91,
@@ -1367,7 +1385,13 @@
         },
         "gradeable": 52,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 91,

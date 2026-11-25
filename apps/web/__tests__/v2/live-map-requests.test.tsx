@@ -287,3 +287,37 @@ describe('the screen scale a move is measured in', () => {
     expect(land(2.5)).toEqual({ moved: false, draw: 0 });
   });
 });
+
+// c/027 B: at most LIVE_MAP_MAX_NODES pages are drawn, the label says how many are not, and a page
+// drawn once stays drawn while the crawl adds and links more.
+describe('the live map’s cap', () => {
+  const drawnIds = () =>
+    [...document.querySelectorAll('[data-v2-node]')].map((el) => el.getAttribute('data-v2-node'));
+  const label = () => document.querySelector('[data-v2-map]')!.getAttribute('aria-label')!;
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => page(`https://x.test/p${i}`, HOME));
+
+  it('draws 500 of 650 pages and says how many it does not', () => {
+    render([page(HOME, null), ...many(649)], { final: false, complete: false });
+    expect(drawnIds()).toHaveLength(500);
+    expect(label()).toContain('500 pages reached so far');
+    expect(label()).toContain('150 more pages reached, not drawn');
+  });
+
+  it('keeps every page it drew when a page linked late joins earlier in the list', () => {
+    const before = [page(HOME, null), ...many(599)];
+    render(before, { final: false, complete: false });
+    const drawn = drawnIds();
+    // A page fetched early whose first link arrives only now: it sits second in the list.
+    const late = page('https://x.test/late', HOME);
+    render([before[0]!, late, ...before.slice(1)], { final: false, complete: false });
+    expect(drawnIds()).toEqual(drawn);
+    expect(label()).toContain('101 more pages reached, not drawn');
+  });
+
+  it('says nothing of a cap under it', () => {
+    render([page(HOME, null), ...many(40)], { final: false, complete: false });
+    expect(drawnIds()).toHaveLength(41);
+    expect(label()).not.toContain('not drawn');
+  });
+});
