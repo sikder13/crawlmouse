@@ -63,6 +63,23 @@
   font-weight: 500;
 }
 
+/* In light the current entry's fill is the rail's own colour (--v2-s2 and --v2-railbg are both
+   #f1f3f6), so weight alone marked it (D-41). A bar in the text colour marks it as well: #13161b on
+   #f1f3f6 is far above 3:1. Dark keeps its filled row, which differs from its rail, and no bar. */
+.current {
+  box-shadow: inset 3px 0 0 var(--v2-fg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .current {
+    box-shadow: none;
+  }
+}
+
+:root[data-theme='dark'] .current {
+  box-shadow: none;
+}
+
 .count {
   margin-left: auto;
   font-family: var(--v2-font-mono);
