@@ -49,7 +49,7 @@ describe('the set-up card (home)', () => {
     const table = setup.querySelector('table[aria-label="Set-up"]')!;
     expect(table.textContent).not.toContain('Choose the day and hour');
     expect(setup.querySelector('[data-v2-setup-schedule]')!.textContent).toBe(
-      'Choose the day and hour the weekly check runs (now Fri around 06:00)Set the day',
+      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00)Set the day',
     );
   });
 });
@@ -97,9 +97,9 @@ describe('the health tile with no site carrying both grades (D-10)', () => {
     }
     const doc = dom(dashboardView(copy, viewer));
     const value = doc.querySelector('[data-v2-health-value]')!;
-    expect(value.textContent).toBe('79');
+    expect(value.textContent).toBe('78');
     expect(value.parentElement!.previousElementSibling!.textContent).toBe(
-      'Technical SEO, mean of 5 sites · no site has both grades',
+      'Technical SEO, mean of 4 sites · no site has both grades',
     );
   });
 });
@@ -117,7 +117,7 @@ describe('the set-up links land on the site page’s settings card (D-15)', () =
   });
 });
 
-describe('no control on a dashboard preview goes nowhere', () => {
+describe('on each dashboard preview: no empty or bare-# href, no link off-site, no button outside a form', () => {
   const previews: Record<string, () => Data> = {
     day0: () => dashboardPreview('day0'),
     home: () => dashboardPreview('home'),

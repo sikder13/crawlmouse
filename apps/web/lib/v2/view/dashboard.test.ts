@@ -250,11 +250,12 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     }
     const h = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).strip!.health;
     expect(h.value).toBe('—');
-    expect(h.excluded).toBe('5 sites excluded: AI readability withheld');
-    // 79 + 84 + 74 + 73 + 86 = 396 / 5 = 79.2 → 79.
+    // The four sites that hold a slot, the staging copy left out (B1, F-097).
+    expect(h.excluded).toBe('AI readability withheld on 4 sites');
+    // 79 + 84 + 74 + 73 = 310 / 4 = 77.5 → 78.
     expect(h.seoOnly).toEqual({
-      label: 'Technical SEO, mean of 5 sites · no site has both grades',
-      value: '79',
+      label: 'Technical SEO, mean of 4 sites · no site has both grades',
+      value: '78',
     });
   });
 
@@ -268,7 +269,7 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     }
     expect(v.setup!.title).toBe('Everything is set up');
     expect(v.setup!.schedule!.label).toBe(
-      'Choose the day and hour the weekly check runs (now Fri around 06:00)',
+      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00)',
     );
   });
 
@@ -285,10 +286,56 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     );
   });
 
-  it('D-16: the trial offer names no competitor while competitors are not built', () => {
+  it('D-16, M5: the trial offer names neither competitors nor Slack while neither is offered', () => {
     expect(dashboardPreview('clean').startPro!.body).toBe(
-      'Weekly checks, every fix with its packet and Slack alerts, on up to 5 sites, for 14 days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.',
+      'Weekly checks and every fix with its packet, on up to 5 sites, for 14 days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.',
     );
+  });
+
+  it('M1: with no row listed, the set-up card claims nothing done', () => {
+    const copy = structuredClone(bad);
+    for (const a of copy.accounts) {
+      a.integrations = a.integrations.map((i) => ({ ...i, connected: false }));
+    }
+    const s = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).setup!;
+    expect(s.items).toEqual([]);
+    expect(s.title).toBe('Weekly check schedule');
+    expect(s.schedule!.label).toBe(
+      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00)',
+    );
+  });
+
+  it('(8) day 0 with every listed row done says so, not "Worth doing while Pro is on"', () => {
+    expect(day0().setup!.items.map((i) => i.done)).toEqual([true]);
+    expect(day0().setup!.title).toBe('Everything is set up');
+  });
+
+  it('M4: a staging copy’s check is never the "last check"', () => {
+    const copy = structuredClone(bad);
+    // staging.example-outfitter.dev's latest moved to 10:04Z (06:04), after every primary site's.
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-00000000002a')!.finished_at =
+      '2026-10-30T10:04:00Z';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.header.line).toContain('last check today 06:02');
+  });
+
+  it('M2: a first site with one result lists its own blocks, since no panel is drawn', () => {
+    const copy = structuredClone(bad);
+    // Only the first audit stays a result; the later five checks of example-outfitter.com failed.
+    for (const id of [2, 3, 4, 5, 6]) {
+      copy.checks.find((c) => c.id === `c0000000-0000-4000-8000-00000000000${id}`)!.status =
+        'failed';
+    }
+    copy.checks
+      .find((c) => c.id === 'c0000000-0000-4000-8000-000000000001')!
+      .crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'disallowed_by_robots';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.history).toBeNull();
+    expect(w.crawlersSite).toBeNull();
+    expect(w.blockedTitle).toBe('AI crawlers blocked on your sites');
+    expect(w.blockedElsewhere.map((b) => [b.host, b.ua])).toEqual([
+      ['example-outfitter.com', 'GPTBot'],
+    ]);
   });
 
   it('D-15: the schedule link opens the first site’s settings card by its anchor', () => {
@@ -307,7 +354,7 @@ describe('Dashboard, day 0: the moment the account begins', () => {
     expect(v.changed).toEqual([]);
     expect(v.header.title).toBe('example-outfitter.com is kept.');
     expect(v.header.line).toBe(
-      'Sat 24 Oct · 1 site · audited 22:34 · next weekly check Fri 30 Oct around 06:00 · trial ends Sat 7 Nov',
+      'Sat 24 Oct · 1 site · audited today 22:34 · next weekly check Fri 30 Oct around 06:00 · trial ends Sat 7 Nov',
     );
     expect(v.sites.rows.map((r) => r.sinceLabel)).toEqual(['first audit · 13 fixes']);
     reconciles(v);

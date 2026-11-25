@@ -10,11 +10,22 @@ import { ALERTS_SENDER } from '../../auth/constants';
 import { TRIAL_DAYS } from './account';
 import { formatPlanPrice } from './plan-price';
 
-/** ", Slack alerts and one competitor per site", or " and Slack alerts" with no competitor offered. */
-const planExtras = (competitors: number) =>
-  competitors > 0
-    ? `, Slack alerts and ${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site`
-    : ' and Slack alerts';
+/**
+ * What a plan's offer lists, each part only where it is offered (D-16, M5): "Weekly checks, every
+ * fix with its packet, Slack alerts and one competitor per site", or "Weekly checks and every fix with
+ * its packet" with neither Slack nor competitors offered.
+ */
+const planParts = (checks: string, slack: boolean, competitors: number) => {
+  const parts = [
+    checks,
+    'every fix with its packet',
+    slack ? 'Slack alerts' : null,
+    competitors > 0
+      ? `${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site`
+      : null,
+  ].filter((p): p is string => p !== null);
+  return `${parts.filter((_, i) => i < parts.length - 1).join(', ')} and ${parts.at(-1)}`;
+};
 
 export const DASHBOARD_COPY = {
   /** The heading: the site, or with several, the account's count of them (F-118). */
@@ -57,6 +68,10 @@ export const DASHBOARD_COPY = {
   topFixesFoot: (rest: number, open: string) =>
     `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}.${rest === 0 ? '' : ` The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`}`,
   setupTrialTitle: 'Worth doing while Pro is on',
+  /** The set-up card with no item listed, only the schedule line (M1): it claims nothing done. */
+  setupScheduleTitle: 'Weekly check schedule',
+  /** The tile's line when it shows the Technical SEO mean: what is withheld, and on how many. */
+  withheldOn: (n: number) => `AI readability withheld on ${n} ${plural(n, 'site', 'sites')}`,
   setupLeftTitle: (n: number) =>
     n === 0
       ? 'Everything is set up'
@@ -86,8 +101,8 @@ export const DASHBOARD_COPY = {
   startProTitle: (days: number) => `Start ${days} days of Pro`,
   startProHeading: 'Weekly checks and every fix, if you want them',
   /** `competitors` is 0 where competitors are not offered (built and shown, D-16): no clause. */
-  startProBody: (days: number, competitors: number, sites: number) =>
-    `Weekly checks, every fix with its packet${planExtras(competitors)}, on up to ${sites} sites, for ${days} days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.`,
+  startProBody: (days: number, competitors: number, sites: number, slack = true) =>
+    `${planParts('Weekly checks', slack, competitors)}, on up to ${sites} sites, for ${days} days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.`,
   sitesFirstRun: (free: string) => `Checked weekly for ${TRIAL_DAYS} days, then ${free} on Free`,
   /** Day 0 with no site yet: the account exists, nothing is watched. */
   noSiteTitle: 'Add the site to watch',
@@ -105,8 +120,9 @@ export const DASHBOARD_COPY = {
     competitors: number,
     sites: number,
     noCard: boolean,
+    slack = true,
   ) =>
-    `You have ${plan} until ${until}: ${schedule} checks, every fix with its packet${planExtras(competitors)}, on up to ${sites} sites.${noCard ? ' No card.' : ''}`,
+    `You have ${plan} until ${until}: ${planParts(`${schedule} checks`, slack, competitors)}, on up to ${sites} sites.${noCard ? ' No card.' : ''}`,
   /** The email-a-developer form's one field, on a live page. */
   developerField: { label: 'Developer’s email', placeholder: 'dev@example.com' },
   /** Copy fix on a live page: what the status line says. */
@@ -179,7 +195,8 @@ export const SETUP_COPY = {
     todo: `Connect ${OBSERVED} to see what the AI crawlers actually fetched`,
     done: 'Observed crawler activity connected',
   },
-  schedule: (when: string) => `Choose the day and hour the weekly check runs (now ${when})`,
+  schedule: (host: string, when: string) =>
+    `Choose the day and hour ${host} is checked weekly (now ${when})`,
 };
 
 // ── Where the dashboards differ from their locked HTML ─────────────────────────────────────
@@ -251,7 +268,7 @@ const DAY0: CopyChange[] = [
     screen: 'dashboard-day0',
     kind: 'facts',
     locked: 'Sun 25 Oct · 1 site · audited 02:34 UTC',
-    rendered: 'Sat 24 Oct · 1 site · audited 22:34',
+    rendered: 'Sat 24 Oct · 1 site · audited today 22:34',
     source: `${ZONE}. Day 0 is read when the account begins, 25 Oct 02:41Z (Q9, owner ruling), Sat 24 Oct there; the first audit finished 02:34Z, 22:34 there`,
   },
   {
@@ -394,6 +411,14 @@ const DAY0: CopyChange[] = [
     rendered: 'from their collections · about 20 minutes +4 SEO',
     source:
       'Owner ruling 2026-11-08 (ruling 1): the effort is data, so a phone shows it, where the locked page hides it',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Worth doing while Pro is on',
+    rendered: 'Everything is set up',
+    source:
+      'V2R register, F-269 (QA dashboard walk D-06, review M1): the title claims only what the card lists, and its one listed row, Slack, is connected',
   },
 ];
 
@@ -606,6 +631,14 @@ const HOME: CopyChange[] = [
       'example-outfitter.com vs summitgear.co Change You summitgear.co Crawlers with full access 2 / 6 6 / 6 Text readable without JavaScript 31% 96% Product schema ● yes ● yes Technical SEO B · 79 B- · 72',
     rendered: '',
     source: 'CC-26 brief, out of scope: competitor data is a later step; this card is not built',
+  },
+  {
+    screen: 'dashboard',
+    kind: 'ruling',
+    locked: 'Choose the day and hour the weekly check runs',
+    rendered: 'Choose the day and hour example-outfitter.com is checked weekly',
+    source:
+      'V2R register, F-279 (review M6): the schedule line names the site whose schedule it sets, from the data',
   },
 ];
 

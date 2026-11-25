@@ -312,9 +312,12 @@ function sinceCheck(v: AccountView): Check | null {
   );
 }
 
-/** The newest result of any site. */
+/**
+ * The newest result of any site that holds a slot: a staging copy is never counted (F-097; A1's
+ * rule for the header's "last check", D-05).
+ */
 const newestResult = (v: AccountView) =>
-  v.d.sites
+  primarySites(v)
     .map((s) => latest(v, s.id))
     .filter((c): c is Check => c !== null)
     .sort((a, b) => instant(b.finished_at!) - instant(a.finished_at!))[0] ?? null;
@@ -445,12 +448,19 @@ function healthAt(v: AccountView) {
   const values = new Map<string, [number, number]>();
   const left: Record<string, number> = {};
   const leave = (why: string) => (left[why] = (left[why] ?? 0) + 1);
+  // A staging copy holds no slot, so it is not counted among the sites left out (F-097). The mean
+  // itself still reads every site carrying both grades, as it did: what it averages is unchanged.
+  const primary = new Set(primarySites(v).map((s) => s.id));
   for (const s of v.d.sites) {
     const c = latest(v, s.id);
-    if (!c) leave('no finished check yet');
-    else if (c.ai_readability?.withheld) leave('AI readability withheld');
-    else if (!bothGrades(c)) leave('Technical SEO not graded');
-    else values.set(s.id, [seoOf(c)!.score, aiOf(c)!.score]);
+    const counted = primary.has(s.id);
+    if (!c) {
+      if (counted) leave('no finished check yet');
+    } else if (c.ai_readability?.withheld) {
+      if (counted) leave('AI readability withheld');
+    } else if (!bothGrades(c)) {
+      if (counted) leave('Technical SEO not graded');
+    } else values.set(s.id, [seoOf(c)!.score, aiOf(c)!.score]);
   }
   return { values, left };
 }
@@ -536,7 +546,8 @@ function health(d: AccountDataset, viewer: Viewer, v: AccountView): HealthView {
     }
   }
   // No site carries both grades: the tile shows the Technical SEO mean, labelled as that (D-10).
-  const seoScores = v.d.sites.flatMap((s) => {
+  // Over the sites that hold a slot, as the header counts them: a staging copy is not averaged in.
+  const seoScores = primarySites(v).flatMap((s) => {
     const c = latest(v, s.id);
     const seo = c ? seoOf(c) : null;
     return seo ? [seo.score] : [];
@@ -548,11 +559,15 @@ function health(d: AccountDataset, viewer: Viewer, v: AccountView): HealthView {
           value: String(Math.round(seoScores.reduce((a, b) => a + b, 0) / seoScores.length)),
         }
       : null;
+  // Beside a Technical SEO mean, "N sites excluded" would read as left out of that mean: say instead
+  // what is withheld, and where (minor 1).
+  const withheldOn = now.left['AI readability withheld'] ?? 0;
   return {
     value: value === null ? '—' : String(value),
     delta,
     deltaTone,
-    excluded,
+    excluded:
+      seoOnly && withheldOn && reasons.length === 1 ? COPY.withheldOn(withheldOn) : excluded,
     fresh,
     seoOnly,
   };
@@ -815,6 +830,7 @@ function setup(
       ? {
           key: 'schedule',
           label: SETUP_COPY.schedule(
+            site.host,
             `${['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][sch.iso_weekday!]} around ${time}`,
           ),
           done: false,
@@ -824,7 +840,15 @@ function setup(
   // Nothing offered and no schedule to set: no card.
   if (!items.length && !schedule) return null;
   return {
-    title: firstRun && trial ? COPY.setupTrialTitle : COPY.setupLeftTitle(left),
+    // A title claims only what the card lists: no row, the schedule's own title; every row done,
+    // "Everything is set up"; otherwise the rows left, or the trial's offer (M1, F-269).
+    title: !items.length
+      ? COPY.setupScheduleTitle
+      : left === 0
+        ? COPY.setupLeftTitle(0)
+        : firstRun && trial
+          ? COPY.setupTrialTitle
+          : COPY.setupLeftTitle(left),
     items,
     schedule,
     foot:
@@ -879,6 +903,7 @@ function startPro(v: AccountView, features: Features): DashboardView['startPro']
           TRIAL_DAYS,
           competitorsOffered(GATES.pro.competitorsPerSite, features),
           GATES.pro.sites,
+          offered('slack_alerts', 'integrations', false, features),
         ),
         start: action(
           'startTrial',
@@ -983,6 +1008,8 @@ function noSiteView(
               competitorsOffered(v.account.limits.competitors_per_site, features),
               v.account.limits.sites,
               !v.cardOnFile && v.account.renews_at === null,
+              // Slack is named only where the set-up card would offer it (M5, D-16).
+              offered('slack_alerts', 'integrations', false, features),
             )} ${COPY.noSiteNote}`
           : COPY.noSiteNote,
     },
@@ -1079,7 +1106,8 @@ export function dashboardView(
         line: [
           dayDate(v.now, zone),
           sitesWord,
-          result ? `audited ${hourMinute(result.finished_at!, zone)}` : null,
+          // The newest result of any primary site, with its day when not today (M3, D-05).
+          newestResult(v) ? `audited ${whenAgo(newestResult(v)!.finished_at!, v)}` : null,
           ...flight,
           nextText,
           trialEnds,
@@ -1155,6 +1183,10 @@ export function dashboardView(
       };
 
   const now = result && !firstRun ? crawlerOrder(result) : null;
+  const historyView = firstRun ? null : history(v, primary);
+  // The two crawler panels are drawn only beside the history chart (DashboardScreen): a first site
+  // with one result has neither, so its blocks are listed with the other sites' (M2, D-09).
+  const panels = now !== null && historyView !== null;
   const byCheck = firstRun ? null : crawlersByCheck(v, primary);
   const legendVerdicts = [
     ...new Set((byCheck ?? []).flatMap((r) => r.verdicts).filter((x): x is Verdict => x !== null)),
@@ -1178,13 +1210,13 @@ export function dashboardView(
     header,
     strip,
     changed,
-    history: firstRun ? null : history(v, primary),
+    history: historyView,
     crawlersByCheck: byCheck,
     legend: legendVerdicts,
-    crawlersSite: now ? primary.host : null,
-    blockedTitle: COPY.blockedElsewhereTitle(now !== null),
+    crawlersSite: panels ? primary.host : null,
+    blockedTitle: COPY.blockedElsewhereTitle(panels),
     blockedElsewhere: v.d.sites
-      .filter((s) => !(now && s.id === primary.id))
+      .filter((s) => !(panels && s.id === primary.id))
       .flatMap((s) => {
         const c = latest(v, s.id);
         return (c ? crawlerOrder(c) : [])
