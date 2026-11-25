@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { CheckPageScreen } from '@/components/v2/screens/check/CheckPageScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { shownFeatures } from '@/lib/feature-switch';
 import { CHECK_COPY, CHECK_QUESTIONS, isCheckQuestion } from '@/lib/v2/copy/check-pages';
 import { socialCardPath } from '@/lib/v2/social-card';
 import { socialMetadata } from '@/lib/v2/social-metadata';
-import { checkPageView } from '@/lib/v2/view/check-pages';
+import { checkDescription, checkPageView } from '@/lib/v2/view/check-pages';
 import '@/styles/v2/tokens.css';
 
 type Params = { params: Promise<{ question: string }> };
@@ -26,14 +27,16 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!isCheckQuestion(question)) return {};
   const copy = CHECK_COPY[question];
   const canonical = checkPageView(question).canonical;
+  // The description follows the Goal 1 switch; the title and canonical do not (OPERATING-RULES §13).
+  const description = checkDescription(question, shownFeatures());
   return {
     title: copy.title,
-    description: copy.description,
+    description,
     alternates: { canonical },
     ...socialMetadata({
       path: canonical,
       title: copy.title,
-      description: copy.description,
+      description,
       image: socialCardPath(`check-${question}`),
     }),
   };
@@ -43,11 +46,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * A `/check` page (CC-29 D8): one question, the home's audit form and live check, a short
  * explanation, and the home's closing form. A 404 unless V2_CHECKS_PUBLIC is on, the flag the form's
  * route (`POST /api/checks`) answers under (Q10). The pages are prerendered, so the flag is read when
- * the site is built: built with it off they are 404s, and turning it on takes a new deployment.
+ * the site is built: built with it off they are 404s, and turning it on takes a new deployment. The
+ * Goal 1 switch (V2_HIDE_FEATURES) is read at build time too, so a change to it takes a redeploy.
  */
 export default async function CheckPage({ params }: Params) {
   if (!checksPublicEnabled()) return notFound();
   const { question } = await params;
   if (!isCheckQuestion(question)) return notFound();
-  return <CheckPageScreen data={checkPageView(question)} start />;
+  return <CheckPageScreen data={checkPageView(question, shownFeatures())} start />;
 }

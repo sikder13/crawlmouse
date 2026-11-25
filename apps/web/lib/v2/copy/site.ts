@@ -6,6 +6,7 @@ import type { AlertRule } from '@crawlmouse/types/v2';
 import type { Addition, CopyChange } from '../copy-registry';
 import { RECHECK_MINUTES } from '../recheck';
 import { RESTORE_DAYS } from './restore-window';
+import { SUPPORT_EMAIL } from './support';
 import { plural } from '../words';
 import { railChanges } from './dashboard';
 
@@ -52,6 +53,20 @@ export const SITE_COPY = {
   },
   /** The fix row's control on a live page. */
   markDone: 'Mark done',
+  /** The site's public link (F-123). A v2 mint is unlisted and noindex (`lib/v2/reports/mint.ts`). */
+  publicLink: {
+    none: 'None yet. A link shows this check to anyone who has it. A new one is unlisted, and search engines are told not to index it.',
+    withdrawn: `A public report of this domain was withdrawn, so a new link cannot be made here. Email ${SUPPORT_EMAIL} if you think that is a mistake.`,
+    unknown: 'Public links could not be checked just now. Reload this page to try again.',
+    hiddenLatest: 'This check’s link is hidden. A new link can be made after the next check.',
+    create: 'Create a public link',
+    update: 'New link for the latest check',
+    copy: 'Copy link',
+    capped: 'You have made today’s links. Try again tomorrow.',
+    notFinished: 'Only a finished check can be published.',
+    failed: 'The link could not be made. Try again.',
+    signedOut: 'Your session has ended. Sign in again to make a link.',
+  },
 };
 
 /** Each alert rule as the Site and Alerts screens name it. */
@@ -210,6 +225,14 @@ export const SITE_CHANGES: CopyChange[] = [
   },
   {
     screen: 'site',
+    kind: 'ruling',
+    locked: 'crawlmouse.com/r/example-outfitter-25oct Open',
+    rendered: `crawlmouse.com/r/example-outfitter-25oct ${SITE_COPY.publicLink.copy} Open ${SITE_COPY.publicLink.update}`,
+    source:
+      'V2R register, F-123 (CC-45 sweep): the site page names its public link, with a copy button; the fixture’s link is of an earlier check, so a new one is offered',
+  },
+  {
+    screen: 'site',
     kind: 'fixture',
     locked: 'fired Fri 06:00',
     rendered: 'fired Fri 06:03',
@@ -265,6 +288,11 @@ export const SITE_ADDITIONS: Addition[] = [
     screen: 'site',
     what: 'A site whose first check has not ended: its state, the pages read so far and a link to the check',
     source: 'CC-26b brief, D8',
+  },
+  {
+    screen: 'site',
+    what: 'The public link row’s Create control for a seat that may publish, on a site with no link',
+    source: 'V2R register, F-123 (CC-45 sweep)',
   },
   {
     screen: 'site',

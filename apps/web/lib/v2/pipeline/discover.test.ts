@@ -29,6 +29,17 @@ describe('CRAWL_USER_AGENT', () => {
 });
 
 describe('discoverSeeds (Q8)', () => {
+  it('sends no From header, as `/bot` says', async () => {
+    const { deps, requests } = site({
+      'https://example.com/robots.txt':
+        'User-agent: *\nAllow: /\nSitemap: https://example.com/a.xml\n',
+      'https://example.com/a.xml': urlset(['https://example.com/']),
+    });
+    await discoverSeeds('https://example.com', deps);
+    expect(requests.length).toBeGreaterThan(1);
+    for (const r of requests) expect(r.opts).not.toHaveProperty('headers');
+  });
+
   it('seeds the homepage and the sitemaps robots.txt names, as our crawler', async () => {
     const { deps, requests } = site({
       'https://example.com/robots.txt':
@@ -83,6 +94,26 @@ describe('discoverSeeds (Q8)', () => {
     });
     const { seeds } = await discoverSeeds('https://example.com', deps);
     expect(seeds.map((s) => s.url)).toEqual(['https://example.com', 'https://example.com/ok']);
+  });
+
+  // F-252: a server that answers /docs/ and not /docs gave a crawl of 404s when the seed was stored in
+  // canonical spelling. The seed keeps the sitemap's spelling, once per page whatever the spelling.
+  it('keeps a location as the sitemap spells it, once per page', async () => {
+    const { deps } = site({
+      'https://example.com/sitemap.xml': urlset([
+        'https://example.com/docs/',
+        'https://example.com/docs',
+        'https://Example.com/guide/#top',
+        'https://example.com:443/plain',
+      ]),
+    });
+    const { seeds } = await discoverSeeds('https://example.com', deps);
+    expect(seeds.map((s) => s.url)).toEqual([
+      'https://example.com',
+      'https://example.com/docs/',
+      'https://example.com/guide/',
+      'https://example.com/plain',
+    ]);
   });
 
   it('reads at most SITEMAP_URL_CAP locations', async () => {

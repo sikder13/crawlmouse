@@ -7,7 +7,7 @@ import { DOC_PATH, renderBudget } from './budget-doc';
 import {
   canaryMonthly,
   FUNCTIONS,
-  HOBBY_HEADROOM_LINE,
+  PLAN_HEADROOM_LINE,
   SHAPES,
   BUSY_PER_POST_MAX,
   MAX_SECONDS,
@@ -18,7 +18,7 @@ import {
   heaviestSearched,
   finishedFanOut,
   floorBySwitchOn,
-  hobbyVerdict,
+  planVerdict,
   monthlyFloor,
   type CheckShape,
 } from './budget';
@@ -145,11 +145,12 @@ describe('the function rows against the code', () => {
   const HAND: Record<string, number> = {
     'inngest/audit.ts': 5, // 357 361 376 378 386
     'inngest/billing.ts': 5, // 65 77 95 116 120
-    'inngest/check.ts': 15, // 254 258 266 326 370 379 457 523 524 534 535 536 537 590 592
+    'inngest/check.ts': 16, // 264 268 276 336 380 389 444 485 550 551 561 562 563 564 617 619
     'inngest/check-reaper.ts': 1, // 39
     'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113
     'inngest/past-due-sweep.ts': 4, // 51 52 58 61
+    'inngest/trial-clock.ts': 4, // 60 61 69 72
     'inngest/deletion.ts': 6, // 73 85 97 98 106 110
     'inngest/mail.ts': 8, // 115 126 137 153 164 182 195 210
     'inngest/report-schedules.ts': 1, // 30
@@ -159,6 +160,8 @@ describe('the function rows against the code', () => {
     'inngest/founder.ts': 4, // 71 95 109 110 (CC-33)
     'inngest/signin-canary.ts': 4, // 54 62 74 77 (CC-33)
     'inngest/ledger.ts': 2, // 39 49 (CC-41)
+    'inngest/competitors.ts': 6, // 77 86 92 104 106 112 (row 18)
+    'inngest/sentinel.ts': 7, // 60 79 83 88 89 101 105 (row 23)
   };
   it.each(Object.entries(HAND))('counts %s step call sites as a hand count does', (file, hand) => {
     expect(count(code(readFileSync(join(ROOT, file), 'utf8')), STEP_CALL)).toBe(hand);
@@ -356,6 +359,8 @@ describe('the month', () => {
     // CC-41's ledger backfill 4×2.
     // CC-33's sign-in canary is in no flag's floor: it runs once SIGNIN_CANARY_TO is set.
     // Since CC-GL D2 the check expiry runs three steps (expire-unkept, settle-kept, purge-removed): 1 + 3.
+    // The trial clock, hourly, reads the time and who is due when nobody is: 24×3.
+    // Row 23's sentinel tick, hourly, asks who is due: 24×2.
     const hand =
       (144 * 2 +
         24 * 3 * 3 +
@@ -367,22 +372,25 @@ describe('the month', () => {
         (1 + 1) +
         288 * 2 +
         24 * 3 +
-        4 * 2) *
+        4 * 2 +
+        24 * 3 +
+        24 * 2) *
       31;
     expect(monthlyFloor()).toBe(hand);
-    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(14);
+    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(16);
     // The canary, idle: 144 runs a day of request, wait and look.
     expect(canaryMonthly()).toBe(144 * (1 + 3) * 31);
   });
 
-  it('counts a finished check as starting four functions of two executions each', () => {
-    expect(finishedFanOut()).toBe(8);
+  it('counts a finished check as starting five functions of two executions each', () => {
+    expect(finishedFanOut()).toBe(10);
   });
 
-  it('fails the Hobby plan when the floor plus 1,000 typical checks passes the line', async () => {
-    const { total, passes } = await hobbyVerdict();
-    expect(total).toBe(monthlyFloor() + 1_000 * (22 + 8));
-    expect(passes).toBe(total <= HOBBY_HEADROOM_LINE);
+  it('passes the Pro plan only while the floor plus 1,000 typical checks stays under the line', async () => {
+    const { total, passes } = await planVerdict();
+    expect(total).toBe(monthlyFloor() + 1_000 * (22 + 10));
+    expect(passes).toBe(total <= PLAN_HEADROOM_LINE);
+    expect(passes).toBe(true);
   });
 });
 
@@ -399,8 +407,9 @@ describe('the floor by switch-on step', () => {
     expect(pipeline!.floor).toBe((3 + 3 + 288 + 4 + 8) * 31);
     expect(door!.floor).toBe(pipeline!.floor);
     // V2_CHECKS_PUBLIC adds the purge 3, the contact purge 2, the schedule and summary ticks 72 each,
-    // CC-31's report schedules 48, and CC-33's founder sweep 576 and digest tick 72 (either flag).
-    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72 + 48 + 576 + 72) * 31);
+    // CC-31's report schedules 48, CC-33's founder sweep 576 and digest tick 72 (either flag), and
+    // the trial clock 72, and row 23's sentinel tick 48.
+    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72 + 48 + 576 + 72 + 72 + 48) * 31);
     // V2_BILLING adds the past-due sweep, 72 a day.
     expect(billing!.floor).toBe(checks!.floor + 72 * 31);
     expect(billing!.floor).toBe(monthlyFloor());

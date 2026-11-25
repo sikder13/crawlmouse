@@ -61,7 +61,8 @@ import { auditHref } from './audit-hrefs';
 import { nextCheckLine, type NextChecks } from './site';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
-import { action, type ActionView } from './account-actions';
+import { action, emailDeveloperAction, type ActionView } from './account-actions';
+import { roleMay } from '../agency/guard';
 import {
   FREE_SCHEDULE,
   accountShellView,
@@ -567,23 +568,7 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
               { id: fix.id },
               { context: `for: ${c.summary}`, copy: true },
             ),
-            action(
-              'emailDeveloper',
-              'Email to my developer',
-              { id: fix.id },
-              {
-                context: `about: ${c.summary}`,
-                inputs: [
-                  {
-                    kind: 'text',
-                    name: 'email',
-                    type: 'email',
-                    ...COPY.developerField,
-                    required: true,
-                  },
-                ],
-              },
-            ),
+            emailDeveloperAction(fix.id, 'Email to my developer', `about: ${c.summary}`),
           ]
         : []),
     ],
@@ -668,7 +653,7 @@ function setup(
     subject: string,
     todo: string,
     doneLabel: string,
-    act: ActionView,
+    act: ActionView | null,
   ) => {
     if (!todo.includes(subject)) {
       throw new Error(`set-up item ${key}: its row does not name its subject "${subject}"`);
@@ -677,7 +662,7 @@ function setup(
       key,
       label: done ? doneLabel : todo,
       done,
-      action: done ? null : { ...act, context: `for ${subject}` },
+      action: done || act === null ? null : { ...act, context: `for ${subject}` },
     });
   };
   const settings = (label: string) =>
@@ -689,7 +674,10 @@ function setup(
       SETUP_COPY.slack.subject,
       SETUP_COPY.slack.todo,
       SETUP_COPY.slack.done,
-      action('integrations', 'Connect'),
+      // Integrations is a 404 for a role that may not edit the account's alerts.
+      roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts')
+        ? action('integrations', 'Connect')
+        : null,
     );
   }
   if (g.competitorsPerSite > 0) {
@@ -703,16 +691,6 @@ function setup(
       settings('Add'),
     );
   }
-  if (g.searchConsole) {
-    item(
-      'search_console',
-      connected('search_console'),
-      SETUP_COPY.searchConsole.subject,
-      SETUP_COPY.searchConsole.todo,
-      SETUP_COPY.searchConsole.done,
-      action('integrations', 'Connect'),
-    );
-  }
   if (g.stagingAndDeployHooks) {
     const done = v.d.sites.some((s) => s.staging_of_site_id === site.id);
     item(
@@ -722,16 +700,6 @@ function setup(
       SETUP_COPY.staging.todo,
       SETUP_COPY.staging.done,
       settings('Add'),
-    );
-  }
-  if (g.observedCrawlerActivity) {
-    item(
-      'observed',
-      connected('cloudflare_analytics', 'vercel_drain'),
-      SETUP_COPY.observed.subject,
-      SETUP_COPY.observed.todo,
-      SETUP_COPY.observed.done,
-      action('integrations', 'Connect'),
     );
   }
   const left = items.filter((i) => !i.done).length;
@@ -935,6 +903,18 @@ export function dashboardView(
   const slots = primarySites(v).length;
   const limit = v.account.limits.sites;
   const plan = PLAN_NAMES[v.tier];
+  // A paused site is kept and holds its slot, but is not checked: after a trial ends, every site
+  // over Free's limit is paused (F-234, F-235).
+  const checked = primarySites(v).filter((s) => !s.paused);
+  const paused = slots - checked.length;
+  /** The site whose schedule the first-run note names: the first site, or one still checked. */
+  const scheduled = primary.paused ? checked[0] : primary;
+  const slotsNote =
+    paused === 0
+      ? `${slots} of ${limit} on ${plan}`
+      : slots <= limit
+        ? COPY.sitesWithPaused(slots, limit, plan, paused)
+        : COPY.sitesOverLimit(checked.length, slots, plan, limit);
 
   const changed = firstRun
     ? []
@@ -953,7 +933,9 @@ export function dashboardView(
   const nextText = nextAt ? `${next ? 'next check' : 'next weekly check'} ${nextAt}` : null;
   const trialEnds = trial ? `trial ends ${dayDate(v.account.trial_ends_at!, zone)}` : null;
   const flight = v.inFlight.filter((f) => f.siteId === primary.id).map((f) => `check ${f.status}`);
-  const sitesWord = `${v.d.sites.length} ${plural(v.d.sites.length, 'site', 'sites')}`;
+  // The sites that hold a slot: a staging copy is not a sixth site (F-097).
+  const slotsHeld = primarySites(v).length;
+  const sitesWord = `${slotsHeld} ${plural(slotsHeld, 'site', 'sites')}`;
   const prev = sinceCheck(v);
 
   const addSite = addSiteAction(v);
@@ -964,7 +946,7 @@ export function dashboardView(
 
   const header: HeaderView = firstRun
     ? {
-        title: COPY.kept(primarySites(v).map((s) => s.host)),
+        title: checked.length ? COPY.kept(checked.map((s) => s.host)) : COPY.allPaused,
         line: [
           dayDate(v.now, zone),
           sitesWord,
@@ -1048,13 +1030,15 @@ export function dashboardView(
     ...new Set((byCheck ?? []).flatMap((r) => r.verdicts).filter((x): x is Verdict => x !== null)),
   ];
   const free = FREE_SCHEDULE[GATES.free.schedule];
-  // With paid plans closed nothing sends the trial's reminder yet, so it is not promised.
   const plansOpen = checkoutOpen();
+  // The reminder goes to the owner, unless they turned it off, and is named while it is ahead.
+  const reminderAt =
+    trial && v.account.email_prefs.trial_reminder && readerRole(v) === 'owner'
+      ? daysBefore(v.account.trial_ends_at!, 3, zone)
+      : null;
   const kinds = COPY.emailKinds(
     v.account.email_prefs.change_notes,
-    plansOpen && trial && v.account.email_prefs.trial_reminder
-      ? dayDate(daysBefore(v.account.trial_ends_at!, 3, zone), zone)
-      : null,
+    reminderAt !== null && instant(reminderAt) > instant(v.now) ? dayDate(reminderAt, zone) : null,
   );
   const daysLeft = trial ? calendarDays(v.now, v.account.trial_ends_at!, zone) : null;
 
@@ -1075,7 +1059,7 @@ export function dashboardView(
         }))
       : null,
     sites: {
-      note: firstRun && trial ? COPY.sitesFirstRun(free) : `${slots} of ${limit} on ${plan}`,
+      note: firstRun && trial ? COPY.sitesFirstRun(free) : slotsNote,
       upsell:
         v.tier === 'pro' && slots >= limit
           ? action(
@@ -1084,7 +1068,11 @@ export function dashboardView(
             )
           : null,
       rows,
-      foot: firstRun ? COPY.firstRunNote(primary.schedule?.cadence ?? null) : null,
+      foot: firstRun
+        ? scheduled
+          ? COPY.firstRunNote(scheduled.schedule?.cadence ?? null)
+          : COPY.firstRunAllPaused
+        : null,
     },
     topFixes:
       firstRun && result && fixes.length

@@ -3,6 +3,7 @@
  * stops each form's submit, as KeepBar does; a live page (`LiveActions`) submits it. The step each
  * entry's `owner` names builds the handler on that same path. lib/v2/view/dashboard.ts re-exports them, where the brief looks for them.
  */
+import { DASHBOARD_COPY } from '../copy/dashboard';
 import { RESTORE_DAYS } from '../copy/restore-window';
 
 type Verb = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
@@ -104,7 +105,7 @@ export const ACCOUNT_ACTIONS = {
   integrations: {
     verb: 'GET',
     route: '/settings/integrations',
-    owner: 'later',
+    owner: 'built',
     guard: 'Owner or manager.',
   },
   plan: { verb: 'GET', route: '/settings/plan', owner: 'CC-27b', guard: 'Signed-in owner.' },
@@ -183,6 +184,8 @@ export type ActionInput =
       /** What the field holds when the page opens (a site's competitors as they stand). */
       value?: string;
       required: boolean;
+      /** `off` for a value the browser should not offer again, such as a webhook's secret URL. */
+      autoComplete?: 'off';
     }
   | {
       kind: 'select';
@@ -262,3 +265,24 @@ export const AGENCY_NAV = [
 export type RailLabel =
   | (typeof ACCOUNT_NAV)[number]['label']
   | (typeof AGENCY_NAV)[number]['label'];
+
+/** The form that emails a fix to a developer, wherever a fix offers it: one address, required. */
+export function emailDeveloperAction(fixId: string, label: string, context: string): ActionView {
+  return action(
+    'emailDeveloper',
+    label,
+    { id: fixId },
+    {
+      context,
+      inputs: [
+        {
+          kind: 'text',
+          name: 'email',
+          type: 'email',
+          ...DASHBOARD_COPY.developerField,
+          required: true,
+        },
+      ],
+    },
+  );
+}

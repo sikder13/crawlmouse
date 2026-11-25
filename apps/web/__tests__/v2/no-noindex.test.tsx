@@ -145,7 +145,10 @@ describe('no v2 component sets a robots directive or a head element', () => {
     [
       'For agencies',
       () => (
-        <AgenciesScreen data={agenciesView({ billing: true, accountDoor: true })} audit="live" />
+        <AgenciesScreen
+          data={agenciesView({ billing: true, agencySales: true, accountDoor: true })}
+          audit="live"
+        />
       ),
     ],
     ['Developers', () => <DevelopersScreen data={developersView()} audit="live" />],

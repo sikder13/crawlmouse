@@ -96,10 +96,10 @@ describe('Settings › Plan with paid plans closed', () => {
     expect(cancel.action).toBeNull();
   });
 
-  it('does not list the trial reminder as a kind of email, and counts what it lists', () => {
+  it('lists the trial reminder, which the clock sends, and no receipts it cannot have', () => {
     const email = settingsView(bad, home, closed).email;
-    expect(email.rows.map((r) => r.kind)).toEqual(['sign_in_link', 'change_note']);
-    expect(email.foot).toMatch(/^Those are the two kinds from us\. There is no newsletter/);
+    expect(email.rows.map((r) => r.kind)).toContain('trial_reminder');
+    expect(email.foot).toMatch(/^Those are the three kinds from us\. There is no newsletter/);
   });
 
   it('lists all three with plans open', () => {
@@ -125,15 +125,15 @@ describe('the first-run dashboard with paid plans closed', () => {
   it('does not mention keeping Pro', () => {
     const v = dashboardView(bad, day0);
     expect(v.setup!.foot).toBe(
-      'All five stop when the 14 days end. The site, its audits and its monthly check do not.',
+      'All three stop when the 14 days end. The site, its audits and its monthly check do not.',
     );
     expect(v.threeKinds!.body).not.toContain('keep Pro');
   });
 
-  it('does not promise a reminder nothing sends yet', () => {
+  it('says the reminder, which the clock sends', () => {
     const v = dashboardView(bad, day0);
-    expect(v.threeKinds!.body).not.toContain('reminder');
-    expect(v.threeKinds!.lead).toBe('You will hear from us two ways and no others:');
+    expect(v.threeKinds!.body).toContain('one reminder on');
+    expect(v.threeKinds!.lead).toBe('You will hear from us three ways and no others:');
   });
 
   it('is as it was with plans open', () => {
@@ -150,21 +150,70 @@ describe('the first-run dashboard with paid plans closed', () => {
       sites: bad.sites.map((s) => (s.id === OLDEST ? { ...s, paused: true } : s)),
     };
     expect(dashboardView(d, day0).setup!.foot).toBe(
-      'All five stop when the 14 days end. The site and its audits do not.',
+      'All three stop when the 14 days end. The site and its audits do not.',
     );
   });
 });
 
-describe('the reminder, until something sends it', () => {
-  it('the rail does not promise it', () => {
+describe('the reminder, which the clock sends with paid plans closed', () => {
+  it('the rail says it', () => {
     const note = accountShellView(viewAt(bad, home), 'Sites', { role: 'owner', ...closed }).trial!
+      .note;
+    expect(note).toContain("We'll email you three days before.");
+  });
+
+  it('the rail does not promise it to a seat that will not get it', () => {
+    const note = accountShellView(viewAt(bad, home), 'Sites', {
+      role: 'developer',
+      ...closed,
+    }).trial!.note;
+    expect(note).not.toContain("We'll email");
+  });
+
+  it('the first-run dashboard does not promise it to a seat that will not get it', () => {
+    const owner = bad.seats.find((s) => s.account_id === BAD && s.role === 'owner')!;
+    const devId = 'c0000000-0000-4000-8000-000000000093';
+    const d: FixtureDataset = {
+      ...bad,
+      seats: [...bad.seats, { ...owner, id: devId, role: 'developer', email: 'dev@example.com' }],
+    };
+    const v = dashboardView(d, { ...day0, seatId: devId });
+    expect(v.threeKinds!.body).not.toContain('reminder');
+  });
+
+  it('the first-run dashboard does not name a reminder day that has passed', () => {
+    const late = { ...day0, now: '2026-11-07T15:00:00.000Z' };
+    const firstOnly: FixtureDataset = {
+      ...bad,
+      checks: bad.sites.flatMap((s) => {
+        const first = bad.checks
+          .filter((c) => c.site_id === s.id && c.finished_at !== null)
+          .sort((x, y) => Date.parse(x.finished_at!) - Date.parse(y.finished_at!))[0];
+        return first ? [first] : [];
+      }),
+    };
+    const v = dashboardView(firstOnly, late);
+    expect(v.firstRun).toBe(true);
+    expect(v.threeKinds!.body).not.toContain('reminder');
+  });
+
+  it('the rail does not promise it to an owner who turned it off', () => {
+    const off = withAccount(bad, {
+      email_prefs: {
+        ...bad.accounts.find((a) => a.id === BAD)!.email_prefs,
+        trial_reminder: false,
+      },
+    });
+    const note = accountShellView(viewAt(off, home), 'Sites', { role: 'owner', ...closed }).trial!
       .note;
     expect(note).not.toContain("We'll email");
   });
 
-  it('Trial ending does not promise it', () => {
+  it('Trial ending says it', () => {
     const v = trialEndView(bad, trialEndViewer(bad, BAD), closed);
-    expect(v.banner.sub).not.toContain('reminder');
+    expect(v.banner.sub).toBe(
+      'The reminder is due once, on Wed 4 Nov. No card is on file, so nothing is charged.',
+    );
   });
 
   it('both still say it with plans open', () => {
@@ -179,7 +228,99 @@ describe('the reminder, until something sends it', () => {
 describe('Trial ending, other cases with paid plans closed', () => {
   it('a no-card trial is not told "either way", with one way to go', () => {
     const v = trialEndView(bad, trialEndViewer(bad, BAD), closed);
-    expect(v.banner.sub).toBe('No card is on file, so nothing is charged.');
+    expect(v.banner.sub).toContain('No card is on file, so nothing is charged.');
+    expect(v.banner.sub).not.toContain('either way');
+  });
+
+  it('names the seats the move to Free removes, and not an invitation', () => {
+    const owner = bad.seats.find((s) => s.account_id === BAD && s.role === 'owner')!;
+    const seat = (id: string, accepted: string | null) => ({
+      ...owner,
+      id,
+      role: 'developer' as const,
+      email: `${id.slice(-4)}@example.com`,
+      accepted_at: accepted,
+    });
+    const withSeats: FixtureDataset = {
+      ...bad,
+      seats: [
+        ...bad.seats.filter((s) => s.account_id !== BAD || s.role === 'owner'),
+        seat('c0000000-0000-4000-8000-000000000091', owner.accepted_at),
+        seat('c0000000-0000-4000-8000-000000000092', null),
+      ],
+    };
+    const v = trialEndView(withSeats, trialEndViewer(withSeats, BAD), closed);
+    expect(v.endText).toContain('The 1 other person with a seat on this account loses access.');
+    // Not under "Pauses, until Pro": choosing Pro later does not bring the seat back.
+    expect(JSON.stringify(v.pauses)).not.toContain('seat');
+    // The page serves any member, and to a member "the other person" would be the owner.
+    for (const role of ['account_manager', 'developer'] as const) {
+      const read = trialEndView(withSeats, trialEndViewer(withSeats, BAD), { ...closed, role });
+      expect(read.endText).not.toContain('loses access');
+    }
+  });
+
+  describe('a member reads what the end does to their own seat', () => {
+    const roles = ['account_manager', 'developer'] as const;
+    const END = 'Sat 7 Nov';
+    const read = (d: FixtureDataset, reading: Parameters<typeof trialEndView>[2]) =>
+      trialEndView(d, trialEndViewer(d, BAD), reading);
+    const card = withAccount(bad, {
+      card_last4: '4242',
+      billing_period_months: 1,
+      renews_at: '2026-11-07T00:00:00.000Z',
+    });
+
+    it.each(roles)('%s, no card, plans closed: the access ends', (role) => {
+      expect(read(bad, { ...closed, role }).endText).toContain(
+        `Your access to this account ends on ${END}.`,
+      );
+    });
+
+    it.each(roles)('%s, no card, plans open: it ends unless the owner keeps Pro', (role) => {
+      expect(read(bad, { billingOpen: true, role }).endText).toContain(
+        `Your access to this account ends on ${END} unless the owner keeps Pro.`,
+      );
+    });
+
+    it.each(roles)('%s, a card that will be charged: only if the owner cancels', (role) => {
+      const text = read(card, { billingOpen: true, role }).endText;
+      expect(text).toContain(`If the owner cancels, your access to this account ends on ${END}.`);
+      expect(text).not.toContain(`Your access to this account ends`);
+    });
+
+    it.each(roles)('%s, a card trial set to cancel: the access ends', (role) => {
+      const text = read(card, {
+        billingOpen: true,
+        role,
+        billingEnd: '2026-11-07T00:00:00.000Z',
+      }).endText;
+      expect(text).toContain(`Your access to this account ends on ${END}`);
+      expect(text).not.toContain('If the owner cancels');
+    });
+
+    it.each(roles)('%s, a card on file with no renewal recorded: as the owner is told', (role) => {
+      const noMirror = withAccount(bad, { card_last4: '4242', billing_period_months: 1 });
+      expect(read(noMirror, { billingOpen: true, role: 'owner' }).banner.sub).toContain(
+        'is charged on Sat 7 Nov unless you cancel',
+      );
+      expect(read(noMirror, { billingOpen: true, role }).endText).toContain(
+        `If the owner cancels, your access to this account ends on ${END}.`,
+      );
+    });
+
+    it('the owner keeps their seat, and is not told otherwise', () => {
+      for (const d of [bad, card]) {
+        expect(read(d, { ...closed, role: 'owner' }).endText).not.toMatch(/your access/i);
+      }
+    });
+
+    it('only the owner is told a reminder is due, since only the owner is sent it', () => {
+      const banner = (role: 'owner' | 'developer' | 'account_manager') =>
+        read(bad, { ...closed, role }).banner.sub;
+      expect(banner('owner')).toContain('The reminder is due once');
+      for (const role of roles) expect(banner(role)).not.toContain('reminder');
+    });
   });
 
   it('a card trial is not told to add Pro', () => {

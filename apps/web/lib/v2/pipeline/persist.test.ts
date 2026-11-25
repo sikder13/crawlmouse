@@ -141,6 +141,18 @@ describe('persistBuiltCheck: what it sends', () => {
     expect(stages).toEqual([]);
   });
 
+  // Inbox 084: a check built by the next deployment, persisted by this one after a rollback.
+  it('persists a check built with the next deployment’s coverage.stopped, leaving it out', async () => {
+    const { db, sent } = recording();
+    const newer = structuredClone(built);
+    (newer.check as { coverage: unknown }).coverage = {
+      ...newer.check.coverage,
+      stopped: { page_cap: 500, at_cap: false, time_ran_out: false, site_stopped: false },
+    };
+    await persistBuiltCheck(db, inputOf(newer));
+    expect(JSON.stringify(sent.at(-1))).not.toContain('"stopped"');
+  });
+
   it('refuses a page with no vantage, before any call', async () => {
     const { db, sent, stages } = recording();
     const partial = new Map(vantage);

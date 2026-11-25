@@ -285,6 +285,8 @@ describe('declaration fetches', () => {
     expect(retryAfterMs('120', now)).toBe(120_000);
     expect(retryAfterMs('Wed, 04 Nov 2026 00:02:00 GMT', now)).toBe(120_000);
     expect(retryAfterMs('soon', now)).toBeNull();
+    // Date.parse alone reads these as dates in the past, which would remove the back-off.
+    for (const v of ['1.5', '-1', '7, 8', '2026-11-04']) expect(retryAfterMs(v, now)).toBeNull();
     expect(retryAfterMs(undefined, now)).toBeNull();
     expect(keepFor(429, null)).toBe(DECLARATION_BACKOFF_MS);
     expect(keepFor(503, 10 * 3_600_000)).toBe(10 * 60_000);

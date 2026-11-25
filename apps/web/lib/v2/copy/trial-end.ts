@@ -117,6 +117,20 @@ export const TRIAL_END_COPY = {
   endNothing: (date: string) => `Nothing to do. On ${date} the account is Free:`,
   endCancel: (date: string, clicks: number) =>
     `Cancel before ${date} from Settings › Plan, in ${numberWord(clicks)} clicks, and on ${date} the account is Free:`,
+  /**
+   * Free keeps one seat, so the move removes the others, and choosing a plan later does not bring
+   * them back: said in what happens, not in the table of what pauses until the plan.
+   */
+  seatsLost: (n: number) =>
+    n === 1
+      ? 'The 1 other person with a seat on this account loses access.'
+      : `The ${n} other people with seats on this account lose access.`,
+  /** To a member: Free removes their seat. `plan` when the owner can still keep it. */
+  yourSeatEnds: (date: string, plan: string | null) =>
+    `Your access to this account ends on ${date}${plan ? ` unless the owner keeps ${plan}` : ''}.`,
+  /** To a member of a trial that will be charged: the seat goes only if the owner cancels. */
+  yourSeatIfCancelled: (date: string) =>
+    `If the owner cancels, your access to this account ends on ${date}.`,
   /** What Free keeps and pauses, from the sites and the free fixes the account holds. */
   endKeeps: (
     host: string,
@@ -196,6 +210,14 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked: 'Fri 6 Nov ·',
     rendered: 'Wed 4 Nov ·',
     source: A8,
+  },
+  {
+    screen: 'trial-end',
+    kind: 'ruling',
+    locked: '5 sites ·',
+    rendered: '4 sites ·',
+    source:
+      'Owner ruling Q10: a staging site holds no primary slot (ARCH-2 §2.5), so the count of sites leaves it out (F-097)',
   },
   {
     screen: 'trial-end',

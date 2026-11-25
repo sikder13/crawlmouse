@@ -8,6 +8,8 @@ import type { Fix } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import { supabaseFixesStore } from '../account/fixes-store';
 import { INVITED_ROLES, type InvitedRole } from '../agency/seats';
+import type { TrialSite } from './after-trial';
+import { competitorSiteId } from '../competitors/compare';
 
 export interface AccountLinkRow {
   kind: string;
@@ -58,6 +60,11 @@ export interface FinishedCheck {
   trigger: string;
   status: string;
   accountId: string | null;
+  /**
+   * A competitor's check (row 18): its site is kept by no account and is the competitor site of its
+   * own host, `competitorSiteId(host)`. It is no customer's audit, so it is not captured as one.
+   */
+  competitor: boolean;
 }
 
 /** One invitation of an invited seat, read before its mail is claimed. */
@@ -84,6 +91,10 @@ export interface MailStore {
   /** `issue_account_link`: mints the link (and a deletion's paired restore link). Never logged or stored. */
   issueAccountLink(tokenId: string): Promise<IssuedLink[]>;
   trialAccount(accountId: string): Promise<TrialAccount | null>;
+  /** The account's sites that have not been removed, for what the trial's end does to them. */
+  trialSites(accountId: string): Promise<TrialSite[]>;
+  /** How many active seats the account has besides its owner's. */
+  trialOtherSeats(accountId: string): Promise<number>;
   notifyCheck(checkId: string): Promise<NotifyCheck | null>;
   fixEmailRequest(requestId: string): Promise<FixEmailRequest | null>;
   /** Sets `fix_email_requests.sent_at` when it is not set. */
@@ -304,6 +315,44 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
       };
     },
 
+    async trialSites(accountId) {
+      const r = await sb
+        .from('sites')
+        .select('id, host, created_at, paused_reason, staging_of_site_id')
+        .eq('account_id', accountId)
+        .is('removed_at', null);
+      if (r.error) fail('sites', r.error);
+      return z
+        .array(
+          z.object({
+            id: z.string(),
+            host: z.string(),
+            created_at: z.string(),
+            paused_reason: z.string().nullable(),
+            staging_of_site_id: z.string().nullable(),
+          }),
+        )
+        .parse(r.data ?? [])
+        .map((s) => ({
+          id: s.id,
+          host: s.host,
+          createdAt: new Date(s.created_at),
+          pausedReason: s.paused_reason,
+          stagingOfSiteId: s.staging_of_site_id,
+        }));
+    },
+
+    async trialOtherSeats(accountId) {
+      const r = await sb
+        .from('seats')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('status', 'active')
+        .neq('role', 'owner');
+      if (r.error) fail('seats', r.error);
+      return (r.data ?? []).length;
+    },
+
     async notifyCheck(checkId) {
       const c = await check(checkId);
       if (c === null) return null;
@@ -352,7 +401,12 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
       const c = await check(checkId);
       if (c === null) return null;
       const s = await site(c.site_id);
-      return { trigger: c.trigger, status: c.status, accountId: s?.account_id ?? null };
+      return {
+        trigger: c.trigger,
+        status: c.status,
+        accountId: s?.account_id ?? null,
+        competitor: s !== null && s.account_id === null && competitorSiteId(s.host) === c.site_id,
+      };
     },
 
     async seatInvitation(seatId, seq) {

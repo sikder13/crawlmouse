@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BUDGET_CEILINGS, MAX_URLS_PER_BATCH, type BatchRequest } from './batch/request.js';
 import { MAX_RESULT_BYTES } from './batch/store.js';
 import { loadCapacity, loadLevels } from './spec/capacity.js';
+import { MAX_TIMING_MS } from './fetch/timing.js';
 import { CRAWLERS } from './identities.js';
 import { startServer, type FixtureServer } from './test-support/http.js';
 
@@ -236,6 +237,19 @@ const access = (n: number, pages: number): BatchRequest[] =>
     })),
   }));
 
+/**
+ * How much the same result can differ between two runs. A row holds four timings in milliseconds
+ * (dns, connect, ttfb, total), each printed in as many digits as it takes, so a run that was slower
+ * by chance is longer by a few bytes: results of 8,762,392 to 8,762,395 bytes have been measured on
+ * unchanged code. `boundedMs` caps a timing at MAX_TIMING_MS, six digits, and it has at least one, so
+ * a row can differ by at most 4 x 5 bytes. A change that adds more than 20 bytes to every row of a
+ * full batch is past this, and fails.
+ */
+const TIMING_DIGITS = String(MAX_TIMING_MS).length;
+const RESULT_TIMING_MARGIN_BYTES = MAX_URLS_PER_BATCH * 4 * (TIMING_DIGITS - 1);
+const LARGEST_RESULT_ALLOWED =
+  CAPACITY.worst_case.largest_result_bytes + RESULT_TIMING_MARGIN_BYTES;
+
 /** The largest result any case below produced, in bytes; read by the store-bound case at the end. */
 let largestResult = 0;
 
@@ -325,7 +339,7 @@ describe.runIf(process.platform === 'linux')('memory under load', () => {
         partial: { reasons: ['result_size'] },
         not_served: [],
       });
-      expect(r.json_bytes).toBeLessThanOrEqual(CAPACITY.worst_case.largest_result_bytes);
+      expect(r.json_bytes).toBeLessThanOrEqual(LARGEST_RESULT_ALLOWED);
     }
   }, 600_000);
 
@@ -342,9 +356,9 @@ describe.runIf(process.platform === 'linux')('memory under load', () => {
   }
 
   it('holds BATCH_CONCURRENCY of the largest result recorded, twice over, in the result store', () => {
-    expect(
-      Number(ENV.BATCH_CONCURRENCY) * CAPACITY.worst_case.largest_result_bytes * 2,
-    ).toBeLessThanOrEqual(MAX_RESULT_BYTES);
+    expect(Number(ENV.BATCH_CONCURRENCY) * LARGEST_RESULT_ALLOWED * 2).toBeLessThanOrEqual(
+      MAX_RESULT_BYTES,
+    );
   });
 
   // Runs last: it reads the results the cases above measured. Under a filter that skips the cases
@@ -353,6 +367,7 @@ describe.runIf(process.platform === 'linux')('memory under load', () => {
     process.stdout.write(
       `load: largest result ${largestResult} bytes (${(largestResult / 1048576).toFixed(2)} MiB)\n`,
     );
-    expect(largestResult).toBeLessThanOrEqual(CAPACITY.worst_case.largest_result_bytes);
+    expect(RESULT_TIMING_MARGIN_BYTES).toBe(1000);
+    expect(largestResult).toBeLessThanOrEqual(LARGEST_RESULT_ALLOWED);
   });
 });

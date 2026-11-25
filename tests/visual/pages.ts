@@ -112,6 +112,52 @@ export async function openV1Page(page: Page, path: string) {
   await settleAnimations(page);
 }
 
+/** The large map's preview. Its canvas renderer is a lazy chunk behind an empty placeholder. */
+const CANVAS_PREVIEW = '/v2-preview/screens/map/large';
+
+/**
+ * Wait until the canvas preview has its canvas, and each visible canvas has drawn at its own size and
+ * held its pixels. The chunk can arrive after `networkidle`, whose timeout openPreview ignores, and the
+ * canvas repaints in the frame after a resize, which clears it. Either way a capture can hold an empty
+ * or stale map. A canvas that never settles is an error rather than a screenshot of half a drawing.
+ */
+export async function settleCanvases(page: Page) {
+  if (new URL(page.url()).pathname === CANVAS_PREVIEW) {
+    await page.locator('canvas').first().waitFor({ state: 'visible', timeout: 30_000 });
+  }
+  await page.evaluate(async () => {
+    const canvases = [...document.querySelectorAll('canvas')].filter(
+      (c) => c.clientWidth > 0 && c.clientHeight > 0,
+    );
+    if (canvases.length === 0) return;
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r(null)));
+    const dpr = window.devicePixelRatio || 1;
+    const blank = (c: HTMLCanvasElement) => {
+      const empty = document.createElement('canvas');
+      empty.width = c.width;
+      empty.height = c.height;
+      return empty.toDataURL();
+    };
+    let last = '';
+    let held = 0;
+    for (const end = performance.now() + 10_000; performance.now() < end; ) {
+      await frame();
+      await frame();
+      const drawn = canvases.every(
+        (c) =>
+          c.width === Math.round(c.clientWidth * dpr) &&
+          c.height === Math.round(c.clientHeight * dpr) &&
+          c.toDataURL() !== blank(c),
+      );
+      const now = canvases.map((c) => c.toDataURL()).join('|');
+      held = drawn && now === last ? held + 1 : 0;
+      if (held >= 2) return;
+      last = now;
+    }
+    throw new Error('a canvas did not finish drawing');
+  });
+}
+
 /** Wait until every animation on the page that has an end has reached it. */
 export async function settleAnimations(page: Page) {
   await page.evaluate(() =>
@@ -145,7 +191,10 @@ export async function fitViewportToPage(page: Page) {
   );
   for (let i = 0; i < 4; i++) {
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    if (height === page.viewportSize()?.height) return;
+    if (height === page.viewportSize()?.height) {
+      await settleCanvases(page);
+      return;
+    }
     await page.setViewportSize({ width: size.width, height });
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
   }

@@ -143,7 +143,9 @@ const HIDE = `
   svg.chart, svg[data-v2-chart] { display: none !important; }
   @media (max-width: 760px) { [data-v2-phone-secondary] { display: none !important; } }
 `;
-const ADDED = '[data-v2-addition], [data-v2-evidence] { display: none !important; }';
+// The skip link (RC-20) is rendered off screen, so innerText reads it; the locked screens predate it.
+const ADDED =
+  '[data-v2-addition], [data-v2-evidence], a[href="#v2-content"] { display: none !important; }';
 const SHELL = 'nav[aria-label="Primary"], footer';
 
 const collapse = (text: string) =>

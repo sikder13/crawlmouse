@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Fix } from '@crawlmouse/types/v2';
 import { fixture } from '../fixtures';
 import { checkRef } from '../pipeline/public';
-import { packetPrompt } from '../view/segment/fixes';
+import { packetBodies, packetPrompt } from '../view/segment/fixes';
+import { withBodies } from '../view/test-support/multi-body';
 import { hashMailAddress } from './address-hash';
 import { guarded } from '../../../../../inngest/mail';
 import { mailHandlers, reportMailHandlers, REQUEST_ID_MAX, type CaptureEvent } from './handlers';
@@ -58,6 +59,16 @@ function store(over: Partial<MailStore> = {}): MailStore {
         ownerEmail: 'owner@example.com',
       }),
     ),
+    trialSites: vi.fn(async () => [
+      {
+        id: 'site-a',
+        host: 'example.com',
+        createdAt: new Date('2026-11-01T00:00:00.000Z'),
+        pausedReason: null,
+        stagingOfSiteId: null,
+      },
+    ]),
+    trialOtherSeats: vi.fn(async () => 0),
     notifyCheck: vi.fn(
       async (): Promise<NotifyCheck> => ({
         status: 'finished',
@@ -78,6 +89,7 @@ function store(over: Partial<MailStore> = {}): MailStore {
       trigger: 'scheduled',
       status: 'finished',
       accountId: ACCOUNT,
+      competitor: false,
     })),
     seatInvitation: vi.fn(async () => ({ recipient: INVITEE, accountId: ACCOUNT, marked: false })),
     issueSeatInvite: vi.fn(
@@ -225,6 +237,49 @@ describe('the trial reminder', () => {
     expect(await h.accountEmail(data)).toBe(outcome);
     expect(ledger.claims).toEqual([]);
   });
+
+  describe('with paid plans closed', () => {
+    const closedSetup = (s: MailStore = store()) => {
+      const ledger = memoryLedger(new Set());
+      const transport = memoryTransport();
+      const mail: MailDeps = { ledger, transport, pepper: PEPPER, now: () => NOW, log: vi.fn() };
+      const h = mailHandlers({ mail, store: s, capture: vi.fn(), plansOpen: () => false });
+      return { h, ledger, transport };
+    };
+
+    it('says what happens to this account’s sites, and offers no plan', async () => {
+      const { h, transport } = closedSetup();
+      expect(await h.accountEmail(data)).toBe('sent');
+      const { text } = transport.sent[0]!;
+      expect(text).toContain('there is nothing you need to do. The account then moves to Free.');
+      expect(text).toContain('example.com stays, with a monthly check and three fixes per audit.');
+      expect(text).toContain('Paid plans open shortly.');
+      expect(text).not.toMatch(/choose a plan|keep pro|add a card|\$/i);
+    });
+
+    it('says when another person loses their seat', async () => {
+      const { h, transport } = closedSetup(store({ trialOtherSeats: vi.fn(async () => 1) }));
+      await h.accountEmail(data);
+      expect(transport.sent[0]!.text).toContain(
+        'The 1 other person with a seat on this account loses access.',
+      );
+    });
+
+    it('retries with nothing claimed when the sites cannot be read', async () => {
+      const failing = store({ trialSites: vi.fn(async () => Promise.reject(new Error('down'))) });
+      const { h, ledger } = closedSetup(failing);
+      await expect(h.accountEmail(data)).rejects.toBeInstanceOf(MailRetry);
+      expect(ledger.claims).toEqual([]);
+    });
+  });
+
+  it('with plans open, reads no sites and keeps its wording', async () => {
+    const s = store();
+    const { h, transport } = setup(s);
+    await h.accountEmail(data);
+    expect(s.trialSites).not.toHaveBeenCalled();
+    expect(transport.sent[0]!.text).toContain('Unless you choose a plan');
+  });
 });
 
 describe('check notify (v1’s rules, D2)', () => {
@@ -309,6 +364,41 @@ describe('the fix to a developer', () => {
     expect(s.markFixEmailSent).toHaveBeenCalledWith('r1', NOW);
     // The second run marks it too: a run that sent and stopped before marking is finished by the next.
     expect(s.markFixEmailSent).toHaveBeenCalledTimes(2);
+  });
+
+  describe('with a framework named', () => {
+    const PACKET = withBodies(FIX.packet!, ['wordpress']);
+    const [own, wordpress] = packetBodies(PACKET);
+    const several = () =>
+      store({
+        fixEmailRequest: vi.fn(async () => ({
+          toEmail: 'dev@example.com',
+          sentAt: null,
+          accountId: ACCOUNT,
+          host: 'example.com',
+          fix: { ...FIX, packet: PACKET },
+        })),
+      });
+
+    it('sends the body written for it, not the packet’s own', async () => {
+      const { h, transport } = setup(several());
+      expect(await h.fixToDeveloper('r1', 'wordpress')).toBe('sent');
+      expect(transport.sent[0]!.text).toContain(packetPrompt(FIX, wordpress!));
+      expect(transport.sent[0]!.text).not.toContain(packetPrompt(FIX, own!));
+    });
+
+    it('with none named, sends the packet’s own', async () => {
+      const { h, transport } = setup(several());
+      await h.fixToDeveloper('r1');
+      expect(transport.sent[0]!.text).toContain(packetPrompt(FIX, own!));
+    });
+
+    it('with one the packet no longer has a body for, sends nothing', async () => {
+      const { h, transport, ledger } = setup(several());
+      expect(await h.fixToDeveloper('r1', 'shopify_liquid')).toBe('no_body');
+      expect(transport.sent).toEqual([]);
+      expect(ledger.claims).toEqual([]);
+    });
   });
 
   it('does not mark a send that did not go out', async () => {
@@ -512,6 +602,7 @@ describe('check_finished (D11)', () => {
           trigger: 'manual',
           status: 'partial',
           accountId: null,
+          competitor: false,
         })),
       }),
     );
@@ -520,6 +611,23 @@ describe('check_finished (D11)', () => {
       `check:${checkRef(CHECK)}`,
       null,
     ]);
+  });
+});
+
+describe('check_finished for a competitor’s check (row 18)', () => {
+  it('captures nothing: it is no one’s audit', async () => {
+    const { h, capture } = setup(
+      store({
+        finishedCheck: vi.fn(async () => ({
+          trigger: 'manual',
+          status: 'finished',
+          accountId: null,
+          competitor: true,
+        })),
+      }),
+    );
+    expect(await h.checkFinished(CHECK)).toBe('competitor');
+    expect(capture).not.toHaveBeenCalled();
   });
 });
 

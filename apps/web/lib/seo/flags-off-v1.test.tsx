@@ -3,6 +3,9 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The page reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
+
 // CC-40 D2: with the v2 flags off, everything D2 changes is byte-identical to what main served at
 // `capturedFrom`. The fixture was captured on that commit, before any D2 change, by rendering each
 // of these through the same calls as below; the root share card is compared as the sha256 of its PNG.

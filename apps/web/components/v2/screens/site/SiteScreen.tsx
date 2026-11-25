@@ -9,6 +9,7 @@ import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
 import { Notice, type NoticeView } from '../account/Notice';
 import { MarkDone } from './MarkDone';
+import { PublicLinkControl } from './PublicLink';
 import { CardHead } from '../account/parts';
 import { verdictCell } from '../account/verdict-cells';
 import { CopyText } from '../segment/CopyText';
@@ -218,10 +219,25 @@ export function SiteScreen({
               muted: r.muted,
               cells: [
                 r.label,
-                <span key="v" className={r.mono ? shared.mono : undefined}>
+                <span
+                  key="v"
+                  className={
+                    [r.mono ? shared.mono : '', r.publicLink ? styles.linkValue : '']
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
+                >
                   {r.value}
                 </span>,
-                r.action ? <ActionControl key="a" action={r.action} variant="quiet" /> : '',
+                r.publicLink ? (
+                  <span key="a" className={styles.publicLink}>
+                    <PublicLinkControl link={r.publicLink} open={r.action} />
+                  </span>
+                ) : r.action ? (
+                  <ActionControl key="a" action={r.action} variant="quiet" />
+                ) : (
+                  ''
+                ),
               ],
             }))}
           />

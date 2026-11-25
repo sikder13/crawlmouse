@@ -25,6 +25,7 @@ import {
   renderedPills,
   renderedText,
   splitAtKeep,
+  withoutSkipLink,
   squash,
   withoutShell,
 } from './_lib/lock';
@@ -126,7 +127,7 @@ describe('Final-Result, the bad site', () => {
     'reads as %s above the keep bar, with each registered change and nothing else',
     (file) => {
       const [lockedMain] = splitAtKeep(locked(file), '<div id="keep"');
-      const [ourMain] = splitAtKeep(html, '<aside id="keep"');
+      const [ourMain] = splitAtKeep(withoutSkipLink(html), '<aside id="keep"');
       expect(
         firstDifference(expected(lockedMain + '</x-dc>', 'result'), renderedText(ourMain)),
       ).toBeNull();

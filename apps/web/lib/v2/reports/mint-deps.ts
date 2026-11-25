@@ -14,7 +14,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 import { newReportSlug } from '../../slug';
 import { verifyTurnstileToken } from '../../turnstile';
 import { findCheck, siteOf } from '../fixtures';
-import { loadCheck, supabaseCheckReader } from '../pipeline/load';
+import { loadCheckWithHistory, supabaseCheckReader } from '../pipeline/load';
 import { buildPublicSnapshot } from './build-snapshot';
 import type { MintV2Deps } from './mint';
 
@@ -76,7 +76,9 @@ export function supabaseMintDeps(
       return (data?.slug as string | undefined) ?? null;
     },
     async snapshotOf(checkId, mintedAt) {
-      const dataset = await loadCheck(supabaseCheckReader(admin), checkId);
+      // With the site's earlier checks, as the audit page reads it: the fixes of a later check name
+      // the check that first saw them (F-261).
+      const dataset = await loadCheckWithHistory(supabaseCheckReader(admin), checkId);
       return {
         snapshot: buildPublicSnapshot(dataset, checkId, mintedAt),
         accountId: siteOf(dataset, findCheck(dataset, checkId)).account_id,

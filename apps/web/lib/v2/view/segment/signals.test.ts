@@ -132,7 +132,7 @@ describe('signalsView: the competitor', () => {
 
   it('words the comparison from the numbers', () => {
     const c = view('bad-site', (ch) => {
-      ch.competitors[0]!.technical_seo.score = 79;
+      ch.competitors[0]!.technical_seo!.score = 79;
       ch.competitors[0]!.text_share = 0.2;
     }).competitor!;
     expect(c.verdict).toBe(
@@ -140,8 +140,84 @@ describe('signalsView: the competitor', () => {
     );
   });
 
+  it("says what the competitor's check could not measure, and compares only the rest", () => {
+    const c = view('bad-site', (ch) => {
+      const rival = ch.competitors[0] as unknown as Record<string, unknown>;
+      rival.text_share = null;
+      rival.technical_seo = null;
+    }).competitor!;
+    expect(c.rows.slice(1, 3)).toEqual([
+      { measure: 'Text without JavaScript', own: '31%', theirs: 'not measured', pro: false },
+      { measure: 'Technical SEO', own: 'B · 79', theirs: 'not graded', pro: false },
+    ]);
+    expect(c.verdict).toBe('');
+  });
+
+  it('compares the measure both checks hold when only one of the competitor’s is missing', () => {
+    const c = view('bad-site', (ch) => {
+      (ch.competitors[0] as unknown as Record<string, unknown>).text_share = null;
+    }).competitor!;
+    expect(c.rows[1]!.theirs).toBe('not measured');
+    expect(c.rows[2]!.theirs).toBe('B- · 72');
+    expect(c.verdict).toBe('You are ahead on technical SEO.');
+  });
+
   it('has no comparison when the audit named no competitor', () => {
     expect(view('clean-site').competitor).toBeNull();
+  });
+});
+
+describe('signalsView: a plan that compares competitors (F-256)', () => {
+  /** bad-site's signals page as a reader whose plan compares `competitors`. */
+  const paid = (competitors: number, edit?: Parameters<typeof edited>[1]) => {
+    const { d, id } = edited('bad-site', edit);
+    return signalsView(d, id, { asFirstSeen: asFirstSeen('bad-site'), competitors });
+  };
+
+  it('Pro shows the compared competitor in full, with no preview held back', () => {
+    const v = paid(1);
+    expect(v.competitor).toBeNull();
+    expect(v.compared).toHaveLength(1);
+    // summitgear.co's snapshot: AI readability A- · 88, 4 agent signals.
+    expect(v.compared[0]!.rows.slice(3)).toEqual([
+      { measure: 'AI readability', own: 'D · 41', theirs: 'A- · 88', pro: false },
+      { measure: 'Agent signals present', own: '2 of 7', theirs: '4 of 7', pro: false },
+    ]);
+    expect(v.compared[0]!.rows.some((r) => r.theirs === 'with Pro')).toBe(false);
+  });
+
+  it('says what the competitor’s check could not give, never a held figure', () => {
+    const v = paid(1, (ch) => {
+      const rival = ch.competitors[0] as unknown as Record<string, unknown>;
+      rival.ai_readability = null;
+      rival.signals_present = null;
+    });
+    expect(v.compared[0]!.rows.slice(3).map((r) => r.theirs)).toEqual(['withheld', 'not read']);
+  });
+
+  it('Agency shows every compared competitor up to its three, and no more', () => {
+    const rivals = (n: number) => (ch: { competitors: { host: string }[] }) => {
+      const first = ch.competitors[0]!;
+      ch.competitors.splice(
+        0,
+        ch.competitors.length,
+        ...Array.from({ length: n }, (_, i) => ({ ...first, host: `rival-${i + 1}.example` })),
+      );
+    };
+    expect(paid(3, rivals(3)).compared.map((c) => c.host)).toEqual([
+      'rival-1.example',
+      'rival-2.example',
+      'rival-3.example',
+    ]);
+    expect(paid(3, rivals(4)).compared).toHaveLength(3);
+    // Pro's one, of the same four.
+    expect(paid(1, rivals(4)).compared.map((c) => c.host)).toEqual(['rival-1.example']);
+  });
+
+  it('a reader whose plan compares none still gets the preview held for Pro', () => {
+    const v = paid(0);
+    expect(v.compared).toEqual([]);
+    expect(v.competitor?.rows.slice(3).map((r) => r.theirs)).toEqual(['with Pro', 'with Pro']);
   });
 });
 

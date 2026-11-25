@@ -6,6 +6,9 @@ import { WEB_ROOT } from './_lib/tokens-css';
 import { V2_REWRITES } from '../../lib/v2/rewrites';
 import { isFlagGated } from '../v1-inventory-source';
 
+// The Home preview reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
+
 const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
 /**
  * The account door's pages (CC-25), the first live pages on the v2 design system: their group's
@@ -212,6 +215,8 @@ describe('v2 stays out of live pages', () => {
     // CC-28: the Alerts page and the changes log.
     join(WEB_ROOT, 'app', 'alerts'),
     join(WEB_ROOT, 'app', 'changes'),
+    // Row 18 (F-256): the rail's Competitors, a redirect to where competitors are compared.
+    join(WEB_ROOT, 'app', 'competitors'),
     // CC-31 workstream B2: the proof page, signed in and through a share link.
     join(WEB_ROOT, 'app', 'reports'),
     join(WEB_ROOT, 'app', 's'),
@@ -228,6 +233,8 @@ describe('v2 stays out of live pages', () => {
     // CC-31: a report's document prints a verdict's word as the screens do. It imports
     // components/v2/verdicts.ts, which is data: a type import and no style.
     file === join(WEB_ROOT, 'lib', 'v2', 'reports', 'generate-doc.ts') ||
+    // RC-20: the root 404 reaches v2 only through a client island that loads the screen on demand.
+    file === join(WEB_ROOT, 'app', 'not-found.tsx') ||
     // A test beside the code it tests; the next case holds that no other module imports one.
     /\.test\.tsx?$/.test(file);
 
@@ -256,6 +263,7 @@ describe('v2 stays out of live pages', () => {
       'app/agency/reports/page.tsx',
       'app/alerts/page.tsx',
       'app/changes/page.tsx',
+      'app/competitors/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/invite/page.tsx',
       'app/reports/[id]/page.tsx',
@@ -329,6 +337,7 @@ describe('v2 stays out of live pages', () => {
       'app/(account)/layout.tsx',
       'app/(account)/login/verify/continue/page.tsx',
       'app/(account)/settings/delete/page.tsx',
+      'app/(account)/settings/integrations/page.tsx',
       'app/(account)/settings/page.tsx',
       'app/(account)/settings/pages.test.tsx',
       'app/(account)/settings/plan/cancel-flow.test.ts',

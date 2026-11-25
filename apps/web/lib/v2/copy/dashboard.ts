@@ -16,6 +16,16 @@ export const DASHBOARD_COPY = {
     hosts.length === 1
       ? `${hosts[0]} is kept.`
       : `${capitalise(numberWord(hosts.length))} sites are kept.`,
+  /** The heading when every site the account keeps is paused (F-235). */
+  allPaused: 'Every site is paused.',
+  /** The sites note with some paused, within the plan's limit: a paused site still holds its slot. */
+  sitesWithPaused: (slots: number, limit: number, plan: string, paused: number) =>
+    `${slots} of ${limit} on ${plan} · ${paused} paused`,
+  /** The sites note over the plan's limit, as after a trial ends: how many are checked (F-235). */
+  sitesOverLimit: (checked: number, slots: number, plan: string, limit: number) =>
+    `${checked} of ${slots} sites checked · ${plan} checks ${limit} ${plural(limit, 'site', 'sites')}`,
+  /** The first-run note with every site paused: no check is scheduled to compare against (F-234). */
+  firstRunAllPaused: 'Every site is paused, so none is scheduled. Nothing to compare yet.',
   /** "Since Thursday's check", or, where a weekday would be ambiguous, "Since the check of Fri 23 Oct". */
   since: (name: { weekday: string } | { date: string }) =>
     'weekday' in name ? `Since ${name.weekday}'s check` : `Since the check of ${name.date}`,
@@ -122,9 +132,7 @@ export const DASHBOARD_COPY = {
  */
 const competitorsOf = (n: number) => `${numberWord(n)} ${plural(n, 'competitor', 'competitors')}`;
 const SLACK = 'Slack';
-const SEARCH_CONSOLE = 'Search Console';
 const STAGING = 'a staging URL';
-const OBSERVED = 'Cloudflare Analytics or a Vercel Drain';
 
 export const SETUP_COPY = {
   slack: {
@@ -138,20 +146,10 @@ export const SETUP_COPY = {
     done: (n: number) =>
       `${capitalise(numberWord(n))} ${plural(n, 'competitor', 'competitors')} added`,
   },
-  searchConsole: {
-    subject: SEARCH_CONSOLE,
-    todo: `Connect ${SEARCH_CONSOLE} to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it`,
-    done: 'Search Console connected',
-  },
   staging: {
     subject: STAGING,
-    todo: `Add ${STAGING} so audits run before each deploy`,
+    todo: `Add ${STAGING} so audits run after each staging deploy`,
     done: 'Staging audited on each deploy',
-  },
-  observed: {
-    subject: OBSERVED,
-    todo: `Connect ${OBSERVED} to see what the AI crawlers actually fetched`,
-    done: 'Observed crawler activity connected',
   },
   schedule: (when: string) => `Choose the day and hour the weekly check runs (now ${when})`,
 };
@@ -309,20 +307,28 @@ const DAY0: CopyChange[] = [
   },
   {
     screen: 'dashboard-day0',
-    kind: 'facts',
-    locked: "Connect Search Console to lay Google's AI-feature impressions over these pages",
-    rendered:
-      "Connect Search Console to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it",
-    source: 'FACTS H6',
+    kind: 'ruling',
+    locked:
+      "Connect Search Console to lay Google's AI-feature impressions over these pages Connect",
+    rendered: '',
+    source:
+      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them',
   },
   {
     screen: 'dashboard-day0',
-    kind: 'facts',
+    kind: 'ruling',
     locked: 'before each deploy Add All four stop',
-    rendered:
-      'before each deploy Add Connect Cloudflare Analytics or a Vercel Drain to see what the AI crawlers actually fetched Connect All five stop',
+    rendered: 'before each deploy Add All three stop',
     source:
-      'FACTS l.57: observed crawler activity is the fifth Pro set-up item (GATES.observedCrawlerActivity); the count is the items’',
+      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them; the count is the items’',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Add a staging URL so audits run before each deploy',
+    rendered: 'Add a staging URL so audits run after each staging deploy',
+    source:
+      'V2R register, F-097 (CTO 057): the deploy hook fires once a staging deploy has finished, so the audit runs after it',
   },
   {
     screen: 'dashboard-day0',
@@ -365,6 +371,14 @@ const DAY0: CopyChange[] = [
 
 const HOME: CopyChange[] = [
   ...railChanges('dashboard'),
+  {
+    screen: 'dashboard',
+    kind: 'ruling',
+    locked: '5 sites ·',
+    rendered: '4 sites ·',
+    source:
+      'Owner ruling Q10: a staging site holds no primary slot (ARCH-2 §2.5), so the count of sites leaves it out (F-097)',
+  },
   {
     screen: 'dashboard',
     kind: 'fixture',
@@ -527,6 +541,14 @@ const HOME: CopyChange[] = [
   },
   {
     screen: 'dashboard',
+    kind: 'ruling',
+    locked: 'Two things left to set up',
+    rendered: 'Everything is set up',
+    source:
+      'V2R register (CTO ruling 047, 23 Nov): the two items left in the locked page are not offered, so on this fixture nothing is left',
+  },
+  {
+    screen: 'dashboard',
     kind: 'facts',
     locked: 'done Alerts to email and Slack',
     rendered: 'done Slack alerts connected',
@@ -535,13 +557,12 @@ const HOME: CopyChange[] = [
   },
   {
     screen: 'dashboard',
-    kind: 'facts',
+    kind: 'ruling',
     locked:
       "One competitor added 2 min Connect Search Console to lay Google's AI-feature impressions over these pages Connect 1 min",
-    rendered:
-      "One competitor added Connect Search Console to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it Connect done Staging audited on each deploy Connect Cloudflare Analytics or a Vercel Drain to see what the AI crawlers actually fetched Connect",
+    rendered: 'One competitor added done Staging audited on each deploy',
     source:
-      'FACTS H6 and l.57: the Pro set-up items from the gates, staging done (a staging site exists) and observed crawler activity not connected; the efforts "2 min" and "1 min" are in no record and are left out',
+      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them; staging is done (a staging site exists); the efforts "2 min" and "1 min" are in no record and are left out',
   },
   {
     screen: 'dashboard',

@@ -32,7 +32,7 @@ A `check.requested` event becomes a finished, persisted, readable check: `reques
 | `crawlmouse.check.cancelled` | `inngest/function.cancelled` of the check function | fails `canceled` the check the cancelled run’s event named, or else the check its run claimed; `onFailure` does not fire on a cancel or a timeout |
 | `crawlmouse.check.reaper`    | cron `*/10 * * * *`                                | fails a queued or running check whose heartbeat (or, unclaimed, its queue time) is older than 45 minutes, and releases its posted batches         |
 
-Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the registered functions’ limits are clamped to, v1’s audit function included (Q3; `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts` sweeps them). The check function’s account-wide limit is `INNGEST_CHECK_CONCURRENCY`, default 2. Its per-site key does not keep two checks of a site apart, because Inngest counts executing steps and a sleeping run holds none; the database does (`checks_one_running_per_site`, Q13).
+Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 100` (Inngest Pro, 100 concurrent steps, read 2026-11-23), which the registered functions’ limits are clamped to, v1’s audit function included (Q3; `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts` sweeps them). The check function’s account-wide limit is `INNGEST_CHECK_CONCURRENCY`, default 16, the production worker’s batch slots: a batch past them is answered busy and the check waits. v1’s audits default to 5. Its per-site key does not keep two checks of a site apart, because Inngest counts executing steps and a sleeping run holds none; the database does (`checks_one_running_per_site`, Q13).
 
 ## The steps of a check
 
@@ -54,23 +54,24 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the 
 
 ## Polling and time
 
-| Bound                                                                                    | Value                   |
-| ---------------------------------------------------------------------------------------- | ----------------------- |
-| First poll wait, doubling to                                                             | 5 s, 30 s               |
-| A batch is lost after its `max_seconds` plus                                             | 60 s                    |
-| A lost batch (`not_found`) is posted again                                               | once                    |
-| Wait after the worker answers busy                                                       | 30 s                    |
-| Wait budget, before and after the first crawl batch; time after it is added to the crawl | 900 s                   |
-| The latest first crawl batch that still gets a whole crawl window, from the first claim  | 1260 s                  |
-| The run’s finish timeout                                                                 | 2220 s                  |
-| Crawl phase ceiling, from the first crawl batch the worker accepts                       | 480 s                   |
-| The longest wait on a worker’s done signal before one poll                               | 60 s                    |
-| Access stages’ slice                                                                     | 300 s                   |
-| Reserve for render, build, persist, finalize                                             | 180 s                   |
-| A batch that would get less is not posted                                                | 60 s                    |
-| Discovery                                                                                | 60 s, 5000 sitemap URLs |
-| Crawl batches per check                                                                  | 40                      |
-| Default page cap                                                                         | 500                     |
+| Bound                                                                                    | Value                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| First poll wait, doubling to                                                             | 5 s, 30 s                                                                                                                                                                                                  |
+| A batch is lost after its `max_seconds` plus                                             | 60 s                                                                                                                                                                                                       |
+| A lost batch (`not_found`) is posted again                                               | once                                                                                                                                                                                                       |
+| Wait after the worker answers busy                                                       | 30 s                                                                                                                                                                                                       |
+| Wait budget, before and after the first crawl batch; time after it is added to the crawl | 900 s                                                                                                                                                                                                      |
+| The latest first crawl batch that still gets a whole crawl window, from the first claim  | 1260 s                                                                                                                                                                                                     |
+| The run’s finish timeout                                                                 | 2220 s                                                                                                                                                                                                     |
+| Crawl phase ceiling, from the first crawl batch the worker accepts                       | 480 s                                                                                                                                                                                                      |
+| The longest wait on a worker’s done signal before one poll                               | 60 s                                                                                                                                                                                                       |
+| Access stages’ slice                                                                     | 300 s                                                                                                                                                                                                      |
+| Reserve for render, build, persist, finalize                                             | 180 s                                                                                                                                                                                                      |
+| A batch that would get less is not posted                                                | 60 s                                                                                                                                                                                                       |
+| Kept after a batch, inside its phase, for the poll grace and one poll                    | crawl: none; crawl batches end by the crawl's end, requests in flight finish within the worker's request timeout after it, and the grace and poll fall after it, in the access slice (F-247); access: 90 s |
+| Discovery                                                                                | 60 s, 5000 sitemap URLs                                                                                                                                                                                    |
+| Crawl batches per check                                                                  | 40                                                                                                                                                                                                         |
+| Default page cap                                                                         | 500                                                                                                                                                                                                        |
 
 | Batch budget | Requests | Bytes   | Seconds (cut to the time left) |
 | ------------ | -------- | ------- | ------------------------------ |
@@ -90,7 +91,7 @@ The worst case these allow fits the finish timeout, and the worst-case step coun
 | `canceled`               | the run was cancelled or passed its finish timeout (Inngest reports both alike)                                                                                                                                     |
 | `stalled`                | the reaper found a claimed check with no heartbeat within its bound                                                                                                                                                 |
 | `not_started`            | the reaper found a check that no run claimed within its bound                                                                                                                                                       |
-| `worker_redeployed`      | a batch came from another worker release than the check’s first (Q10)                                                                                                                                               |
+| `worker_redeployed`      | a batch came from another worker release than the check’s first (Q10), in the check’s one retry run: a first run that meets one is queued again and retried from the start (F-260)                                  |
 | `worker_unavailable`     | no crawl batch could be read: the worker did not answer, refused the app’s credentials, lost a batch twice, kept a batch running past its deadline, or its result could not be read                                 |
 | `capacity_wait_exceeded` | the worker answered, busy with other checks, until the next wait for the first crawl batch would have passed the wait budget (900 s) or 1260 s from the start: the check never won a slot                           |
 | `site_unreachable`       | no page was read, robots.txt on the homepage’s origin got no answer (a network failure or a timeout), and no robots.txt read got a status                                                                           |
@@ -119,7 +120,7 @@ A bucketed key’s check id is the engine’s `stableId` of the key, so two requ
 ## Differences from ARCH-2 §4
 
 - **Polling, not `check.batch.done` (D1).** The deployed worker holds no Inngest or database key and is polled; `step.sleep` holds no Vercel function open.
-- **Concurrency default 2, not 20 (D3).** The limits are clamped to the plan cap (above); a higher one makes Inngest refuse the whole app sync.
+- **Concurrency default 16 (D3, revised for Inngest Pro).** The limits are clamped to the plan cap (above); a higher one makes Inngest refuse the whole app sync.
 - **The database serialises a site’s checks**, not the concurrency key (above).
 - **Cancel and timeout** are caught by a function of their own, since `onFailure` does not see them.
 - **Sitemaps are read by the app** (Q8); the worker reads robots.txt for itself and the sitemap’s status only.
@@ -133,4 +134,4 @@ A bucketed key’s check id is the engine’s `stableId` of the key, so two requ
 - **`loadCheck` returns `provenance: "measured"`** (Q2), not FixtureDataset’s `"fixture"`.
 - **`V2_PIPELINE` registers the functions only** (Q6); the account door’s promises about checks moved to `V2_CHECKS_PUBLIC`.
 - **Persistence is staged** (Q11), and **008 creates more than D6 listed** (its table, its columns and `persist_built_check`): `persist_chunks`, `checks_one_running_per_site` and `checks_heartbeat_idx`, and `check_failure_reasons`, `claim_check`, `fail_check`, `reap_stalled_checks`, `stage_check_rows` (Q11, Q13, review round 1).
-- **v1’s audit function clamps its concurrency to the plan cap**, not 100 (Q3).
+- **v1’s audit function clamps its concurrency to the plan cap** (Q3), and defaults to the 5 it ran at.

@@ -1,0 +1,25 @@
+.main {
+  flex: 1;
+  padding-top: 96px;
+  padding-bottom: 120px;
+}
+
+.code {
+  margin: 0 0 12px;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.lead {
+  margin: 16px 0 0;
+  max-width: 620px;
+  font-size: 18px;
+  color: var(--v2-fg2);
+}
+
+.actions {
+  margin-top: 28px;
+  gap: 8px;
+  flex-wrap: wrap;
+}

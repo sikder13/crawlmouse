@@ -134,6 +134,12 @@ export interface CompetitorRowView {
   pro: boolean;
 }
 
+export interface CompetitorView {
+  host: string;
+  rows: CompetitorRowView[];
+  verdict: string;
+}
+
 export interface SignalsView {
   frame: SegmentFrame;
   headline: { title: string; pill: DoorView['pill'] };
@@ -141,7 +147,10 @@ export interface SignalsView {
   tiles: { label: string; value: string; note: string | null }[];
   rows: SignalRowView[];
   coverage: { read: string };
-  competitor: { host: string; rows: CompetitorRowView[]; verdict: string } | null;
+  /** The preview held for Pro: the first compared competitor, for a reader whose plan compares none. */
+  competitor: CompetitorView | null;
+  /** Each compared competitor in full, up to the reader's plan's number (F-256); empty on Free. */
+  compared: CompetitorView[];
   keep: { title: string; sub: string } | null;
 }
 
@@ -200,9 +209,12 @@ function weightSentence(check: Check): string {
   return `${capitalise(numberWord(counting.length))} of them, ${names}, ${worth} the AI readability grade; the other ${numberWord(rest)} change nothing yet and add no fixes.`;
 }
 
-function competitorOf(check: Check, present: number): SignalsView['competitor'] {
-  const c = check.competitors[0];
-  if (!c) return null;
+function competitorOf(
+  check: Check,
+  c: Check['competitors'][number],
+  present: number,
+  held: boolean,
+): CompetitorView {
   const ai = check.crawlers.filter(isAi);
   const seo = check.technical_seo;
   const air = check.ai_readability;
@@ -210,9 +222,15 @@ function competitorOf(check: Check, present: number): SignalsView['competitor'] 
     seo: seo?.score ?? null,
     read: check.without_js?.site_text_share ?? null,
   };
-  const side = (mine: number | null, theirs: number) =>
-    mine === null ? null : mine > theirs ? 'ahead' : mine < theirs ? 'behind' : 'level';
-  const seoSide = side(own.seo, c.technical_seo.score);
+  const side = (mine: number | null, theirs: number | null) =>
+    mine === null || theirs === null
+      ? null
+      : mine > theirs
+        ? 'ahead'
+        : mine < theirs
+          ? 'behind'
+          : 'level';
+  const seoSide = side(own.seo, c.technical_seo?.score ?? null);
   const readSide = side(own.read, c.text_share);
   const parts = [
     seoSide ? `${seoSide} on technical SEO` : null,
@@ -230,26 +248,36 @@ function competitorOf(check: Check, present: number): SignalsView['competitor'] 
       {
         measure: 'Text without JavaScript',
         own: own.read === null ? 'not measured' : `${percent(own.read)}%`,
-        theirs: `${percent(c.text_share)}%`,
+        theirs: c.text_share === null ? 'not measured' : `${percent(c.text_share)}%`,
         pro: false,
       },
       {
         measure: 'Technical SEO',
         own: seo?.grade ? `${seo.grade} · ${seo.score}` : 'not graded',
-        theirs: `${c.technical_seo.grade} · ${c.technical_seo.score}`,
+        theirs: c.technical_seo
+          ? `${c.technical_seo.grade} · ${c.technical_seo.score}`
+          : 'not graded',
         pro: false,
       },
       {
         measure: 'AI readability',
         own: air && !air.withheld ? `${air.grade} · ${air.total}` : 'withheld',
-        theirs: 'with Pro',
-        pro: true,
+        theirs: held
+          ? 'with Pro'
+          : c.ai_readability
+            ? `${c.ai_readability.grade} · ${c.ai_readability.score}`
+            : 'withheld',
+        pro: held,
       },
       {
         measure: 'Agent signals present',
         own: `${present} of ${KINDS.length}`,
-        theirs: 'with Pro',
-        pro: true,
+        theirs: held
+          ? 'with Pro'
+          : c.signals_present === null
+            ? 'not read'
+            : `${c.signals_present} of ${KINDS.length}`,
+        pro: held,
       },
     ],
     verdict: parts.length ? `You are ${parts.join(' and ')}.` : '',
@@ -267,7 +295,15 @@ export function signalsView(
   const by = (state: string) => screenSignals(check).filter((s) => s.state === state).length;
   const present = by('detected');
   const absent = by('not_detected');
-  const competitor = competitorOf(check, present);
+  // F-256: a plan that compares competitors sees each of them in full, as many as it allows; any
+  // other reader sees the first as the preview held for Pro.
+  const allowed = options.competitors ?? 0;
+  const compared =
+    allowed > 0
+      ? check.competitors.slice(0, allowed).map((c) => competitorOf(check, c, present, false))
+      : [];
+  const first = check.competitors[0];
+  const competitor = allowed === 0 && first ? competitorOf(check, first, present, true) : null;
   const max = check.ai_readability?.components.signals.max;
   return {
     frame,
@@ -296,6 +332,7 @@ export function signalsView(
     rows,
     coverage: { read: `Tested ${present + absent} of ${KINDS.length} signals` },
     competitor,
+    compared,
     keep: frame.keptUntil
       ? {
           title: `Keep this audit: these ${numberWord(KINDS.length)} signals are re-checked monthly, and the note you get when something changes covers them too.`,

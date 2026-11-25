@@ -185,10 +185,10 @@ describe('crawlAndPersist (A2: the big crawl result never crosses an Inngest ste
 // "exactly one step, returning a small value", so — following this repo's load-harness-guard
 // pattern — we assert the step structure against the source text. (Deterministic, no network.)
 // Inngest rejects the WHOLE app sync (no functions register, no audit ever runs) if a function's
-// concurrency exceeds the account plan cap (Free = 5). The limit must therefore be plan-safe by
-// default and tunable by env, never a hardcoded Pro-tier number.
+// concurrency exceeds the account plan cap (Pro: 100; it was 5 on Free). The limit must therefore be
+// plan-safe by default and tunable by env, never a hardcoded number above the cap.
 describe('auditConcurrencyLimit (Inngest plan-cap safety)', () => {
-  it('defaults to the Free-plan-safe 5 when the env var is unset', () => {
+  it('defaults to the 5 v1 audits have run at when the env var is unset', () => {
     expect(auditConcurrencyLimit({})).toBe(5);
   });
 
@@ -205,9 +205,8 @@ describe('auditConcurrencyLimit (Inngest plan-cap safety)', () => {
   });
 
   it('clamps any value above the plan cap to the cap, so no env value can break app sync', () => {
-    // The cap is the account's Inngest plan cap (Free: 5), shared with checkFn
-    // (concurrency.ts). Before CC-20b this clamped at 100, so `6` already broke sync on Free.
-    for (const raw of ['6', '50', '100', '101', '500', '1000000']) {
+    // The cap is the account's Inngest plan cap (Pro: 100), shared with checkFn (concurrency.ts).
+    for (const raw of ['101', '500', '1000000']) {
       expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: raw })).toBe(PLAN_CONCURRENCY_CAP);
     }
   });

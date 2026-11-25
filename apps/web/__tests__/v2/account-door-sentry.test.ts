@@ -151,10 +151,13 @@ describe('the server SDK sends no door secret in an event or a transaction', () 
 
   it('without either, the SDK does send them (the test sees what it guards against)', () => {
     const out = capturedWith('none');
+    // @sentry/nextjs 10.75.3 filters the token_hash query parameter itself (measured: the URL and the
+    // breadcrumb carry `token_hash=[Filtered]`), so the unscrubbed run no longer sends URLCANARY. The
+    // scrubber still removes it in the cases above; this line fails if the SDK stops filtering it.
+    expect(out).toContain('token_hash=[Filtered]');
     for (const canary of [
       ...NAMED_COOKIES,
       'ANONCANARY',
-      'URLCANARY',
       'CHECKIDCANARY',
       'c4ec4c4e-c4ec',
       'LINKCANARY',

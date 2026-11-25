@@ -413,6 +413,34 @@ describe('POST /api/agency-trial', () => {
     expect(r.admin).toBe(0);
   });
 
+  it('while paying is kept to one user, anyone else is refused 404, before the service-role client', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_AGENCY_SALES', '1');
+    vi.stubEnv('V2_BILLING_ONLY_USER', 'u0000000-0000-4000-8000-0000000000ff');
+    r.user = USER;
+    const { POST } = await import('./route');
+    const res = await POST(json(GOOD));
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'not_found' });
+    expect(r.admin).toBe(0);
+  });
+
+  it('while paying is kept to one user, that user starts the trial', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_AGENCY_SALES', '1');
+    vi.stubEnv('V2_BILLING_ONLY_USER', ` ${USER.id} `);
+    r.user = USER;
+    vi.resetModules();
+    vi.doMock('@/lib/v2/account/sites', () => ({
+      admittedHost: async () => ({ ok: true, host: 'clientsite.com' }),
+    }));
+    const { POST } = await import('./route');
+    vi.doUnmock('@/lib/v2/account/sites');
+    const res = await POST(json(GOOD));
+    expect(await res.json()).toEqual({ url: URL_NEW });
+    expect(r.admin).toBeGreaterThan(0);
+  });
+
   it('404 with V2_BILLING unset, before the service-role client', async () => {
     vi.stubEnv('V2_BILLING', '');
     r.user = USER;

@@ -90,6 +90,17 @@
   padding: 18px 24px;
 }
 
+.developer {
+  padding: 0 24px 18px;
+}
+
+.developer form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
 .card {
   padding: 20px 22px;
 }

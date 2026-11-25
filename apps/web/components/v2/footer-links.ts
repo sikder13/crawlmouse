@@ -95,7 +95,8 @@ const GUIDES: LiveLink = { label: 'Guides', href: '/guides' };
 const DOCS: PlannedLink = { label: 'Docs', planned: true };
 const DEVELOPERS: LiveLink = { label: 'Developers', href: '/developers' };
 const PRICING: LiveLink = { label: 'Pricing', href: '/pricing' };
-const FOR_AGENCIES: LiveLink = { label: 'For agencies', href: '/agencies' };
+/** For agencies' page; Home's Agency card links it while the plan is not on sale. */
+export const FOR_AGENCIES: LiveLink = { label: 'For agencies', href: '/agencies' };
 
 /** The marketing header: four top-level items, Developers under Learn. */
 export const MARKETING_NAV: NavEntry[] = [
@@ -134,21 +135,14 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: 'Free checks',
     items: [
-      {
-        label: 'Is GPTBot blocked?',
-        href: '/ai-readiness-checker',
-        note: 'The checker reads robots.txt and builds the per-crawler access matrix, GPTBot included.',
-      },
-      {
-        label: 'JavaScript-only content?',
-        href: '/blog/can-ai-crawlers-see-javascript',
-        note: 'An article on how to check, until a dedicated check exists.',
-      },
-      {
-        label: 'robots.txt for AI',
-        href: '/blog/block-ai-crawlers-robots-txt',
-        note: 'An article: the robots.txt guide for GPTBot, ClaudeBot and the rest.',
-      },
+      { label: 'Is GPTBot blocked?', href: '/check/gptbot', gate: 'checksPublic' },
+      { label: 'JavaScript-only content?', href: '/check/javascript', gate: 'checksPublic' },
+      { label: 'robots.txt for AI', href: '/check/robots-ai', gate: 'checksPublic' },
+      // §13: these three earn search traffic (the first, 379 impressions in 28 days, is the site's
+      // largest), so the footer keeps its site-wide link to each (inbox 039).
+      { label: 'AI readiness checker', href: '/ai-readiness-checker' },
+      { label: 'Can AI crawlers see JavaScript?', href: '/blog/can-ai-crawlers-see-javascript' },
+      { label: 'Blocking AI crawlers in robots.txt', href: '/blog/block-ai-crawlers-robots-txt' },
     ],
   },
   {

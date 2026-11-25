@@ -48,6 +48,9 @@ function NavItem({ entry }: { entry: NavEntry }) {
 const Brand = memo(BrandLink);
 const Footer = memo(SiteFooter);
 
+/** Where the skip link lands: just after the header, so the next Tab enters the page. */
+const CONTENT_ID = 'v2-content';
+
 /** The page frame: canvas colours, the header with the brand, and the footer. */
 export function PageShell({
   header = 'marketing',
@@ -61,6 +64,9 @@ export function PageShell({
 }: PageShellProps) {
   return (
     <div className={styles.shell} data-v2-shell="">
+      <a href={`#${CONTENT_ID}`} className={styles.skip}>
+        Skip to content
+      </a>
       <header className={`${styles.header} ${styles[header]}`}>
         <div className={`${layout.wrap} ${layout.row} ${styles.bar}`}>
           <Brand />
@@ -74,6 +80,7 @@ export function PageShell({
           {actions ? <div className={`${layout.row} ${styles.actions}`}>{actions}</div> : null}
         </div>
       </header>
+      <span id={CONTENT_ID} tabIndex={-1} className={styles.content} />
       {children}
       {footer ? <Footer status={status} lineMark={footerLineMark} gates={footerGates} /> : null}
     </div>

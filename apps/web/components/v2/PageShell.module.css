@@ -49,6 +49,29 @@
   font-weight: 600;
 }
 
+/* The first Tab stop (F-085): off screen until it has focus. */
+.skip {
+  position: absolute;
+  left: 16px;
+  top: -64px;
+  z-index: 10;
+  padding: 8px 14px;
+  background: var(--v2-bg);
+  color: var(--v2-fg);
+  border: 1px solid var(--v2-line);
+  border-radius: 6px;
+}
+
+.skip:focus {
+  top: 8px;
+}
+
+.content {
+  display: block;
+  height: 0;
+  outline: none;
+}
+
 .header {
   flex: none;
 }

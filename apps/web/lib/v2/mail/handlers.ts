@@ -30,9 +30,10 @@ import type {
   MailHandlers,
   ReportMailHandlers,
 } from '../../../../../inngest/mail';
-import { packetPrompt } from '../view/segment/fixes';
+import { packetBodies, packetPrompt } from '../view/segment/fixes';
 import type { AgencyCapture } from '../agency/events';
 import { checkRef } from '../pipeline/public';
+import { afterTrial } from './after-trial';
 import { hashMailAddress } from './address-hash';
 import { unsubscribeHeaders } from './headers';
 import { reportDeclineUrl, reportPauseUrl } from './links';
@@ -46,6 +47,7 @@ import { fixToDeveloper } from './templates/fix-to-developer';
 import { reportConfirm } from './templates/report-confirm';
 import { seatInvite } from './templates/seat-invite';
 import { trialReminder } from './templates/trial-reminder';
+import { trialReminderKey } from './trial-key';
 import type { RenderedMail } from './types';
 
 /**
@@ -63,6 +65,8 @@ export interface MailHandlerDeps {
   mail: MailDeps;
   store: MailStore;
   capture: CaptureEvent;
+  /** Whether paid plans are open; with them closed the trial reminder offers none. Open by default. */
+  plansOpen?: () => boolean;
 }
 
 /** The link row each account template's `tokenId` names (CC-27b's emits). */
@@ -127,10 +131,18 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
     const endsAt = new Date(a.trialEndsAt);
     if (endsAt.getTime() <= mail.now().getTime()) return 'trial_over';
     if (a.ownerEmail === null) return 'no_owner';
+    // Read before the claim, so a failed read is retried with nothing claimed.
+    const closed = a.trialVariant === 'no_card' && d.plansOpen?.() === false;
+    const after = closed
+      ? afterTrial(
+          await read(store.trialSites(accountId)),
+          await read(store.trialOtherSeats(accountId)),
+        )
+      : undefined;
     return send(mail, {
       kind: 'trial_reminder',
       to: a.ownerEmail,
-      idempotencyKey: `trial_reminder:${accountId}:${endsAt.toISOString()}`,
+      idempotencyKey: trialReminderKey(accountId, endsAt),
       accountId,
       render: async () =>
         trialReminder({
@@ -138,6 +150,7 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
           variant: a.trialVariant!,
           endsAt: endsAt.toISOString(),
           timezone: a.timezone,
+          ...(after ? { after } : {}),
         }),
     });
   }
@@ -194,11 +207,18 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
       });
     },
 
-    async fixToDeveloper(requestId) {
+    async fixToDeveloper(requestId, framework) {
       const r = await read(store.fixEmailRequest(requestId));
       if (r === null) return 'not_found';
       if (r.fix.packet === null) return 'no_packet';
-      const packet = r.fix.packet;
+      // The steps the reader had on screen; an event naming none (one from before the field, or
+      // the dashboard's form) sends the packet's own. A named body a later check removed is not
+      // swapped for another framework's: nothing is sent.
+      const packet =
+        framework === undefined
+          ? r.fix.packet
+          : packetBodies(r.fix.packet).find((b) => b.framework === framework);
+      if (packet === undefined) return 'no_body';
       const outcome = await send(mail, {
         kind: 'fix_to_developer',
         to: r.toEmail,
@@ -226,6 +246,8 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
     async checkFinished(checkId) {
       const c = await read(store.finishedCheck(checkId));
       if (c === null) return 'not_found';
+      // A competitor's check is audited for a customer's comparison, not by anyone: not an audit.
+      if (c.competitor) return 'competitor';
       const ref = checkRef(checkId);
       await d.capture(
         'check_finished',
