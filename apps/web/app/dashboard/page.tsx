@@ -19,11 +19,7 @@ export const metadata = {
   alternates: { canonical: '/dashboard' },
 };
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ upgraded?: string }>;
-}) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
   const { upgraded } = await searchParams;
   const sb = await supabaseServer();
   const {
@@ -31,11 +27,7 @@ export default async function DashboardPage({
   } = await sb.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: planRow } = await sb
-    .from('users')
-    .select('pro_until')
-    .eq('id', user.id)
-    .maybeSingle();
+  const { data: planRow } = await sb.from('users').select('pro_until').eq('id', user.id).maybeSingle();
   const proUntil = planRow?.pro_until ?? null;
   const isPro = isProActive(proUntil);
   // Just paid but the entitlement webhook hasn't landed yet → show an activating state that polls,
@@ -48,12 +40,7 @@ export default async function DashboardPage({
   const sites = await loadDashboardSites(sb, admin, isPro);
   // §3 dashboard — per-site report-branding + visibility settings for the owner's claimed reports
   // (fail-soft: an empty map on any error, so the dashboard never breaks).
-  const reportSettingsByUrl = await loadReportSettingsForSites(
-    admin,
-    user.id,
-    sites.map((s) => s.siteUrl),
-    isPro,
-  );
+  const reportSettingsByUrl = await loadReportSettingsForSites(admin, user.id, sites.map((s) => s.siteUrl), isPro);
 
   return (
     <>
@@ -67,9 +54,7 @@ export default async function DashboardPage({
           </Link>
         </div>
 
-        <div className="mb-8">
-          {activating ? <ActivatingPro /> : <PlanStatusCard proUntil={proUntil} />}
-        </div>
+        <div className="mb-8">{activating ? <ActivatingPro /> : <PlanStatusCard proUntil={proUntil} />}</div>
 
         <DashboardView sites={sites} reportSettingsByUrl={reportSettingsByUrl} />
       </main>
