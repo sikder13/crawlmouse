@@ -16,6 +16,9 @@ import { fixture } from '../../lib/v2/fixtures';
 /** A mono character's width, at most, in em. */
 const CHAR_EM = 0.62;
 const css = readFileSync(join(__dirname, 'GradeHistory.module.css'), 'utf8');
+/** The chart's top padding and the rule that sizes its box (`.chart`). */
+const CHART_RULE = css.match(/\n\.chart \{([^}]*)\}/)![1]!;
+const PAD_TOP = Number(CHART_RULE.match(/padding: (\d+)px/)![1]);
 /** The axis lettering's size: the desktop rule, and the phone rule under `.fit`. */
 const DESKTOP = Number(css.match(/\n\.ticks text \{[^}]*font-size: (\d+)px/)![1]);
 const PHONE = Number(css.match(/\.fit \.ticks text \{[^}]*font-size: (\d+)px/)![1]);
@@ -92,4 +95,47 @@ describe('the history axis with two checks on one day (D-25)', () => {
       }
     },
   );
+
+  it('sets the time line at least 1.2 times the phone lettering under its day, inside the drawing', () => {
+    const d = new JSDOM(renderToStaticMarkup(<DashboardScreen data={sameDay()} />)).window.document;
+    const svg = d.querySelector('svg[data-v2-chart]')!;
+    const height = Number(svg.getAttribute('viewBox')!.split(' ')[3]);
+    const axis = [...svg.querySelectorAll('g')].at(-1)!;
+    for (const t of axis.querySelectorAll('text')) {
+      const baseline = Number(t.getAttribute('y'));
+      const dy = Number(t.querySelectorAll('tspan')[1]!.getAttribute('dy'));
+      expect(dy).toBeGreaterThanOrEqual(1.2 * PHONE);
+      // The time's descenders, a quarter of an em under its baseline, stay inside the drawing.
+      expect(baseline + dy + 0.25 * PHONE).toBeLessThanOrEqual(height);
+    }
+  });
+});
+
+describe('the chart’s box grows with its drawing (PR 2 re-review, item 2)', () => {
+  const box = (data: ReturnType<typeof sameDay>) => {
+    const svg = new JSDOM(
+      renderToStaticMarkup(<DashboardScreen data={data} />),
+    ).window.document.querySelector('svg[data-v2-chart]')!;
+    const style = svg.getAttribute('style') ?? '';
+    return {
+      viewBox: Number(svg.getAttribute('viewBox')!.split(' ')[3]),
+      height: Number(style.match(/--v2-chart-h:\s*(\d+)px/)![1]),
+    };
+  };
+
+  it('its stylesheet sizes the box from the element’s height', () => {
+    expect(CHART_RULE).toMatch(/height: var\(--v2-chart-h/);
+  });
+
+  it.each([
+    ['with times', () => sameDay()],
+    [
+      'without times',
+      () =>
+        dashboardView(bad, { accountId: 'a0000000-0000-4000-8000-000000000001', now: bad.as_of }),
+    ],
+  ] as const)('%s: the box is the drawing’s height plus the top padding', (_, data) => {
+    const b = box(data());
+    expect(b.height - PAD_TOP).toBe(b.viewBox);
+  });
 });
