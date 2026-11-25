@@ -39,6 +39,7 @@ import {
   PAGE_LIMIT_SOURCE,
 } from './copy/account-door';
 import { CLIENT_ADDITIONS, CLIENT_CHANGES, MATRIX_ADDITIONS, MATRIX_CHANGES } from './copy/agency';
+import { ZONE_CHANGES } from './copy/zones';
 import { CLIENT_REPORTS_ADDITIONS, CLIENT_REPORTS_CHANGES } from './copy/client-reports';
 import { SEATS_ADDITIONS, SEATS_CHANGES } from './copy/seats';
 import { formatPlanPrice } from './copy/plan-price';
@@ -473,6 +474,8 @@ export const COPY_CHANGES: CopyChange[] = [
   ...CLIENT_CHANGES,
   ...SEATS_CHANGES,
   ...CLIENT_REPORTS_CHANGES,
+  // Last: a time another entry writes is zoned as well (D-17).
+  ...ZONE_CHANGES,
 ];
 
 export interface Addition {

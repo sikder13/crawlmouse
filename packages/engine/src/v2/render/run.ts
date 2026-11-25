@@ -69,6 +69,13 @@ export const RENDER_RETRY = { attempts: 5, base_ms: 2000, max_ms: 60_000 } as co
  */
 export const RESERVE_PER_RENDER_MS = REQUEST_TIMEOUT_MS;
 
+/**
+ * How long the synchronous measuring of a page's two replies is allowed for, by their size: 18.5 s
+ * was measured for two 10 MiB replies (20 MiB), rounded up to 1 s per MiB. It blocks the event loop,
+ * so no timer can stop it once it starts. Not measured on Vercel's CPU.
+ */
+export const measureAllowanceMs = (chars: number): number => (chars / (1024 * 1024)) * 1000;
+
 /** Why a picked page has no `without_js`, and what each reason means (the spec renders this). */
 export const NOT_RENDERED = {
   not_configured: 'The environment holds no Browser Run account or token.',
@@ -93,6 +100,8 @@ export const NOT_RENDERED = {
   challenged: 'A side of the render matches a challenge title or marker listed in challenge.ts.',
   nothing_rendered: 'The rendered side has no words, so there is no share.',
   measure_failed: 'Counting the words of the two renders threw.',
+  out_of_time:
+    "The render step's deadline left too little time for this page's renders, so it was not started or not finished.",
   phase_threw:
     "A page of the empty-root phase threw out of the render; each page of that phase is left unrendered, and the graded phase's pages stand.",
 } as const;
@@ -156,6 +165,12 @@ export interface RenderCheckInput {
   inFlight?: number;
   sleep?: (ms: number) => Promise<void>;
   /**
+   * When the step must be done, on `now`'s clock. A page, a side or a retry that could run past it is
+   * not started, and the page records `out_of_time`. No deadline when left out.
+   */
+  deadlineAt?: number;
+  now?: () => number;
+  /**
    * Reads a page's two renders. Null, a refusal or a throw records `measure_failed`. Left out, the
    * reading runs here, on the calling thread, with no bound of its own; the pipeline passes the crawl
    * worker's reader, which stops a read at its deadline (`questions/042`, design C).
@@ -176,7 +191,12 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 
 const graded = (p: RenderCandidate) => p.kind === 'content' && p.status_code === 200 && p.is_html;
 
-/** What one page reserves from its phase's allowance before it runs: both of its renders. */
+/**
+ * What one page reserves from its phase's allowance (browser time, against the caps) before it
+ * runs: both of its renders. The deadline is tested per request instead (`fits(REQUEST_TIMEOUT_MS)`
+ * before each), so a step whose share is exactly two requests long can still render (QA B1 on #172):
+ * a request starts only while it could still finish by the deadline.
+ */
 const PAGE_RESERVE_MS = 2 * RESERVE_PER_RENDER_MS;
 
 export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcome> {
@@ -267,6 +287,31 @@ async function renderPhase(
         ? 'caps_not_configured'
         : stoppedBefore;
 
+  const now = input.now ?? Date.now;
+  /** Whether work that may take `ms` ends by the step's deadline. */
+  const fits = (ms: number) => input.deadlineAt === undefined || now() + ms <= input.deadlineAt;
+
+  /**
+   * `work`, or `'late'` once a page could no longer finish by the deadline. Admission has no timeout
+   * of its own. What it decides is not changed: a page it has not admitted is not rendered.
+   */
+  async function beforeDeadline<T>(work: Promise<T>): Promise<T | 'late'> {
+    if (input.deadlineAt === undefined) return work;
+    // A refusal that lands after the wait ended has nobody to hear it.
+    work.catch(() => undefined);
+    const left = input.deadlineAt - REQUEST_TIMEOUT_MS - now();
+    if (left < 0) return 'late';
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<'late'>((resolve) => {
+      timer = setTimeout(() => resolve('late'), left);
+    });
+    try {
+      return await Promise.race([work, late]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   const notRendered = (p: Picked, reason: NotRenderedReason, detail?: string): RenderedPage =>
     detail === undefined
       ? { ...p, rendered: false, reason }
@@ -274,6 +319,8 @@ async function renderPhase(
 
   /** One side of a page, retried on 429. Every reply's browser time is added to the page's `used`. */
   async function side(url: string, s: RenderSide, used: { ms: number }) {
+    // A retry must leave room for this side and, from the static side, the rendered one after it.
+    const sidesLeft = s === 'static' ? 2 : 1;
     for (let attempt = 0; ; attempt += 1) {
       let reply: RenderReply;
       try {
@@ -293,6 +340,7 @@ async function renderPhase(
       const waitMs =
         reply.retryAfterMs ?? Math.min(RENDER_RETRY.base_ms * 2 ** attempt, RENDER_RETRY.max_ms);
       if (waitMs > RENDER_RETRY.max_ms) return reply;
+      if (!fits(waitMs + sidesLeft * REQUEST_TIMEOUT_MS)) return reply;
       await sleep(waitMs);
     }
   }
@@ -309,6 +357,7 @@ async function renderPhase(
   async function reserve(allowanceMs: number): Promise<NotRenderedReason | null> {
     for (;;) {
       if (stopped) return stopped;
+      if (!fits(REQUEST_TIMEOUT_MS)) return (stopped = 'out_of_time');
       if (checkHeld + PAGE_RESERVE_MS <= allowanceMs) {
         checkHeld += PAGE_RESERVE_MS;
         rendering += 1;
@@ -322,7 +371,9 @@ async function renderPhase(
   async function renderPage(p: Picked, allowanceMs: number): Promise<RenderedPage> {
     if (stopped) return notRendered(p, stopped);
     try {
-      await admit(p.url);
+      if ((await beforeDeadline(admit(p.url))) === 'late') {
+        return notRendered(p, (stopped = 'out_of_time'));
+      }
     } catch (e) {
       return notRendered(p, 'not_admitted', e instanceof NotAdmitted ? e.rule : 'error');
     }
@@ -343,8 +394,12 @@ async function renderPhase(
   async function renderReserved(p: Picked, used: { ms: number }): Promise<RenderedPage> {
     const staticSide = await side(p.url, 'static', used);
     if (!staticSide.ok) return notRendered(p, staticSide.reason);
+    if (!fits(REQUEST_TIMEOUT_MS)) return notRendered(p, 'out_of_time');
     const renderedSide = await side(p.url, 'rendered', used);
     if (!renderedSide.ok) return notRendered(p, renderedSide.reason);
+    if (!fits(measureAllowanceMs(staticSide.html.length + renderedSide.html.length))) {
+      return notRendered(p, 'out_of_time');
+    }
     let reading: RenderedReading | null;
     try {
       reading = await input.read(staticSide.html, renderedSide.html, p.url);
@@ -368,6 +423,8 @@ async function renderPhase(
   const allowanceMs = allowanceFor(sample.length);
   let settleFailed = false;
   if (!stopped && sample.length > 0 && allowanceMs < PAGE_RESERVE_MS) stopped = 'check_cap';
+  // Before the budget is asked, so a phase with no time for one request reserves nothing.
+  if (!stopped && sample.length > 0 && !fits(REQUEST_TIMEOUT_MS)) stopped = 'out_of_time';
   let reserved = false;
   let stoppedAtBudget: NotRenderedReason | null = null;
   if (!stopped && sample.length > 0) {

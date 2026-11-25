@@ -30,7 +30,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
   it('counts sixteen fixes: thirteen from the first audit and three first seen at Friday’s check', () => {
     expect(v.header.title).toBe('example-outfitter.com');
     expect(v.header.line).toBe(
-      "Fri 30 Oct · last check today 06:02 · next Fri 6 Nov around 06:00 · 214 pages · 16 fixes: the 13 from the audit plus 3 new at Friday's check",
+      "Fri 30 Oct · last check today 06:02 EDT · next Fri 6 Nov around 06:00 EST · 214 pages · 16 fixes: the 13 from the audit plus 3 new at Friday's check",
     );
   });
 
@@ -44,7 +44,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
   it('gives both grades, their move since Thursday and their parts', () => {
     expect(v.grades.title).toBe('Grades, six checks');
     expect(v.grades.sub).toBe(
-      '24 Oct the first audit, 26–29 Oct run by you, weekly from Fri 30 Oct around 06:00',
+      '24 Oct the first audit, 26–29 Oct run by you, weekly from Fri 30 Oct around 06:00 EDT',
     );
     const [seo, ai] = v.grades.cards;
     expect(seo).toMatchObject({ letter: 'B', score: 79, move: '−1 since Thu' });
@@ -77,7 +77,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
     expect(by('Googlebot').cause).toBe('allowed by robots.txt; verified bot, not fetched');
     expect(by('GPTBot').cause).toBe('Cloudflare firewall rule (error 1020)');
     expect(by('OAI-SearchBot').cause).toBe('client-rendered template, 31%');
-    expect(by('ClaudeBot').cause).toBe('robots.txt changed Thu 19:40: ClaudeBot disallowed');
+    expect(by('ClaudeBot').cause).toBe('robots.txt changed Thu 19:40 EDT: ClaudeBot disallowed');
     expect(by('ClaudeBot').changedNow).toBe(true);
     expect(by('GPTBot').changedNow).toBe(false);
   });
@@ -92,7 +92,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
       [5, false, false, '+2 SEO'],
     ]);
     expect(v.fixes.rows[2]!.diff).toBe(
-      'robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done',
+      'robots.txt, Thu 19:40 EDT · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done',
     );
     expect(v.fixes.rows[1]!.note).toBe(
       'marked done Wed; the re-check that day did not agree, so it stays open',
@@ -111,9 +111,9 @@ describe('Site page, example-outfitter.com at as_of', () => {
       ['Remove this site', 'Its history is deleted 7 days after you remove it'],
     ]);
     expect(v.alerts.rows.map((r) => [r.on, r.fired])).toEqual([
-      [true, 'fired Fri 06:03'],
+      [true, 'fired Fri 06:03 EDT'],
       [true, null],
-      [true, 'fired Fri 06:03'],
+      [true, 'fired Fri 06:03 EDT'],
       [true, null],
       [true, null],
       [false, null],

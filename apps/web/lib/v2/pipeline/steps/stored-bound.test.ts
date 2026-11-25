@@ -260,8 +260,9 @@ describe('render and access planning read the build’s bounded view (F2)', () =
   it('render fails build_failed past the bound at 2 GB', async () => {
     const { deps, evidence } = await between();
     await putJson(evidence, pathOf(event, 'seeds'), []);
+    const withClock = { ...deps, now: () => 0 } as StepDeps;
     await atMemory(2048, () =>
-      expect(finishSteps(deps).render(event, {} as never)).rejects.toMatchObject({
+      expect(finishSteps(withClock).render(event, {} as never)).rejects.toMatchObject({
         reason: 'build_failed',
       }),
     );

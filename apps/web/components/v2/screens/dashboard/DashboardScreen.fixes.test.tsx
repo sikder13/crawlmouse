@@ -43,7 +43,7 @@ describe('the sites card (home)', () => {
     )!;
     const last = queued.querySelector('td:last-child')!;
     expect([...last.querySelectorAll('span:not([aria-hidden])')].map((s) => s.textContent)).toEqual(
-      ['Fri 06:01 · ', 'check queued'],
+      ['Fri 06:01 EDT · ', 'check queued'],
     );
   });
 

@@ -17,13 +17,14 @@ import {
   PACE,
   FIRST_ACCEPT_BY_S,
   QUEUE_WAIT_MAX_S,
+  RENDER_SHARE_S,
   RESERVE_S,
   MAX_PAGE_CAP,
   crawlCeilingS,
   finishSFor,
   reserveS,
 } from '../limits';
-import { addBackMs, batchSeconds, fetchEndsAt, phaseEndsAt, tailOf } from './time';
+import { addBackMs, batchSeconds, fetchEndsAt, phaseEndsAt, renderEndsAt, tailOf } from './time';
 
 const S = 1000;
 const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
@@ -386,6 +387,26 @@ function simulate(opts: {
     elapsedS: (clock.now - T0) / S,
   }));
 }
+
+// Review of the render budget: each retry of the render step read a new start, so two failed attempts
+// of 90 s each ran the check past the reserve. The render's end is counted from the earlier of the
+// step's start and the end of the fetching phases.
+describe('the render step’s end (RENDER_SHARE_S of the reserve)', () => {
+  const fetchEnd = fetchEndsAt(so());
+  it('gives a step that starts before the fetching phases end its whole share', () => {
+    const start = fetchEnd - 600 * S;
+    expect(renderEndsAt(start, so())).toBe(start + RENDER_SHARE_S * S);
+  });
+
+  it('gives a step that starts after them, a retry or a late start, only what the share has left', () => {
+    expect(renderEndsAt(fetchEnd + 60 * S, so())).toBe(fetchEnd + RENDER_SHARE_S * S);
+    // However many attempts, rendering never runs past the share, so the steps after it keep the rest.
+    for (const late of [0, 30, 90, 200]) {
+      const end = renderEndsAt(fetchEnd + late * S, so());
+      expect(end).toBeLessThanOrEqual(T0 + (PACE.finishS - (RESERVE_S - RENDER_SHARE_S)) * S);
+    }
+  });
+});
 
 describe('the time plan through the orchestration (finding 8)', () => {
   it('slow batches and every claim wait: the fetching ends in time to leave RESERVE_S', async () => {

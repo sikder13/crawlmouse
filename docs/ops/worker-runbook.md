@@ -329,16 +329,27 @@ Levels run: 4, 8, 16. The largest result the load test measured is 8.36 MiB; 16 
 ### The done signal (PR 5a)
 
 The worker can tell the app when a batch ends, so a check reads it at once instead of at its next poll.
-Set the app's route as a secret on each worker. The address differs per worker, so it cannot live in
-`fly.toml`, which must match `fly.production.toml`:
+
+**Production: nothing to set.** `fly.toml` and `fly.production.toml` both carry
+`APP_SIGNAL_URL = "https://crawlmouse.com/api/webhooks/worker"` under `[env]`. It is an address, not a
+secret, and the two files may differ only in `app` (`src/fly-production.test.ts`). It is the apex, because
+the worker refuses a redirect and `www` answers 308. The app verifies each note with
+`WORKER_SIGNING_SECRET`, which production's app already holds to sign batch posts (F-332). Until the
+production worker is redeployed from a commit with the line, it sends nothing and checks poll.
+
+**Staging: its own address, as a Fly secret.** A Fly secret takes precedence over an `[env]` variable of
+the same name, so the staging worker keeps the route of its staging app:
 
 ```bash
-flyctl secrets set APP_SIGNAL_URL=https://<the app's host>/api/webhooks/worker --app <the worker's app>
+flyctl secrets set APP_SIGNAL_URL=https://<the staging app's host>/api/webhooks/worker --app crawlmouse-worker-staging
 ```
 
-Until it is set the worker sends nothing and checks poll as before, so the app and the worker can deploy
-in either order. To turn it off, unset the secret. Verify:
-`pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts src/signal-config.test.ts`.
+Unset on staging, that secret would let the `[env]` value through: the staging worker would send its
+notes to production's route, which verifies each with production's `WORKER_SIGNING_SECRET`, and a note
+names a staging check, which no production run waits on. To turn the signal off on a worker, set
+`APP_SIGNAL_URL` to a Fly secret that is not an https address, `off` say: the worker reads it as unset
+(`httpsUrl`, `src/config.ts`). Verify:
+`pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts src/signal-config.test.ts src/deploy-files.test.ts src/fly-production.test.ts`.
 
 **Staging only.** The staging app is behind Vercel Deployment Protection, which answers the worker's
 POST with 401 before it reaches the route. Give the staging worker the automation bypass as its own
