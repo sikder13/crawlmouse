@@ -37,14 +37,18 @@ export default async function ReportProofPage({ params }: { params: Promise<{ id
   const { id } = await params;
   if (!isId(id)) return notFound();
   const admin = supabaseAdmin();
-  const proof = await memberProof({ session, admin, files: supabaseShareFiles(admin) }, id);
+  // The theme is read beside the proof, with the user already read, and never fails the page.
+  const [proof, theme] = await Promise.all([
+    memberProof({ session, admin, files: supabaseShareFiles(admin) }, id),
+    sessionTheme({ session, user }),
+  ]);
   if (proof === null) return notFound();
   await (
     await pageCapture()
   )('proof_viewed', { accountId: proof.accountId, userId: user.id }, { via: 'account' });
   return (
     <>
-      {await sessionTheme()}
+      {theme}
       <ProofScreen data={proofView(proof.doc)} />
     </>
   );

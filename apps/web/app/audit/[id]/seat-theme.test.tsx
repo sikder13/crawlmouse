@@ -2,7 +2,7 @@
  * F-292 (D-29): the owner's result, fix and report pages wear the signed-in seat's theme, as the
  * dashboard does. Each v2 page under `/audit/[id]` (every `page.tsx` but v1's own) and
  * `/reports/[id]` renders `sessionTheme()`, which reads the session's seat theme
- * (`readSessionHeader`) and hands it to `SeatTheme`. `SeatTheme` is replaced here by a marker
+ * (`sessionTheme`: one read of `seats.theme`) and hands it to `SeatTheme`. `SeatTheme` is replaced here by a marker
  * carrying the theme it was given, so the markup says what the page would apply; what it applies is
  * `components/v2/SeatTheme.dom.test.tsx`'s.
  */
@@ -12,16 +12,43 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixesAsOf, fixture } from '../../../lib/v2/fixtures';
-import type { SessionHeader } from '../../../lib/v2/session-header';
 
 vi.mock('server-only', () => ({}));
 
+/**
+ * The session: a signed-in user or none, and the `seats` read the theme makes, which can hold
+ * themes, or fail as an error, or throw.
+ */
 const state = vi.hoisted(() => ({
-  header: { kind: 'signed_out' } as SessionHeader,
+  user: null as { id: string } | null,
+  seats: [] as { account_id: string; theme: string }[],
+  fail: null as null | 'error' | 'throw',
 }));
-vi.mock('@/lib/v2/account/session-header-read', () => ({
-  readSessionHeader: async () => state.header,
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
+vi.mock('@/lib/supabase/server', () => ({
+  supabaseServer: async () => ({
+    auth: { getUser: async () => ({ data: { user: state.user } }) },
+    from: (table: string) => {
+      if (table !== 'seats') throw new Error(`the theme read ${table}`);
+      if (state.fail === 'throw') throw new Error('network down');
+      const result =
+        state.fail === 'error'
+          ? { data: null, error: { code: '08006' } }
+          : { data: state.seats, error: null };
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        then: (f: (r: unknown) => unknown) => Promise.resolve(result).then(f),
+      };
+      return chain;
+    },
+  }),
 }));
+const signedIn = (...themes: string[]) => {
+  state.user = { id: 'u1' };
+  state.seats = themes.map((theme, i) => ({ account_id: `a${i}`, theme }));
+  state.fail = null;
+};
 vi.mock('@/components/v2/SeatTheme', () => ({
   SeatTheme: ({ theme }: { theme: string }) => <i data-seat-theme={theme} />,
 }));
@@ -46,12 +73,6 @@ vi.mock('./_lib/access', () => ({
   isReadableAudit: async () => true,
 }));
 
-// /reports/[id]: a signed-in member whose session reads the proof page.
-vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: async () => ({
-    auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
-  }),
-}));
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
 vi.mock('@/lib/v2/reports/share-proof', () => ({
   memberProof: async () => ({ accountId: 'a1', doc: {} }),
@@ -101,7 +122,9 @@ const themes = (markup: string) =>
 beforeEach(() => vi.stubEnv('V2_CHECKS_PUBLIC', '1'));
 afterEach(() => {
   vi.unstubAllEnvs();
-  state.header = { kind: 'signed_out' };
+  state.user = null;
+  state.seats = [];
+  state.fail = null;
 });
 
 describe('the seat theme on the signed-in result, fix and report pages', () => {
@@ -124,20 +147,39 @@ describe('the seat theme on the signed-in result, fix and report pages', () => {
     it.each(['dark', 'light', 'system'] as const)(
       'with the seat theme %s, applies exactly that theme once',
       async (theme) => {
-        state.header = { kind: 'signed_in', theme };
+        signedIn(theme);
         expect(themes(await render(file))).toEqual([theme]);
       },
     );
 
-    it('signed in with no seat theme known, applies none', async () => {
-      state.header = { kind: 'signed_in', theme: null };
+    it('signed in with no seat, applies none', async () => {
+      signedIn();
       expect(themes(await render(file))).toEqual([]);
     });
   });
 
   // The report page sends a visitor to sign in; the audit pages render for anyone.
   it.each(V2_PAGES)('%s, signed out, applies none, so the device decides', async (file) => {
-    state.header = { kind: 'signed_out' };
+    state.user = null;
     expect(themes(await render(file))).toEqual([]);
+  });
+
+  // The theme is cosmetic: a failed seats read leaves the page as it would be with no theme.
+  it.each(SURFACES.flatMap((f) => [[f, 'error'] as const, [f, 'throw'] as const]))(
+    '%s, when the seats read gives %s, still renders, with no theme',
+    async (file, fail) => {
+      signedIn('dark');
+      state.fail = fail;
+      const markup = await render(file);
+      expect(markup.length).toBeGreaterThan(0);
+      expect(themes(markup)).toEqual([]);
+    },
+  );
+
+  it('two seats with different themes and no account chosen apply none; the same theme, that one', async () => {
+    signedIn('dark', 'light');
+    expect(themes(await render('overview/page.tsx'))).toEqual([]);
+    signedIn('dark', 'dark');
+    expect(themes(await render('overview/page.tsx'))).toEqual(['dark']);
   });
 });

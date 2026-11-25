@@ -11,9 +11,7 @@ import type { CheckRead } from '../../../../../lib/v2/pipeline/public';
 
 vi.mock('server-only', () => ({}));
 // The pages read the seat's theme from the session (F-292); a visitor here has none.
-vi.mock('@/lib/v2/account/session-header-read', () => ({
-  readSessionHeader: async () => ({ kind: 'signed_out' }),
-}));
+vi.mock('@/lib/v2/account/session-theme', () => ({ sessionTheme: async () => null }));
 
 const readAudit = vi.fn<(id: string) => Promise<CheckRead | null>>();
 vi.mock('../../_lib/access', () => ({

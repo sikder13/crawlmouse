@@ -71,10 +71,11 @@ export function SegmentBody({ read, segment }: { read: ReadyCheck; segment: Segm
 }
 
 export async function SegmentPage({ id, segment }: { id: string; segment: SegmentKey }) {
-  const read = await readyAudit(id);
+  // The theme is read beside the audit, and never fails the page (session-theme.tsx).
+  const [read, theme] = await Promise.all([readyAudit(id), sessionTheme()]);
   return (
     <>
-      {await sessionTheme()}
+      {theme}
       <SegmentBody read={read} segment={segment} />
     </>
   );
@@ -149,12 +150,12 @@ export async function FixPage({
   fixId: string;
   notice?: NoticeView | null;
 }) {
-  const read = await readyAudit(id);
+  const [read, theme] = await Promise.all([readyAudit(id), sessionTheme()]);
   const found = fixOf(read, fixId);
   if (!found) notFound();
   return (
     <>
-      {await sessionTheme()}
+      {theme}
       <FixBody read={read} found={found} notice={notice} />
     </>
   );
@@ -196,10 +197,10 @@ export function MapBody({ read, scope }: { read: ReadyCheck; scope: 'hubs' | 'al
 }
 
 export async function MapPage({ id, scope }: { id: string; scope: 'hubs' | 'all' }) {
-  const read = await readyAudit(id);
+  const [read, theme] = await Promise.all([readyAudit(id), sessionTheme()]);
   return (
     <>
-      {await sessionTheme()}
+      {theme}
       <MapBody read={read} scope={scope} />
     </>
   );

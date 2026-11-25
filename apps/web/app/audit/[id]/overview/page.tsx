@@ -20,7 +20,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
  */
 export default async function AuditOverviewPage({ params }: { params: Params }) {
   if (!checksPublicEnabled()) return notFound();
-  const read = await readAudit((await params).id);
+  // The theme is read beside the audit, and never fails the page (session-theme.tsx).
+  const [read, theme] = await Promise.all([readAudit((await params).id), sessionTheme()]);
   if (read === null) notFound();
-  return <CheckPage read={read} theme={await sessionTheme()} />;
+  return <CheckPage read={read} theme={theme} />;
 }
