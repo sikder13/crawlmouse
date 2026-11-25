@@ -147,6 +147,14 @@ export const SITE_CHANGES: CopyChange[] = [
   },
   {
     screen: 'site',
+    kind: 'ruling',
+    locked: '26 27 28 Thu 29 Fri 30',
+    rendered: '26 Oct 27 Oct 28 Oct 29 Oct 30 Oct',
+    source:
+      'V2R register, F-288 (QA dashboard walk D-25): every check’s column head in one form, its day and month in the account’s zone, with its time where two checks share a day (checkLabels)',
+  },
+  {
+    screen: 'site',
     kind: 'facts',
     locked:
       'Googlebot ● ● ● ● ● ● — Bingbot ● ● ● ● ● ● — GPTBot ■ ■ ■ ■ ■ ■ Cloudflare firewall rule (1020) OAI-SearchBot ▲ ▲ ▲ ▲ ▲ ▲ client-rendered template, 31% ClaudeBot ▲ ▲ ▲ ▲ ▲ ■ robots.txt changed Thu 19:40: ClaudeBot disallowed PerplexityBot ■ ■ ■ ■ ■ ■ Bot Fight Mode challenge',

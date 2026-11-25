@@ -187,13 +187,13 @@ describe('the history axis when two checks fall on one day (QA dashboard walk D-
     copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000003')!.finished_at =
       '2026-10-26T18:00:00Z';
     const h = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).history!;
-    expect(h.points.map((p) => p.label)).toEqual([
-      '24 Oct 22:34',
-      '26 Oct 09:14',
-      '26 Oct 14:00',
-      '28 Oct 16:04',
-      '29 Oct 08:42',
-      '30 Oct 06:02',
+    expect(h.points.map((p) => [p.label, p.time])).toEqual([
+      ['24 Oct', '22:34'],
+      ['26 Oct', '09:14'],
+      ['26 Oct', '14:00'],
+      ['28 Oct', '16:04'],
+      ['29 Oct', '08:42'],
+      ['30 Oct', '06:02'],
     ]);
   });
 });

@@ -204,6 +204,7 @@ function History({ data }: Props) {
         fitOnPhone
         label={h.title}
         labels={h.points.map((p) => p.label)}
+        times={h.points.map((p) => p.time)}
         dates={h.points.map((p) => p.date)}
         series={[
           { name: 'Technical SEO', values: h.points.map((p) => p.seo) },

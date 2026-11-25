@@ -15,8 +15,13 @@ export interface GradeSeries {
 export interface GradeHistoryProps {
   /** Names the chart's scroll region and its table. */
   label: string;
-  /** One axis label per check: "24 Oct", "26", "Thu 29". */
+  /** One axis label per check, its day: "24 Oct". */
   labels: readonly string[];
+  /**
+   * Each check's time, "02:39", where checks share a day (else null): drawn on a second line under
+   * its day, so a label never runs into the next one on a narrow axis.
+   */
+  times?: readonly (string | null)[];
   /** One date per check, in full, for the table the chart is read from. */
   dates: readonly string[];
   series: readonly [GradeSeries, GradeSeries];
@@ -38,6 +43,8 @@ export interface GradeHistoryProps {
 
 const W = 640;
 const H = 186;
+/** The second axis line's offset, and the room the drawing grows by to hold it. */
+const TIME_LINE = 12;
 const X0 = 40;
 const X1 = 630;
 const TICKS = [100, 75, 50, 25];
@@ -70,6 +77,7 @@ export function GradeHistory({
   note,
   marker,
   fitOnPhone = false,
+  times = [],
 }: GradeHistoryProps) {
   const n = labels.length;
   if (n < 2) throw new Error(`GradeHistory "${label}": two checks at least, got ${n}`);
@@ -88,6 +96,8 @@ export function GradeHistory({
   if (dates.length !== n)
     throw new Error(`GradeHistory "${label}": ${dates.length} dates for ${n} checks`);
   const xs = labels.map((_, i) => X0 + (i * (X1 - X0)) / (n - 1));
+  const timed = times.some((t) => t);
+  const height = timed ? H + TIME_LINE : H;
   const first = (s: 0 | 1) => series[s].values.find((v): v is number => v !== null);
   const marked = marker ? series[marker.series].values[marker.index] : null;
   const captionId = useId();
@@ -98,7 +108,7 @@ export function GradeHistory({
         <svg
           className={styles.chart}
           data-v2-chart=""
-          viewBox={`0 0 ${W} ${H}`}
+          viewBox={`0 0 ${W} ${height}`}
           aria-hidden="true"
           focusable="false"
         >
@@ -166,7 +176,16 @@ export function GradeHistory({
                 y={180}
                 textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
               >
-                {l}
+                {timed ? (
+                  <>
+                    <tspan x={xs[i]}>{l}</tspan>
+                    <tspan x={xs[i]} dy={TIME_LINE}>
+                      {times[i] ?? ''}
+                    </tspan>
+                  </>
+                ) : (
+                  l
+                )}
               </text>
             ))}
           </g>

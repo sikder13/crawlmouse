@@ -46,6 +46,7 @@ import {
 import {
   aiOf,
   bothGrades,
+  checkLabels,
   crawlerOrder,
   move,
   readRuns,
@@ -131,11 +132,10 @@ export interface ChangeRowView {
 }
 
 export interface HistoryPointView {
-  /**
-   * The axis label, one form at every check: "24 Oct"; "24 Nov 02:39" at every check when two of
-   * the checks drawn fell on one day.
-   */
+  /** The axis label's day, one form at every check: "24 Oct" (`checkLabels`). */
   label: string;
+  /** The check's time, "02:39", where two of the checks drawn share a day; else null. */
+  time: string | null;
   /** The check's date in full, for the text alternative. */
   date: string;
   seo: number | null;
@@ -583,14 +583,14 @@ function history(v: AccountView, site: Site): HistoryView | null {
   if (all.length < 2) return null;
   const zone = zoneOf(v);
   const shown = all.slice(-HISTORY_CHECKS);
-  // One form at every check, so the axis does not read "24 Oct", "26", "Thu 29"; with two checks on
-  // one day, each label carries its time, so no two read alike ("24 Nov", "24", "24", D-25).
-  const days = shown.map((c) => dayMonth(c.finished_at!, zone));
-  const sameDay = new Set(days).size < days.length;
+  // One form at every check ("24 Oct"), and each check's time where two share a day in the
+  // account's zone (`checkLabels`, D-25).
+  const labels = checkLabels(shown, zone);
   const points = shown.map((c, i) => ({
-    label: sameDay ? `${days[i]} ${hourMinute(c.finished_at!, zone)}` : days[i]!,
-    date: sameDay
-      ? `${dayDate(c.finished_at!, zone)} ${hourMinute(c.finished_at!, zone)}`
+    label: labels[i]!.date,
+    time: labels[i]!.time,
+    date: labels[i]!.time
+      ? `${dayDate(c.finished_at!, zone)} ${labels[i]!.time}`
       : dayDate(c.finished_at!, zone),
     seo: seoOf(c)?.score ?? null,
     ai: aiOf(c)?.score ?? null,
