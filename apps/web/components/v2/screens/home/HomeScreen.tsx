@@ -1,10 +1,11 @@
+import { AccountLink } from '../../AccountLink';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
 import { Table } from '../../Table';
 import { VerdictCell } from '../../VerdictCell';
-import { FOR_AGENCIES, LOG_IN, MARKETING_NAV } from '../../footer-links';
+import { FOR_AGENCIES, MARKETING_NAV } from '../../footer-links';
 import { GATES } from '../../../../lib/entitlement-v2';
 import type { Tagged } from '../../../../lib/v2/copy/agencies';
 import { PRICING_COPY, planPages } from '../../../../lib/v2/copy/pricing';
@@ -152,14 +153,7 @@ export function HomeScreen({
   const nojs = data.features.nojs;
 
   return (
-    <PageShell
-      nav={MARKETING_NAV}
-      actions={
-        <Button variant="quiet" href={LOG_IN.href}>
-          {LOG_IN.label}
-        </Button>
-      }
-    >
+    <PageShell nav={MARKETING_NAV} actions={<AccountLink />}>
       <main>
         <section className={`${layout.wrap} ${styles.hero}`}>
           <Heading level={1} size="xl" className={styles.heroTitle}>
