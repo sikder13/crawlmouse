@@ -59,6 +59,7 @@ export async function operatorRerun(
   const deps: RequestDeps = {
     store: {
       requestSite: (siteId) => pipeline.requestSite(siteId),
+      accountClock: (accountId) => pipeline.accountClock(accountId),
       checkStatus: (checkId) => pipeline.checkStatus!(checkId),
       insertQueued: async (row: QueuedCheck) => {
         const { data, error } = await admin.rpc('operator_request_check', {
