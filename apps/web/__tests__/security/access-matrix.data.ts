@@ -307,6 +307,34 @@ const ROUTES: readonly Spec[] = [
     ),
     calls: 1,
   },
+  {
+    path: 'api/agency/domain',
+    v2: true,
+    identity: 'signed-in owner or account manager of the named account',
+    gate: 'member',
+    detail:
+      'Names or removes the named Agency account’s portal host (Goal 1 row 25) once `member_role` answers owner or account manager there; no seat and a developer seat get the same 403.',
+    check: at('app/api/agency/domain/route.ts', 'member_role'),
+    proof: by(
+      'app/api/agency/domain/route.test.ts',
+      'answers an account the caller is not a member of exactly as a developer seat, so it says nothing about the account',
+    ),
+    calls: 0,
+  },
+  {
+    path: 'api/agency/domain/check',
+    v2: true,
+    identity: 'signed-in owner or account manager of the named account',
+    gate: 'member',
+    detail:
+      'Reads the named Agency account’s portal host TXT record and attaches the host to the Vercel project once it proves control (Goal 1 row 25), after `member_role` answers owner or account manager there.',
+    check: at('app/api/agency/domain/check/route.ts', 'member_role'),
+    proof: by(
+      'app/api/agency/domain/route.test.ts',
+      'answers an account the caller is not a member of exactly as a developer seat, so it says nothing about the account',
+    ),
+    calls: 0,
+  },
   // v2: account
   {
     path: 'api/account',
@@ -1812,6 +1840,20 @@ const LIBS: readonly Spec[] = [
     calls: 1,
   },
   {
+    path: 'apps/web/lib/v2/agency/domain-route.ts',
+    v2: true,
+    identity: 'its callers',
+    gate: 'caller',
+    detail:
+      'The portal-host store over `agency_brands` (Goal 1 row 25), made for a caller its route has already checked: a session, `member_role` owner or account manager on the named account, the Agency tier.',
+    callers: [
+      'apps/web/app/api/agency/domain/check/route.ts',
+      'apps/web/app/api/agency/domain/route.ts',
+    ],
+    proof: callerProof,
+    calls: 1,
+  },
+  {
     path: 'apps/web/lib/v2/account/deletion-ports.ts',
     v2: true,
     identity: 'its callers',
@@ -2052,6 +2094,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/s/view/[reportId]/page.tsx',
       'apps/web/lib/v2/account/deletion-ports.ts',
       'apps/web/lib/v2/account/email-change-ports.ts',
+      'apps/web/lib/v2/agency/domain-route.ts',
       'apps/web/lib/v2/competitors/functions.ts',
       'apps/web/lib/v2/reports/mint-deps.ts',
     ],
@@ -2197,6 +2240,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/lib/v2/account/pages.ts',
       'apps/web/lib/v2/account/settings-pages.ts',
       'apps/web/lib/v2/account/viewer.ts',
+      'apps/web/lib/v2/agency/domain-route.ts',
       'apps/web/lib/v2/ops/operator.ts',
       'apps/web/lib/v2/pipeline/public-deps.ts',
       'apps/web/lib/v2/pricing/read.ts',

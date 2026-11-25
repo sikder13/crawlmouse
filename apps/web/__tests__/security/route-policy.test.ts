@@ -445,6 +445,8 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/account/restore',
       'api/agency-trial',
       'api/agency/brand',
+      'api/agency/domain',
+      'api/agency/domain/check',
       'api/alert-rules',
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',

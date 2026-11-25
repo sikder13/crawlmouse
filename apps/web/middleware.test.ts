@@ -334,6 +334,8 @@ describe('a state-changing API request from another site is refused before the r
       'api/account/restore',
       'api/agency-trial',
       'api/agency/brand',
+      'api/agency/domain',
+      'api/agency/domain/check',
       'api/alert-rules',
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',

@@ -79,6 +79,8 @@ const ANONYMOUS: Record<
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
   'api/agency-trial': { status: 401, body: { error: 'auth_required' } },
   'api/agency/brand': { status: 401, body: { code: 'auth_required' } },
+  'api/agency/domain': { status: 401, body: { code: 'auth_required' } },
+  'api/agency/domain/check': { status: 401, body: { code: 'auth_required' } },
   'api/billing/pro-trial/start': { status: 401, body: { code: 'auth_required' } },
   'api/billing/seats': { status: 401, body: { code: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
