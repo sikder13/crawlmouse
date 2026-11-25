@@ -695,6 +695,12 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
       'QA dashboard walk D-09 (F-272): a block on a site other than the first never reached the dashboard',
   },
   {
+    screen: 'dashboard-day0',
+    what: 'With no crawler panels (the first run), a card of the AI crawlers blocked at each site’s latest result, above the sites table, shown only when one is: a table the locked page does not have (tests/visual/parity.spec.ts addedOmit)',
+    source:
+      'QA dashboard walk D-09 (F-272) and review M2 of PR 1: a block on any site reaches the dashboard',
+  },
+  {
     screen: 'dashboard',
     what: 'When no site carries both grades, the health tile shows the Technical SEO mean under a label that says so ("Technical SEO, mean of 4 sites · no site has both grades")',
     source: 'QA dashboard walk D-10 (F-273): the headline tile read "—"',
