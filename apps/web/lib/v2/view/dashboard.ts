@@ -45,7 +45,6 @@ import {
 } from './account';
 import {
   aiOf,
-  axisLabels,
   bothGrades,
   crawlerOrder,
   move,
@@ -132,7 +131,10 @@ export interface ChangeRowView {
 }
 
 export interface HistoryPointView {
-  /** The axis label: "24 Oct", "26", "Thu 29". */
+  /**
+   * The axis label, one form at every check: "24 Oct"; "24 Nov 02:39" at every check when two of
+   * the checks drawn fell on one day.
+   */
   label: string;
   /** The check's date in full, for the text alternative. */
   date: string;
@@ -190,6 +192,8 @@ export interface SiteRowView {
 
 export interface SitesView {
   note: string;
+  /** Day 0 with no site: the add-site action, beside the sentence that says what it starts. */
+  add: ActionView | null;
   upsell: ActionView | null;
   rows: SiteRowView[];
   foot: string | null;
@@ -579,10 +583,15 @@ function history(v: AccountView, site: Site): HistoryView | null {
   if (all.length < 2) return null;
   const zone = zoneOf(v);
   const shown = all.slice(-HISTORY_CHECKS);
-  const labels = axisLabels(shown, zone);
+  // One form at every check, so the axis does not read "24 Oct", "26", "Thu 29"; with two checks on
+  // one day, each label carries its time, so no two read alike ("24 Nov", "24", "24", D-25).
+  const days = shown.map((c) => dayMonth(c.finished_at!, zone));
+  const sameDay = new Set(days).size < days.length;
   const points = shown.map((c, i) => ({
-    label: labels[i]!,
-    date: dayDate(c.finished_at!, zone),
+    label: sameDay ? `${days[i]} ${hourMinute(c.finished_at!, zone)}` : days[i]!,
+    date: sameDay
+      ? `${dayDate(c.finished_at!, zone)} ${hourMinute(c.finished_at!, zone)}`
+      : dayDate(c.finished_at!, zone),
     seo: seoOf(c)?.score ?? null,
     ai: aiOf(c)?.score ?? null,
   }));
@@ -852,7 +861,8 @@ function noSiteView(v: AccountView, earlier: EarlierAuditsView | null): Dashboar
       ]
         .filter(Boolean)
         .join(' · '),
-      actions: addSiteAction(v, true),
+      // The action sits in the sites card, beside the sentence that says what adding a site starts.
+      actions: [],
     },
     strip: null,
     changed: [],
@@ -862,6 +872,7 @@ function noSiteView(v: AccountView, earlier: EarlierAuditsView | null): Dashboar
     crawlersNow: null,
     sites: {
       note: `0 of ${v.account.limits.sites} on ${PLAN_NAMES[v.tier]}`,
+      add: addSiteAction(v, true)[0] ?? null,
       upsell: null,
       rows: [],
       foot: !adds
@@ -1076,6 +1087,7 @@ export function dashboardView(
       : null,
     sites: {
       note: firstRun && trial ? COPY.sitesFirstRun(free) : slotsNote,
+      add: null,
       upsell:
         v.tier === 'pro' && slots >= limit
           ? action(

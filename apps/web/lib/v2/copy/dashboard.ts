@@ -631,6 +631,16 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
   },
   {
     screen: 'dashboard',
+    what: 'On a phone, where the sites table stacks each row, each value’s column name above it (the column headers, repeated; hidden from a screen reader)',
+    source: 'V2R dashboard fixes (b): every column on screen at 390 px without a sideways scroll',
+  },
+  {
+    screen: 'dashboard',
+    what: 'On a phone, the chart’s note and marker words written under it rather than on its lines (the same words; read once, in its caption)',
+    source: 'V2R dashboard fixes (c): the chart fits a phone and stays legible',
+  },
+  {
+    screen: 'dashboard',
     what: 'For a viewer with v1 audits of their own: a line in the sites card that opens each one’s site, date, earlier grade and link',
     source: 'CC-36 brief, D5',
   },
