@@ -332,6 +332,22 @@ function verdictOf(v: AccountView, c: Change): Verdict | null {
   return check?.crawlers.find((x) => x.ua === c.ua)?.verdict ?? null;
 }
 
+/**
+ * "Other changes · Show": the Changes log filtered to what the count holds (D-34). It names the kind
+ * when every change counted is of one kind, and the site when they are all on one; with a mix of
+ * either, that filter is left off, since the log filters one of each.
+ */
+function otherChangesLink(others: readonly Change[]): ActionView {
+  const show = action('changeLog', 'Show', {}, { context: 'the other changes' });
+  const kinds = [...new Set(others.map((c) => c.kind))];
+  const sites = [...new Set(others.map((c) => c.site_id))];
+  const query = new URLSearchParams();
+  if (sites.length === 1) query.set('site', sites[0]!);
+  if (kinds.length === 1) query.set('kind', kinds[0]!);
+  const q = query.toString();
+  return q ? { ...show, href: `${show.href}?${q}` } : show;
+}
+
 /** Every change is a crawler newly blocked, by robots.txt or a rule: the only case "blocked" may name. */
 function allBlocked(v: AccountView, changes: readonly Change[]): boolean {
   return (
@@ -1018,10 +1034,13 @@ export function dashboardView(
           v,
           window.filter((c) => c.kind === 'resolved'),
         ),
-        other: {
-          count: window.filter((c) => c.kind !== 'opened' && c.kind !== 'resolved').length,
-          show: action('changeLog', 'Show', {}, { context: 'the other changes' }),
-        },
+        other: (() => {
+          const others = window.filter((c) => c.kind !== 'opened' && c.kind !== 'resolved');
+          return {
+            count: others.length,
+            show: otherChangesLink(others),
+          };
+        })(),
       };
 
   const now = result && !firstRun ? crawlerOrder(result) : null;
