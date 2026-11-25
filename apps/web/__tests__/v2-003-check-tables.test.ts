@@ -103,6 +103,7 @@ beforeAll(async () => {
 }, 120_000);
 
 let lineageSerial = 0x2000;
+let renderBudgetDay = 0;
 
 /** A fresh valid row for `table`, inserting what it depends on first. */
 async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
@@ -238,6 +239,12 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
       return ROWS.check_ledger_drafts(check);
     case 'full_render_uses':
       return ROWS.full_render_uses(world.accountId, randomUUID(), '2026-11-01');
+    case 'render_budget_days':
+      return ROWS.render_budget_days(
+        new Date(Date.UTC(2021, 0, ++renderBudgetDay)).toISOString().slice(0, 10),
+      );
+    case 'render_reservations':
+      return ROWS.render_reservations(randomUUID(), check, '2021-01-01');
   }
 }
 
@@ -352,6 +359,9 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   check_ledger_drafts: null,
   // V2R A2, row 17: service only.
   full_render_uses: null,
+  // V2R A2's daily render budget: service only.
+  render_budget_days: null,
+  render_reservations: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -429,6 +439,9 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   if (table === 'check_ledger_drafts') expectedTable.service_role = 'ard';
   // V2R A2, row 17: its functions take and give back a use; the service reads the count.
   if (table === 'full_render_uses') expectedTable.service_role = 'ard';
+  // V2R A2: the render budget's functions run as the service role; a day's row is never deleted.
+  if (table === 'render_budget_days') expectedTable.service_role = 'arw';
+  if (table === 'render_reservations') expectedTable.service_role = 'arwd';
   // 028 lets service_role read its ledgers and suppressions; its functions write them.
   if (['email_sends', 'email_suppressions', 'slack_sends'].includes(table))
     expectedTable.service_role = 'r';

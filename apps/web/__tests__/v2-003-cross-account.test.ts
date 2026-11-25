@@ -83,6 +83,9 @@ const READ_SCOPE: Record<string, ReadScope> = {
   check_ledger_drafts: 'none',
   // V2R A2, row 17: the full renders an account took this month. Service only.
   full_render_uses: 'none',
+  // V2R A2: the daily render budget. Service only.
+  render_budget_days: 'none',
+  render_reservations: 'none',
 };
 
 let db: PGlite;

@@ -441,6 +441,15 @@ export const ROWS = {
     month,
     check_id: checkId,
   }),
+  // V2R A2: a day's committed browser time, and one render phase's reservation; service only. They
+  // name no account: the budget is the whole product's.
+  render_budget_days: (day: string): Row => ({ day, committed_ms: 100 }),
+  render_reservations: (id: string, checkId: string, day: string): Row => ({
+    id,
+    check_id: checkId,
+    day,
+    reserved_ms: 100,
+  }),
   // CC-41: a check's ledger draft, held until the writer records it; service only.
   check_ledger_drafts: (checkId: string): Row => ({
     check_id: checkId,
@@ -602,6 +611,11 @@ export const TABLES_038: readonly NewTable[] = ['qa_accounts'];
 export const TABLES_041: readonly NewTable[] = ['account_attribution', 'check_ledger_drafts'];
 /** The public tables V2R A2's full-render migration creates (row 17). */
 export const TABLES_FULL_RENDER: readonly NewTable[] = ['full_render_uses'];
+/** The public tables V2R A2's render budget migration creates. */
+export const TABLES_RENDER_BUDGET: readonly NewTable[] = [
+  'render_budget_days',
+  'render_reservations',
+];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
   .filter(
@@ -615,7 +629,8 @@ export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
       !TABLES_033.includes(t) &&
       !TABLES_038.includes(t) &&
       !TABLES_041.includes(t) &&
-      !TABLES_FULL_RENDER.includes(t),
+      !TABLES_FULL_RENDER.includes(t) &&
+      !TABLES_RENDER_BUDGET.includes(t),
   )
   .sort();
 /** Every public table 003, 006b, 008, 026b, 027b, 028, 029, 033, CC-38's and CC-41's migrations create. */
@@ -698,6 +713,10 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.full_render_uses')::text as t`,
   );
   const withFullRender = fr[0]!.t !== null;
+  const { rows: rb } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.render_reservations')::text as t`,
+  );
+  const withRenderBudget = rb[0]!.t !== null;
   // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
   const { rows: identity } = await db.query<{ n: number }>(
     `select count(*)::int as n from pg_attribute
@@ -942,6 +961,18 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       'full_render_uses',
       ROWS.full_render_uses(accountId, usedBy, '2026-11-01'),
       { account_id: accountId, month: '2026-11-01', check_id: usedBy },
+      'account',
+    );
+  }
+  if (withRenderBudget) {
+    // A day of its own per world, since the day is the key.
+    const day = new Date(Date.UTC(2020, 0, n)).toISOString().slice(0, 10);
+    await put('render_budget_days', ROWS.render_budget_days(day), { day }, 'account');
+    const id = randomUUID();
+    await put(
+      'render_reservations',
+      ROWS.render_reservations(id, randomUUID(), day),
+      { id },
       'account',
     );
   }

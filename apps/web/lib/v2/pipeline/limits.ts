@@ -19,12 +19,26 @@ export { FAILURE_REASONS, type FailureReason } from '../../../../../inngest/chec
 
 /**
  * Of the run's finish timeout, what render, build, persist and finalize keep after the last batch. Render
- * runs with a daily budget that refuses (Q7), so today it returns at once; a deadline inside
- * renderCheck has to come before rendering is enabled. Persist is one step whatever
+ * takes at most RENDER_SHARE_S of it (`steps/time.ts` `renderEndsAt`), and renders nothing while its
+ * two caps are unset. Persist is one step whatever
  * persistBuiltCheck sends inside it (Q11: staged chunks, then the finishing RPC); its duration at the
  * page cap is not measured against this reserve yet.
  */
 export const RESERVE_S = 180;
+/**
+ * Of RESERVE_S, what the render step may spend rendering (`RENDER_STEP_MS`), counted from its start.
+ * The rest is for build, persist and finalize, which need at least AFTER_RENDER_MIN_S. Chosen, not
+ * measured against a real render: rendering is off until the Browser Run caps are set, and this is
+ * to be checked on staging first.
+ */
+export const RENDER_SHARE_S = 90;
+/**
+ * What the steps after render keep at least. Loading, building, serialising, compressing and
+ * staging a check at the most edges the F-248 bound keeps (500 pages × 200 links) took about 22 s
+ * in-process (PR #165's harness). Persist's round trips to the database and Inngest's step latency
+ * come on top, and are not measured here.
+ */
+export const AFTER_RENDER_MIN_S = 90;
 /** The crawl phase's ceiling: ENGINE-GAP §8's Free-tier HTTP-phase ceiling. */
 export const CRAWL_CEILING_S = 480;
 /**
