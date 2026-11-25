@@ -88,3 +88,22 @@ describe('the history legend (QA dashboard walk D-25)', () => {
     expect(legend(noAi)).toContain('Technical SEO');
   });
 });
+
+describe('the chart’s words under a phone chart are read once, in its caption (PR 2 review, item 4)', () => {
+  it('the caption holds the score runs, the note and the marker’s words; the list under it is hidden', () => {
+    const d = dom(dashboardPreview('home'));
+    expect(
+      d
+        .querySelector('svg[data-v2-chart]')!
+        .closest('div')!
+        .parentElement!.querySelector('caption')!.textContent,
+    ).toBe(
+      'Technical SEO 79 at checks 1 to 2, then 80 at checks 3 to 5, then 79 at check 6; AI readability 41 at checks 1 to 5, then 22 at check 6. AI readability · 41 since the first audit. Claude-SearchBot and ClaudeBot blocked · 22',
+    );
+    const notes = d.querySelector('ul[aria-hidden="true"]')!;
+    expect([...notes.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'AI readability · 41 since the first audit',
+      'Claude-SearchBot and ClaudeBot blocked · 22',
+    ]);
+  });
+});

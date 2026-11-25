@@ -198,6 +198,40 @@ describe('the history axis when two checks fall on one day (QA dashboard walk D-
   });
 });
 
+describe('the history axis reads days in the account’s zone, not UTC (PR 2 review, item 3)', () => {
+  const labels = (first: string, second: string) => {
+    const copy = structuredClone(bad);
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000001')!.finished_at = first;
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000002')!.finished_at = second;
+    const h = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).history!;
+    return h.points.map((p) => [p.label, p.time]);
+  };
+
+  it('one UTC day, two days in Indiana: no times', () => {
+    // 25 Oct 02:00Z is Sat 24 Oct 22:00 in Indiana; 25 Oct 12:00Z is Sun 25 Oct 08:00.
+    expect(labels('2026-10-25T02:00:00Z', '2026-10-25T12:00:00Z')).toEqual([
+      ['24 Oct', null],
+      ['25 Oct', null],
+      ['27 Oct', null],
+      ['28 Oct', null],
+      ['29 Oct', null],
+      ['30 Oct', null],
+    ]);
+  });
+
+  it('two UTC days, one day in Indiana: times', () => {
+    // 24 Oct 23:00Z is Sat 24 Oct 19:00 in Indiana; 25 Oct 01:00Z is Sat 24 Oct 21:00.
+    expect(labels('2026-10-24T23:00:00Z', '2026-10-25T01:00:00Z')).toEqual([
+      ['24 Oct', '19:00'],
+      ['24 Oct', '21:00'],
+      ['27 Oct', '10:32'],
+      ['28 Oct', '16:04'],
+      ['29 Oct', '08:42'],
+      ['30 Oct', '06:02'],
+    ]);
+  });
+});
+
 describe('Dashboard, day 0: the moment the account begins', () => {
   const v = day0();
 

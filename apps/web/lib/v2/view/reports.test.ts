@@ -193,6 +193,27 @@ describe('Reports made, a compare of two checks on one day (QA dashboard walk D-
   });
 });
 
+describe('Reports made, a compare’s days read in the account’s zone, not UTC (PR 2 review, item 3)', () => {
+  const covers = (first: string, second: string) => {
+    const copy = structuredClone(bad);
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000001')!.finished_at = first;
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000005')!.finished_at = second;
+    return reportsView(copy, ACCOUNT_VIEWERS.home(), {}, BASE).made.rows.find(
+      (r) => r.type === 'Compare',
+    )!.covers;
+  };
+
+  it('one UTC day, two days in Indiana: no times', () => {
+    expect(covers('2026-10-25T02:00:00Z', '2026-10-25T12:00:00Z')).toBe('Sat 24 Oct vs Sun 25 Oct');
+  });
+
+  it('two UTC days, one day in Indiana: times', () => {
+    expect(covers('2026-10-24T23:00:00Z', '2026-10-25T01:00:00Z')).toBe(
+      'Sat 24 Oct 19:00 vs Sat 24 Oct 21:00',
+    );
+  });
+});
+
 describe('how long a share link works', () => {
   it('is the interval create_share_link adds to the moment it is made, in days', () => {
     const sql = readFileSync(
