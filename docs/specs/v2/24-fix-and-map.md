@@ -187,21 +187,21 @@ Read through the TypeScript compiler. A screen receives its view and nothing els
 
 #### `FixFrame`
 
-| Field           | Type                                      | Note                                                                                     |
-| --------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `domain`        | `string`                                  |                                                                                          |
-| `overview`      | `string`                                  | The crumb's first link and the Overview tab.                                             |
-| `section`       | `object`                                  | The section the fix belongs to: the crumb's second link, the current tab, the back link. |
-| `section.title` | `string`                                  |                                                                                          |
-| `section.href`  | `string`                                  |                                                                                          |
-| `position`      | `string`                                  | "Fix 2 of 14", or "Fix 1, resolved".                                                     |
-| `keptUntil`     | `string \| null`                          |                                                                                          |
-| `keepHref`      | `string`                                  |                                                                                          |
-| `tabs`          | `(SegmentLink & { current: boolean; })[]` |                                                                                          |
-| `back`          | `object`                                  |                                                                                          |
-| `back.label`    | `string`                                  |                                                                                          |
-| `back.href`     | `string`                                  |                                                                                          |
-| `next`          | `SegmentLink \| null`                     | The next live fix in order, with its effect; null on a resolved fix.                     |
+| Field           | Type                                                                    | Note                                                                                     |
+| --------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `domain`        | `string`                                                                |                                                                                          |
+| `overview`      | `string`                                                                | The crumb's first link and the Overview tab.                                             |
+| `section`       | `object`                                                                | The section the fix belongs to: the crumb's second link, the current tab, the back link. |
+| `section.title` | `string`                                                                |                                                                                          |
+| `section.href`  | `string`                                                                |                                                                                          |
+| `position`      | `string`                                                                | "Fix 2 of 14", or "Fix 1, resolved".                                                     |
+| `keptUntil`     | `string \| null`                                                        |                                                                                          |
+| `keepHref`      | `string`                                                                |                                                                                          |
+| `tabs`          | `(SegmentLink & { current: boolean; added?: boolean \| undefined; })[]` |                                                                                          |
+| `back`          | `object`                                                                |                                                                                          |
+| `back.label`    | `string`                                                                |                                                                                          |
+| `back.href`     | `string`                                                                |                                                                                          |
+| `next`          | `SegmentLink \| null`                                                   | The next live fix in order, with its effect; null on a resolved fix.                     |
 
 #### `FixHead`
 
@@ -239,7 +239,7 @@ Read through the TypeScript compiler. A screen receives its view and nothing els
 | `frame.position`      | `string`                                                                     | "Fix 2 of 14", or "Fix 1, resolved".                                                                                                                                                                                                       |
 | `frame.keptUntil`     | `string \| null`                                                             |                                                                                                                                                                                                                                            |
 | `frame.keepHref`      | `string`                                                                     |                                                                                                                                                                                                                                            |
-| `frame.tabs`          | `(SegmentLink & { current: boolean; })[]`                                    |                                                                                                                                                                                                                                            |
+| `frame.tabs`          | `(SegmentLink & { current: boolean; added?: boolean \| undefined; })[]`      |                                                                                                                                                                                                                                            |
 | `frame.back`          | `SegmentLink`                                                                |                                                                                                                                                                                                                                            |
 | `frame.next`          | `SegmentLink \| null`                                                        | The next live fix in order, with its effect; null on a resolved fix.                                                                                                                                                                       |
 | `head`                | `object`                                                                     |                                                                                                                                                                                                                                            |
@@ -254,74 +254,75 @@ Read through the TypeScript compiler. A screen receives its view and nothing els
 
 #### `LockedFixPage`
 
-| Field                 | Type                                      | Note                                                                                     |
-| --------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `kind`                | `"locked"`                                |                                                                                          |
-| `wall`                | `object`                                  | The ask opens the keep bar; with no keep bar (a kept audit) there is none.               |
-| `wall.heading`        | `string`                                  |                                                                                          |
-| `wall.body`           | `string`                                  |                                                                                          |
-| `wall.action`         | `SegmentLink \| null`                     |                                                                                          |
-| `frame`               | `object`                                  |                                                                                          |
-| `frame.domain`        | `string`                                  |                                                                                          |
-| `frame.overview`      | `string`                                  | The crumb's first link and the Overview tab.                                             |
-| `frame.section`       | `{ title: string; href: string; }`        | The section the fix belongs to: the crumb's second link, the current tab, the back link. |
-| `frame.position`      | `string`                                  | "Fix 2 of 14", or "Fix 1, resolved".                                                     |
-| `frame.keptUntil`     | `string \| null`                          |                                                                                          |
-| `frame.keepHref`      | `string`                                  |                                                                                          |
-| `frame.tabs`          | `(SegmentLink & { current: boolean; })[]` |                                                                                          |
-| `frame.back`          | `SegmentLink`                             |                                                                                          |
-| `frame.next`          | `SegmentLink \| null`                     | The next live fix in order, with its effect; null on a resolved fix.                     |
-| `head`                | `object`                                  |                                                                                          |
-| `head.title`          | `string`                                  |                                                                                          |
-| `head.points`         | `string`                                  |                                                                                          |
-| `head.unit`           | `string`                                  |                                                                                          |
-| `head.recommendation` | `RecommendationView`                      |                                                                                          |
-| `head.lede`           | `string[]`                                | What the packet says is wrong; a locked fix has none to say it from.                     |
-| `head.tiles`          | `FixTile[]`                               |                                                                                          |
-| `beforeAfter`         | `BeforeAfterView \| null`                 |                                                                                          |
-| `keep`                | `FixKeep \| null`                         |                                                                                          |
+| Field                 | Type                                                                    | Note                                                                                     |
+| --------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `kind`                | `"locked"`                                                              |                                                                                          |
+| `wall`                | `object`                                                                | The ask opens the keep bar; with no keep bar (a kept audit) there is none.               |
+| `wall.heading`        | `string`                                                                |                                                                                          |
+| `wall.body`           | `string`                                                                |                                                                                          |
+| `wall.action`         | `SegmentLink \| null`                                                   |                                                                                          |
+| `frame`               | `object`                                                                |                                                                                          |
+| `frame.domain`        | `string`                                                                |                                                                                          |
+| `frame.overview`      | `string`                                                                | The crumb's first link and the Overview tab.                                             |
+| `frame.section`       | `{ title: string; href: string; }`                                      | The section the fix belongs to: the crumb's second link, the current tab, the back link. |
+| `frame.position`      | `string`                                                                | "Fix 2 of 14", or "Fix 1, resolved".                                                     |
+| `frame.keptUntil`     | `string \| null`                                                        |                                                                                          |
+| `frame.keepHref`      | `string`                                                                |                                                                                          |
+| `frame.tabs`          | `(SegmentLink & { current: boolean; added?: boolean \| undefined; })[]` |                                                                                          |
+| `frame.back`          | `SegmentLink`                                                           |                                                                                          |
+| `frame.next`          | `SegmentLink \| null`                                                   | The next live fix in order, with its effect; null on a resolved fix.                     |
+| `head`                | `object`                                                                |                                                                                          |
+| `head.title`          | `string`                                                                |                                                                                          |
+| `head.points`         | `string`                                                                |                                                                                          |
+| `head.unit`           | `string`                                                                |                                                                                          |
+| `head.recommendation` | `RecommendationView`                                                    |                                                                                          |
+| `head.lede`           | `string[]`                                                              | What the packet says is wrong; a locked fix has none to say it from.                     |
+| `head.tiles`          | `FixTile[]`                                                             |                                                                                          |
+| `beforeAfter`         | `BeforeAfterView \| null`                                               |                                                                                          |
+| `keep`                | `FixKeep \| null`                                                       |                                                                                          |
 
 #### `ResolvedFixPage`
 
-| Field                 | Type                                      | Note                                                                                     |
-| --------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `kind`                | `"resolved"`                              |                                                                                          |
-| `resolved`            | `string`                                  |                                                                                          |
-| `proof`               | `FixProofView \| null`                    |                                                                                          |
-| `frame`               | `object`                                  |                                                                                          |
-| `frame.domain`        | `string`                                  |                                                                                          |
-| `frame.overview`      | `string`                                  | The crumb's first link and the Overview tab.                                             |
-| `frame.section`       | `{ title: string; href: string; }`        | The section the fix belongs to: the crumb's second link, the current tab, the back link. |
-| `frame.position`      | `string`                                  | "Fix 2 of 14", or "Fix 1, resolved".                                                     |
-| `frame.keptUntil`     | `string \| null`                          |                                                                                          |
-| `frame.keepHref`      | `string`                                  |                                                                                          |
-| `frame.tabs`          | `(SegmentLink & { current: boolean; })[]` |                                                                                          |
-| `frame.back`          | `SegmentLink`                             |                                                                                          |
-| `frame.next`          | `SegmentLink \| null`                     | The next live fix in order, with its effect; null on a resolved fix.                     |
-| `head`                | `object`                                  |                                                                                          |
-| `head.title`          | `string`                                  |                                                                                          |
-| `head.points`         | `string`                                  |                                                                                          |
-| `head.unit`           | `string`                                  |                                                                                          |
-| `head.recommendation` | `RecommendationView`                      |                                                                                          |
-| `head.lede`           | `string[]`                                | What the packet says is wrong; a locked fix has none to say it from.                     |
-| `head.tiles`          | `FixTile[]`                               |                                                                                          |
-| `beforeAfter`         | `BeforeAfterView \| null`                 |                                                                                          |
-| `keep`                | `FixKeep \| null`                         |                                                                                          |
+| Field                 | Type                                                                    | Note                                                                                     |
+| --------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `kind`                | `"resolved"`                                                            |                                                                                          |
+| `resolved`            | `string`                                                                |                                                                                          |
+| `proof`               | `FixProofView \| null`                                                  |                                                                                          |
+| `frame`               | `object`                                                                |                                                                                          |
+| `frame.domain`        | `string`                                                                |                                                                                          |
+| `frame.overview`      | `string`                                                                | The crumb's first link and the Overview tab.                                             |
+| `frame.section`       | `{ title: string; href: string; }`                                      | The section the fix belongs to: the crumb's second link, the current tab, the back link. |
+| `frame.position`      | `string`                                                                | "Fix 2 of 14", or "Fix 1, resolved".                                                     |
+| `frame.keptUntil`     | `string \| null`                                                        |                                                                                          |
+| `frame.keepHref`      | `string`                                                                |                                                                                          |
+| `frame.tabs`          | `(SegmentLink & { current: boolean; added?: boolean \| undefined; })[]` |                                                                                          |
+| `frame.back`          | `SegmentLink`                                                           |                                                                                          |
+| `frame.next`          | `SegmentLink \| null`                                                   | The next live fix in order, with its effect; null on a resolved fix.                     |
+| `head`                | `object`                                                                |                                                                                          |
+| `head.title`          | `string`                                                                |                                                                                          |
+| `head.points`         | `string`                                                                |                                                                                          |
+| `head.unit`           | `string`                                                                |                                                                                          |
+| `head.recommendation` | `RecommendationView`                                                    |                                                                                          |
+| `head.lede`           | `string[]`                                                              | What the packet says is wrong; a locked fix has none to say it from.                     |
+| `head.tiles`          | `FixTile[]`                                                             |                                                                                          |
+| `beforeAfter`         | `BeforeAfterView \| null`                                               |                                                                                          |
+| `keep`                | `FixKeep \| null`                                                       |                                                                                          |
 
 ### The explorer (`lib/v2/view/link-map.ts`)
 
 #### `MapNodeView`
 
-| Field    | Type                              | Note                                                                   |
-| -------- | --------------------------------- | ---------------------------------------------------------------------- |
-| `path`   | `string`                          | The page's path, which names it on the map and in the list.            |
-| `kind`   | `"page" \| "orphan" \| "js_only"` |                                                                        |
-| `depth`  | `number \| null`                  | The page's depth: its record's when there is one, else the drawing's.  |
-| `x`      | `number`                          |                                                                        |
-| `y`      | `number`                          |                                                                        |
-| `r`      | `number`                          |                                                                        |
-| `parent` | `string \| null`                  | The path of the page whose link the line is drawn from; null for none. |
-| `js`     | `boolean`                         | The link the line stands for was made by JavaScript (drawn dashed).    |
+| Field     | Type                              | Note                                                                                |
+| --------- | --------------------------------- | ----------------------------------------------------------------------------------- |
+| `path`    | `string`                          | The page's path, which names it on the map and in the list.                         |
+| `kind`    | `"page" \| "orphan" \| "js_only"` |                                                                                     |
+| `depth`   | `number \| null`                  | The page's depth: its record's when there is one, else the drawing's.               |
+| `x`       | `number`                          |                                                                                     |
+| `y`       | `number`                          |                                                                                     |
+| `r`       | `number`                          |                                                                                     |
+| `parent`  | `string \| null`                  | The path of the page whose link the line is drawn from; null for none.              |
+| `js`      | `boolean`                         | The link the line stands for was made by JavaScript (drawn dashed).                 |
+| `missing` | `string \| null`                  | `missingLabel`: for a page that answered 404 or 410, which has no depth; else null. |
 
 #### `PageDetails`
 
@@ -353,34 +354,34 @@ Read through the TypeScript compiler. A screen receives its view and nothing els
 
 #### `LinkMapView`
 
-| Field             | Type                                      | Note                                                                                                                                                                                  |
-| ----------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `noneServed`      | `boolean`                                 | Pages answered and none was served: `title` and `caption` say so, and nothing is drawn.                                                                                               |
-| `frame`           | `object`                                  |                                                                                                                                                                                       |
-| `frame.domain`    | `string`                                  |                                                                                                                                                                                       |
-| `frame.overview`  | `string`                                  |                                                                                                                                                                                       |
-| `frame.section`   | `{ title: string; href: string; }`        |                                                                                                                                                                                       |
-| `frame.keptUntil` | `string \| null`                          |                                                                                                                                                                                       |
-| `frame.keepHref`  | `string`                                  |                                                                                                                                                                                       |
-| `frame.tabs`      | `(SegmentLink & { current: boolean; })[]` |                                                                                                                                                                                       |
-| `frame.back`      | `SegmentLink`                             |                                                                                                                                                                                       |
-| `frame.next`      | `SegmentLink`                             |                                                                                                                                                                                       |
-| `title`           | `string`                                  |                                                                                                                                                                                       |
-| `caption`         | `string`                                  |                                                                                                                                                                                       |
-| `explore`         | `SegmentLink \| null`                     |                                                                                                                                                                                       |
-| `filters`         | `MapFilter[]`                             |                                                                                                                                                                                       |
-| `renderer`        | `"svg" \| "canvas"`                       |                                                                                                                                                                                       |
-| `label`           | `string`                                  | The stage's name for a screen reader.                                                                                                                                                 |
-| `nodes`           | `MapNodeView[]`                           |                                                                                                                                                                                       |
-| `order`           | `string[]`                                | Every drawn page, in the order the keyboard walks them: by depth, then path.                                                                                                          |
-| `details`         | `Record<string, PageDetails>`             | What the record holds about a drawn page, by path; a page with no record is absent.                                                                                                   |
-| `reduced`         | `string`                                  | What the panel says for a page with no record.                                                                                                                                        |
-| `initial`         | `string`                                  | The page selected when the explorer opens.                                                                                                                                            |
-| `keep`            | `{ title: string; sub: string; } \| null` | The keep bar's words; null once an account keeps the audit. Which element is orange follows the selection (Explorer.tsx): the page's fix link, else the keep bar, else the next link. |
-| `legend`          | `object`                                  | The legend's keys for what is drawn; a page and the selection ring are always keyed.                                                                                                  |
-| `legend.jsOnly`   | `boolean`                                 |                                                                                                                                                                                       |
-| `legend.orphans`  | `boolean`                                 |                                                                                                                                                                                       |
-| `legend.jsLinks`  | `boolean`                                 |                                                                                                                                                                                       |
+| Field             | Type                                                                    | Note                                                                                                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `noneServed`      | `boolean`                                                               | Pages answered and none was served: `title` and `caption` say so, and nothing is drawn.                                                                                               |
+| `frame`           | `object`                                                                |                                                                                                                                                                                       |
+| `frame.domain`    | `string`                                                                |                                                                                                                                                                                       |
+| `frame.overview`  | `string`                                                                |                                                                                                                                                                                       |
+| `frame.section`   | `{ title: string; href: string; }`                                      |                                                                                                                                                                                       |
+| `frame.keptUntil` | `string \| null`                                                        |                                                                                                                                                                                       |
+| `frame.keepHref`  | `string`                                                                |                                                                                                                                                                                       |
+| `frame.tabs`      | `(SegmentLink & { current: boolean; added?: boolean \| undefined; })[]` |                                                                                                                                                                                       |
+| `frame.back`      | `SegmentLink`                                                           |                                                                                                                                                                                       |
+| `frame.next`      | `SegmentLink`                                                           |                                                                                                                                                                                       |
+| `title`           | `string`                                                                |                                                                                                                                                                                       |
+| `caption`         | `string`                                                                |                                                                                                                                                                                       |
+| `explore`         | `SegmentLink \| null`                                                   |                                                                                                                                                                                       |
+| `filters`         | `MapFilter[]`                                                           |                                                                                                                                                                                       |
+| `renderer`        | `"svg" \| "canvas"`                                                     |                                                                                                                                                                                       |
+| `label`           | `string`                                                                | The stage's name for a screen reader.                                                                                                                                                 |
+| `nodes`           | `MapNodeView[]`                                                         |                                                                                                                                                                                       |
+| `order`           | `string[]`                                                              | Every drawn page, in the order the keyboard walks them: by depth, then path.                                                                                                          |
+| `details`         | `Record<string, PageDetails>`                                           | What the record holds about a drawn page, by path; a page with no record is absent.                                                                                                   |
+| `reduced`         | `string`                                                                | What the panel says for a page with no record.                                                                                                                                        |
+| `initial`         | `string`                                                                | The page selected when the explorer opens.                                                                                                                                            |
+| `keep`            | `{ title: string; sub: string; } \| null`                               | The keep bar's words; null once an account keeps the audit. Which element is orange follows the selection (Explorer.tsx): the page's fix link, else the keep bar, else the next link. |
+| `legend`          | `object`                                                                | The legend's keys for what is drawn; a page and the selection ring are always keyed.                                                                                                  |
+| `legend.jsOnly`   | `boolean`                                                               |                                                                                                                                                                                       |
+| `legend.orphans`  | `boolean`                                                               |                                                                                                                                                                                       |
+| `legend.jsLinks`  | `boolean`                                                               |                                                                                                                                                                                       |
 
 ## Values that come from a check
 

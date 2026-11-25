@@ -37,10 +37,18 @@ describe.each([
     ).toBeNull();
   });
 
-  it('has the rail’s links in the locked order, counted from the view model', () => {
+  it('has the rail’s links in the locked order, with Seats before Settings, counted from the view model', () => {
     const [ours] = withoutShell(html).cut;
     const [theirs] = withoutShell(lockedHtml).cut;
-    expect(railLabels(ours!)).toEqual(railLabels(theirs!));
+    // The locked rail has no Seats; it was reached only by typing its address (D-24, F-287).
+    const locked = railLabels(theirs!);
+    const settings = locked.indexOf('Settings');
+    expect(settings).toBeGreaterThan(0);
+    expect(railLabels(ours!)).toEqual([
+      ...locked.slice(0, settings),
+      'Seats',
+      ...locked.slice(settings),
+    ]);
     const data = dashboardPreview(name);
     for (const n of data.shell.nav) {
       if (n.count) expect(ours).toContain(`${n.label} <span`);
@@ -57,10 +65,14 @@ describe.each([
     expect(primaries(header)).toHaveLength(1);
   });
 
-  it('posts every form to a route CC-26b or CC-27b owns, never with a GET', () => {
-    const routes = Object.values(ACCOUNT_ACTIONS).map(
-      (a) => new RegExp(`^${a.route.replace(/\[\w+\]/g, '[^/]+')}$`),
-    );
+  it('posts every form to a route CC-26b or CC-27b owns, or the rail’s sign-out, never with a GET', () => {
+    const routes = [
+      ...Object.values(ACCOUNT_ACTIONS).map(
+        (a) => new RegExp(`^${a.route.replace(/\[\w+\]/g, '[^/]+')}$`),
+      ),
+      // The rail's Sign out (D-23): the logout route the sign-in pages already post to.
+      /^\/api\/auth\/logout$/,
+    ];
     const forms = [...html.matchAll(/<form [^>]*>/g)].map(([tag]) => [
       tag,
       tag.match(/ method="([^"]+)"/)?.[1],

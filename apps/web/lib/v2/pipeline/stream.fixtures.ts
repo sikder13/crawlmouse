@@ -3,6 +3,7 @@
  * recorded build fixture so each is a contract `CrawlPage` with the fields a test names changed.
  */
 import type { CrawlBatchResult, CrawlPage, LinkEdge } from '@crawlmouse/types/v2';
+import { canonicalizeUrl } from '@crawlmouse/engine';
 import { readRecorded } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 
 const RECORDED = readRecorded('batches').find((b): b is CrawlBatchResult => b.kind === 'crawl')!;
@@ -23,7 +24,13 @@ export interface RowSpec {
   text?: number;
 }
 
-export const urlOf = (path: string): string => `${ORIGIN}${path}`;
+/**
+ * A page's URL as a check stores it: the engine's canonical form, so the root is `https://stream.test`
+ * with no slash. These fixtures once wrote `${ORIGIN}${path}` as given, root `https://stream.test/`,
+ * the form the map looked for and no real check holds; the map drew nothing of any real check and no
+ * test here could see it (c/027, map-layout.real-urls.test.ts).
+ */
+export const urlOf = (path: string): string => canonicalizeUrl(`${ORIGIN}${path}`);
 
 export function row(spec: RowSpec): CrawlPage {
   const { status = 200, ms = 120, links = 3 } = spec;

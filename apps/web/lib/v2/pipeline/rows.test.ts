@@ -111,18 +111,18 @@ describe('checkFromRow', () => {
     expect(checkFromRow(running(progress)).progress).toEqual(progress);
   });
 
-  // Inbox 084, deployed before the field is written: the next deployment adds coverage.stopped, and a
-  // rollback from it to this one must still read the checks it wrote.
-  it('reads a check whose coverage carries the next deployment’s `stopped`, by leaving it out', () => {
+  // Inbox 084: coverage gained `stopped`; a check written before it is read with stopped: null.
+  it('reads a check whose coverage was written before `stopped` with stopped: null, and keeps a newer one', () => {
     const check = cleanSite.checks.find((c) => c.coverage !== null)!;
-    const newer = {
-      ...check,
-      coverage: {
-        ...check.coverage,
-        stopped: { page_cap: 500, at_cap: false, time_ran_out: false, site_stopped: false },
-      },
-    };
-    expect(checkFromRow(newer).coverage).toEqual(check.coverage);
+    const older = Object.fromEntries(
+      Object.entries(check.coverage!).filter(([key]) => key !== 'stopped'),
+    );
+    expect(checkFromRow({ ...check, coverage: older }).coverage).toEqual({
+      ...check.coverage,
+      stopped: null,
+    });
+    expect(checkFromRow({ ...check }).coverage).toEqual(check.coverage);
+    expect(check.coverage!.stopped).not.toBeNull();
     expect(() => checkFromRow({ ...check, coverage: { ...check.coverage, other: 1 } })).toThrow();
   });
 

@@ -8,8 +8,13 @@ import type { MapNode } from './progress';
 
 export * from '@crawlmouse/engine/v2/layout';
 
-/** A site's home page: the origin and nothing after its slash. */
-const HOME = /^https?:\/\/[^/]+\/$/;
+/**
+ * A site's home page: the origin, with or without its slash, and nothing after it. A check's URLs
+ * are the engine's canonical form, which writes the root without the slash
+ * (packages/engine/src/url-canonical.ts); the recordings write it with one. Read only one way, a
+ * real check's map has no home page, so no page a link reaches is drawn (map-layout.real-urls.test.ts).
+ */
+const HOME = /^https?:\/\/[^/?#]+\/?$/;
 
 /**
  * The layout's input from the crawl state: each page a link path from the home page reaches, with

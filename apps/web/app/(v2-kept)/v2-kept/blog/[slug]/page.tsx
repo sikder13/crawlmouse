@@ -39,5 +39,5 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 /** `/blog/<slug>` in the v2 shell while V2_CHECKS_PUBLIC is on (CC-36 D3); a 404 with it off. */
 export default async function KeptBlogPostPage(props: Props) {
   if (!checksPublicEnabled()) return notFound();
-  return keptPage(await BlogPostPage(props), [ArticleLayout]);
+  return keptPage(await BlogPostPage(props), [ArticleLayout], 'v2');
 }

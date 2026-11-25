@@ -8,6 +8,7 @@ import {
   NOT_RENDERED,
   IN_FLIGHT_ENV,
   inFlightFromEnv,
+  measureAllowanceMs,
   RENDER_IN_FLIGHT_DEFAULT,
   RENDER_IN_FLIGHT_MAX,
   RESERVE_PER_RENDER_MS,
@@ -646,5 +647,356 @@ describe('a render that fails', () => {
 describe('the reasons a page is not rendered', () => {
   it('give a meaning for every way a render can fail', () => {
     for (const f of RENDER_FAILURES) expect(Object.keys(NOT_RENDERED)).toContain(f);
+  });
+});
+
+describe('the step deadline', () => {
+  /** A client whose every render takes `ms` of a clock the test reads. */
+  function timedClient(ms: number, forced?: RenderReply) {
+    const clock = { now: 1_000_000 };
+    const client = fakeClient(FIXTURES.values(), {
+      before: () => {
+        clock.now += ms;
+        return forced;
+      },
+    });
+    return { client, clock, calls: client.calls };
+  }
+  const WORST_PAGE = 2 * REQUEST_TIMEOUT_MS;
+
+  it('starts no request that could run past the deadline, and asks the budget for nothing', async () => {
+    const { client, clock, calls } = timedClient(1_000);
+    const daily = memoryDailyBudget();
+    const reserve = vi.spyOn(daily, 'reserve');
+    const out = await renderCheck(
+      input({
+        client,
+        daily,
+        now: () => clock.now,
+        deadlineAt: clock.now + REQUEST_TIMEOUT_MS - 1,
+      }),
+    );
+    expect(calls).toEqual([]);
+    expect(reserve).not.toHaveBeenCalled();
+    expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual(
+      out.pages.map(() => 'out_of_time'),
+    );
+  });
+
+  it('keeps the pages it rendered and marks the rest, settling what it used', async () => {
+    const pageMs = 2 * 10_000;
+    const { client, clock } = timedClient(10_000);
+    const daily = memoryDailyBudget();
+    const settle = vi.spyOn(daily, 'settle');
+    const out = await renderCheck(
+      input({
+        client,
+        daily,
+        inFlight: 1,
+        now: () => clock.now,
+        // Room for the first page's two requests, one after the other, and not for the second
+        // page's first request once the first page has run.
+        deadlineAt: clock.now + pageMs + REQUEST_TIMEOUT_MS - 1,
+      }),
+    );
+    expect(out.pages[0]).toMatchObject({ rendered: true });
+    const rest = out.pages.slice(1);
+    expect(rest.length).toBeGreaterThan(0);
+    for (const p of rest) expect(p).toMatchObject({ rendered: false, reason: 'out_of_time' });
+    expect(settle).toHaveBeenCalledTimes(1);
+    expect(out.browser_ms).toBeGreaterThan(0);
+  });
+
+  // QA's B1 on #172: the step's share is exactly two requests (90 s), and the deadline was tested
+  // against both up front, so a page rendered only when no time at all had passed. It is tested
+  // before each request now: a step that has used some of its share still renders.
+  it('renders a page when less than both requests’ time is left, one request at a time', async () => {
+    for (const used of [1, 1_000, REQUEST_TIMEOUT_MS - 1_000]) {
+      const { client, clock, calls } = timedClient(1);
+      const out = await renderCheck(
+        input({
+          client,
+          inFlight: 1,
+          maxRenders: 1,
+          now: () => clock.now,
+          deadlineAt: clock.now + WORST_PAGE - used,
+        }),
+      );
+      expect(out.pages[0], `used ${used}`).toMatchObject({ rendered: true });
+      expect(calls).toHaveLength(2);
+    }
+  });
+
+  it('does not wait out a rate limit that would end past the deadline', async () => {
+    const limited: RenderReply = {
+      ok: false,
+      reason: 'rate_limited',
+      retryAfterMs: 30_000,
+      browserMs: 0,
+    } as RenderReply;
+    const { client, clock, calls } = timedClient(0, limited);
+    const sleep = vi.fn(async (ms: number) => {
+      clock.now += ms;
+    });
+    const out = await renderCheck(
+      input({
+        client,
+        sleep,
+        inFlight: 1,
+        maxRenders: 1,
+        now: () => clock.now,
+        deadlineAt: clock.now + WORST_PAGE + 1,
+      }),
+    );
+    expect(sleep).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'rate_limited' });
+  });
+
+  it('starts the second side only when it can finish by the deadline', async () => {
+    const fits = timedClient(REQUEST_TIMEOUT_MS - 1_000);
+    const first = await renderCheck(
+      input({
+        client: fits.client,
+        inFlight: 1,
+        maxRenders: 1,
+        now: () => fits.clock.now,
+        deadlineAt: fits.clock.now + WORST_PAGE,
+      }),
+    );
+    expect(first.pages[0]).toMatchObject({ rendered: true });
+    const late = timedClient(REQUEST_TIMEOUT_MS + 1);
+    const second = await renderCheck(
+      input({
+        client: late.client,
+        inFlight: 1,
+        maxRenders: 1,
+        now: () => late.clock.now,
+        deadlineAt: late.clock.now + WORST_PAGE,
+      }),
+    );
+    expect(late.calls).toHaveLength(1);
+    expect(second.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
+  });
+
+  it('stops waiting on an admission that would leave no time to render', async () => {
+    const { client, clock, calls } = timedClient(1_000);
+    const out = await renderCheck(
+      input({
+        client,
+        maxRenders: 1,
+        inFlight: 1,
+        admit: () => new Promise<void>(() => undefined),
+        now: () => clock.now,
+        // 20 ms of real time before a request could no longer finish.
+        deadlineAt: clock.now + REQUEST_TIMEOUT_MS + 20,
+      }),
+    );
+    expect(calls).toEqual([]);
+    expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
+  });
+
+  it('still refuses a page admission refused, inside the deadline', async () => {
+    const { client, clock } = timedClient(1_000);
+    const out = await renderCheck(
+      input({
+        client,
+        maxRenders: 1,
+        admit: async () => {
+          throw new NotAdmitted('private');
+        },
+        now: () => clock.now,
+        deadlineAt: clock.now + 10 * WORST_PAGE,
+      }),
+    );
+    expect(out.pages[0]).toMatchObject({
+      rendered: false,
+      reason: 'not_admitted',
+      detail: 'private',
+    });
+  });
+
+  it('a refusal that lands after the wait ended is not an unhandled rejection', async () => {
+    const seen: unknown[] = [];
+    const on = (e: unknown) => seen.push(e);
+    process.on('unhandledRejection', on);
+    try {
+      const { client, clock } = timedClient(1_000);
+      await renderCheck(
+        input({
+          client,
+          maxRenders: 1,
+          admit: () =>
+            new Promise<void>((_ok, no) => setTimeout(() => no(new NotAdmitted('private')), 30)),
+          now: () => clock.now,
+          deadlineAt: clock.now + WORST_PAGE + 5,
+        }),
+      );
+      await new Promise((r) => setTimeout(r, 60));
+    } finally {
+      process.off('unhandledRejection', on);
+    }
+    expect(seen).toEqual([]);
+  });
+
+  it('a refusal already past the deadline is not an unhandled rejection', async () => {
+    const seen: unknown[] = [];
+    const on = (e: unknown) => seen.push(e);
+    process.on('unhandledRejection', on);
+    try {
+      const { client, clock } = timedClient(1_000);
+      const out = await renderCheck(
+        input({
+          client,
+          maxRenders: 1,
+          inFlight: 1,
+          // The clock passes the deadline while admission is asked, and it then refuses.
+          admit: async () => {
+            clock.now += 1;
+            throw new NotAdmitted('private');
+          },
+          now: () => clock.now,
+          deadlineAt: clock.now + REQUEST_TIMEOUT_MS,
+        }),
+      );
+      expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
+      await new Promise((r) => setTimeout(r, 30));
+    } finally {
+      process.off('unhandledRejection', on);
+    }
+    expect(seen).toEqual([]);
+  });
+
+  it('allows for measuring both replies, not one', async () => {
+    const big = 'x'.repeat(2 * 1024 * 1024);
+    const html = `<html><body><p>${big}</p></body></html>`;
+    const { clock } = timedClient(0);
+    const client = fakeClient(FIXTURES.values(), {
+      before: () => {
+        clock.now += REQUEST_TIMEOUT_MS;
+        return { ok: true, html, browserMs: 5 };
+      },
+    });
+    const out = await renderCheck(
+      input({
+        client,
+        maxRenders: 1,
+        inFlight: 1,
+        now: () => clock.now,
+        // Enough to measure one reply, and one millisecond short of both.
+        deadlineAt: clock.now + WORST_PAGE + measureAllowanceMs(2 * html.length) - 1,
+      }),
+    );
+    expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
+  });
+
+  it('does not measure a page whose replies could not be measured in the time left', async () => {
+    const big = 'x'.repeat(2 * 1024 * 1024);
+    const { clock } = timedClient(0);
+    const client = fakeClient(FIXTURES.values(), {
+      before: () => {
+        clock.now += REQUEST_TIMEOUT_MS - 1;
+        return { ok: true, html: `<html><body><p>${big}</p></body></html>`, browserMs: 5 };
+      },
+    });
+    const out = await renderCheck(
+      input({
+        client,
+        maxRenders: 1,
+        inFlight: 1,
+        now: () => clock.now,
+        // After both sides, 2 ms are left: too little for 4 MiB.
+        deadlineAt: clock.now + WORST_PAGE,
+      }),
+    );
+    expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
+    expect(out.browser_ms).toBe(10);
+  });
+
+  it('measures the same page when there is time for its size', async () => {
+    const big = 'x'.repeat(2 * 1024 * 1024);
+    const { clock } = timedClient(0);
+    const html = `<html><body><p>${big}</p></body></html>`;
+    const client = fakeClient(FIXTURES.values(), {
+      before: () => {
+        clock.now += REQUEST_TIMEOUT_MS;
+        return { ok: true, html, browserMs: 5 };
+      },
+    });
+    const bytes = 2 * html.length;
+    const out = await renderCheck(
+      input({
+        client,
+        maxRenders: 1,
+        inFlight: 1,
+        now: () => clock.now,
+        deadlineAt: clock.now + WORST_PAGE + measureAllowanceMs(bytes),
+      }),
+    );
+    expect(out.pages[0]).toMatchObject({ rendered: true });
+  });
+
+  it('with no deadline renders as before', async () => {
+    const { client, clock } = timedClient(10_000);
+    const out = await renderCheck(input({ client, now: () => clock.now }));
+    expect(out.pages.some((p) => p.rendered)).toBe(true);
+    expect(out.pages.every((p) => p.rendered || p.reason !== 'out_of_time')).toBe(true);
+  });
+});
+
+describe('measuring a page somewhere bounded (questions/042, design C)', () => {
+  it('measures each page through the reader it is given, with both sides and the URL', async () => {
+    const seen: string[] = [];
+    const out = await renderCheck(
+      input({
+        read: async (s, r, url) => {
+          seen.push(url);
+          expect(s.length).toBeGreaterThan(0);
+          expect(r.length).toBeGreaterThan(0);
+          return { raw_words: 10, rendered_words: 40, challenged: false, links: null };
+        },
+      }),
+    );
+    expect(seen.sort()).toEqual(THREE.map((c) => c.url).sort());
+    for (const p of out.pages) {
+      expect(p).toMatchObject({
+        rendered: true,
+        without_js: { raw_words: 10, rendered_words: 40, text_share: 0.25 },
+      });
+      expect(p).not.toHaveProperty('links');
+    }
+  });
+
+  it.each([
+    ['answers null', async () => null],
+    [
+      'throws',
+      async () => {
+        throw new Error('the reader went away');
+      },
+    ],
+  ])('records measure_failed when the reader %s', async (_name, read) => {
+    const out = await renderCheck(input({ read }));
+    expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual([
+      'measure_failed',
+      'measure_failed',
+      'measure_failed',
+    ]);
+  });
+
+  it('reads a challenge from the reader as challenged', async () => {
+    const out = await renderCheck(
+      input({
+        read: async () => ({ raw_words: 0, rendered_words: 9, challenged: true, links: null }),
+      }),
+    );
+    expect(out.pages.every((p) => !p.rendered && p.reason === 'challenged')).toBe(true);
+  });
+
+  it('gives the same pages without a reader as with the inline one', async () => {
+    const { readRendered } = await import('./page.js');
+    const inline = await renderCheck(input());
+    const given = await renderCheck(input({ read: async (s, r, u) => readRendered(s, r, u) }));
+    expect(given.pages).toEqual(inline.pages);
   });
 });

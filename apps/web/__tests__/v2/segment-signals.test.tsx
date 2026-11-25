@@ -20,7 +20,7 @@ import { SEGMENT_VARIANTS, segmentElement } from './_lib/screens';
 
 const RESULT_OF = { 'bad-site': 'bad-site', clean: 'clean', challenged: 'challenged' } as const;
 const door = (variant: (typeof SEGMENT_VARIANTS)[number]) =>
-  (RESULT_PREVIEWS[RESULT_OF[variant]]() as ResultView).doors[4]!;
+  (RESULT_PREVIEWS[RESULT_OF[variant]]() as ResultView).doors[5]!;
 
 describe('Final-Seg-Signals, the bad site', () => {
   const html = renderToStaticMarkup(segmentElement('signals', 'bad-site'));
