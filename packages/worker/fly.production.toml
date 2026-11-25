@@ -34,8 +34,10 @@ kill_timeout = "5s"
   # One machine: batch records and nonces are per process. The deploy passes --ha=false to match.
   min_machines_running = 1
 
-  # At most this many requests reach the worker at once, so at most this many 1 MiB request bodies
-  # are buffered; past it the proxy queues them.
+  # At most this many requests reach the worker at once; past it the proxy queues them. A POST /batch
+  # body is at most 1 MiB. A POST /render/measure body is at most about 20 MiB, and the worker reads
+  # one only after its signed headers pass and only for the two it measures at once
+  # (MEASURE_CONCURRENCY in src/server.ts); it answers the rest from their headers.
   [http_service.concurrency]
     type = "requests"
     soft_limit = 20

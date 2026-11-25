@@ -73,9 +73,20 @@ export function finishSteps(
         deps.store.previousGraded(event.siteId, event.checkId),
       ]);
       const states = previous ? await deps.store.pageStates(previous.check.id) : new Map();
+      // Each rendered page is read on the worker's reader thread, which stops a read at its deadline
+      // (questions/042, design C). With no worker able to, a page records `measure_failed`: it is
+      // never read here, where nothing bounds it.
+      let worker: ReturnType<typeof deps.worker> = null;
+      try {
+        worker = deps.worker();
+      } catch {
+        // A worker client that cannot be built reads no page: each records measure_failed.
+      }
       const outcome = await renderCheck({
         ...renderCandidates(assembled, [...sampled.stage1, ...sampled.stage2], fixes, states),
         ...deps.render,
+        read: async (staticHtml, renderedHtml, pageUrl) =>
+          (await worker?.measureRendered?.(staticHtml, renderedHtml, pageUrl)) ?? null,
       });
       await putJson(deps.evidence, pathOf(event, 'render'), outcome);
       const rendered = outcome.pages.filter((p) => p.rendered).length;
