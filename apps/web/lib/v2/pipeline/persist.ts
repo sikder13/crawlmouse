@@ -50,7 +50,7 @@ import {
   type ServerEvents,
 } from '../account/events';
 import { PERSIST_RPC } from './columns';
-import { DiffInputsSchema, withoutCoverageNext } from './rows';
+import { DiffInputsSchema, withCoverageAdded } from './rows';
 import type {
   FixRead,
   PageVantage,
@@ -168,10 +168,10 @@ export function persistCalls(input: PersistInput): PersistCalls {
     link_edges: z.array(LinkEdgeSchema).parse(built.link_edges),
     access_tests: z.array(AccessTestSchema).parse(built.access_tests),
   };
-  // A check built by the next deployment and persisted by this one after a rollback (COVERAGE_NEXT).
+  // A check built before `coverage.stopped` was kept, and persisted after the deploy, has none.
   const check = CheckSchema.parse({
     ...built.check,
-    coverage: withoutCoverageNext(built.check.coverage),
+    coverage: withCoverageAdded(built.check.coverage),
   });
   const stages = STAGED.flatMap((collection) =>
     chunked(bulk[collection]).map((rows, chunk) => ({ collection, chunk, rows })),
