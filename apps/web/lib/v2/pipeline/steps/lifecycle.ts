@@ -23,7 +23,9 @@ import { iso, pathOf } from './stored';
 
 const NOTHING_YET = { pagesCrawled: 0, linksFound: 0, discovered: null, waitingSince: null };
 
-export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'discover' | 'fail'> {
+export function lifecycleSteps(
+  deps: StepDeps,
+): Pick<CheckSteps, 'claim' | 'discover' | 'fail' | 'requeue'> {
   return {
     /**
      * CRAWL_PAUSED first (v1's rule, Q12), then `claim_check`. `at` is this attempt's time; the first
@@ -59,6 +61,25 @@ export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'disc
     },
 
     fail: (event, reason) => failCheck(deps.store, event.checkId, reason),
+
+    /**
+     * F-260: the check queued again for its one retry, by the run that claimed it; then the first
+     * run's stored batch results removed, named from its batch rows as expiry and the purge name a
+     * check's objects (keep.ts `objectNames`), and only then the rows deleted. Nothing is removed for a
+     * check that is another run's or has ended. A retried step finds the check queued with no run and
+     * the rows that are left, and removes again.
+     */
+    async requeue(event, runId) {
+      if (!(await deps.store.requeue(event.checkId, runId, iso(deps.now())))) {
+        return { requeued: false };
+      }
+      const rows = await deps.store.batches(event.checkId);
+      if (rows.length > 0) {
+        await deps.evidence.remove(rows.map((r) => pathOf(event, `batch-${r.batch}`)));
+      }
+      await deps.store.deleteBatches(event.checkId);
+      return { requeued: true };
+    },
   };
 }
 

@@ -121,7 +121,7 @@ describe('the writes', () => {
       rule: { id: a.ruleId, enabled: false },
       slack: { set: URL_A },
     });
-    expect(out).toEqual({ ok: true, slack: { set: true, last4: 'WXYZ' } });
+    expect(out).toEqual({ ok: true, slack: { set: true, last4: 'WXYZ' }, tested: false });
     expect(JSON.stringify(out)).not.toContain('hooks.slack.com');
     expect(await enabledOf(a.ruleId)).toBe(false);
     const secret = await db.query<{ secret: string }>(
@@ -170,6 +170,6 @@ describe('the writes', () => {
     const a = await paidAccount('clear');
     await applyAlertRules(ports(), a.accountId, { rule: null, slack: { set: URL_A } });
     const out = await applyAlertRules(ports(), a.accountId, { rule: null, slack: 'clear' });
-    expect(out).toEqual({ ok: true, slack: { set: false, last4: null } });
+    expect(out).toEqual({ ok: true, slack: { set: false, last4: null }, tested: false });
   });
 });
