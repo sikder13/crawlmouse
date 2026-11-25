@@ -53,7 +53,7 @@ export {
   mergeFullRender,
 } from './render/full.js';
 export type { RenderOutcome } from './render/run.js';
-export { clientFromEnv } from './render/client.js';
+export { clientFromEnv, REQUEST_TIMEOUT_MS } from './render/client.js';
 export { capsFromEnv } from './render/budget.js';
 export type { DailyBudget } from './render/budget.js';
 export type { JsTextState } from './render/state.js';

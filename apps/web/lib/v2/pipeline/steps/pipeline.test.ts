@@ -25,6 +25,7 @@ import { objectNames } from '../keep';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import { AFTER_RENDER_MIN_S, RENDER_SHARE_S, RESERVE_S } from '../limits';
+import { REQUEST_TIMEOUT_MS } from '@crawlmouse/engine/v2/pipeline';
 import { RENDER_STEP_MS } from './deps';
 import { NO_DAILY_BUDGET, checkSteps, fullRenderSteps, type StepDeps } from './index';
 
@@ -298,6 +299,58 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     const pages = await renderedPages(evidence);
     expect(pages.length).toBeGreaterThan(0);
     for (const p of pages) expect(p).toMatchObject({ rendered: false, reason: 'out_of_time' });
+  });
+
+  // QA's B1 on #172: the deadline left no room for one page once any time passed in the step's
+  // loads (1 ms: 0 of 27 rendered), because it was tested against both renders up front and the
+  // two together are the step's whole share. It is now tested before each request.
+  describe('renders through the step while the clock moves (QA B1)', () => {
+    const HTML =
+      '<html><head><title>A page</title></head><body><main><p>' +
+      'Words a reader can read without JavaScript. '.repeat(20) +
+      '</p></main></body></html>';
+    /** A run whose loads take `loadsMs`, and each request `requestMs`, on the step's own clock. */
+    async function moving(loadsMs: number, requestMs: number) {
+      const starts: number[] = [];
+      let stepStart = 0;
+      const { evidence } = await runRecorded((clock) => ({
+        admit: async () => undefined,
+        client: {
+          content: async () => {
+            starts.push(clock.now);
+            clock.now += requestMs;
+            return { ok: true, html: HTML, browserMs: requestMs };
+          },
+        },
+        // Called once the step has loaded what it reads: the loads took `loadsMs`.
+        dailyFor: () => {
+          stepStart = clock.now;
+          clock.now += loadsMs;
+          return { reserve: async () => true, settle: async () => undefined };
+        },
+      }));
+      return { pages: await renderedPages(evidence), starts, stepStart };
+    }
+
+    it.each([1, 1_000, 30_000])(
+      'renders every sampled page when the loads took %i ms and each request is quick',
+      async (loadsMs) => {
+        const { pages, starts } = await moving(loadsMs, 1);
+        expect(pages.length).toBeGreaterThan(0);
+        expect(pages.filter((p) => p.rendered)).toHaveLength(pages.length);
+        expect(starts).toHaveLength(2 * pages.length);
+      },
+    );
+
+    it('starts no request that could not finish by the deadline, and renders what fits', async () => {
+      // Each request takes 20 s on the step's clock, so the 90 s share holds a few and not all.
+      const { pages, starts, stepStart } = await moving(1_000, 20_000);
+      const deadline = stepStart + RENDER_STEP_MS;
+      expect(starts.length).toBeGreaterThan(0);
+      for (const at of starts) expect(at + REQUEST_TIMEOUT_MS).toBeLessThanOrEqual(deadline);
+      expect(pages.some((p) => p.rendered)).toBe(true);
+      expect(pages.some((p) => p.reason === 'out_of_time')).toBe(true);
+    });
   });
 
   it('hands persistence the built check, every page’s vantage and the map’s path', async () => {
