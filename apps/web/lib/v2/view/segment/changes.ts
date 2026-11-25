@@ -12,7 +12,7 @@ type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
 type CheckTrigger = Check['trigger'];
 import { findCheck, siteOf } from '../../fixtures';
-import { dateTimeUtc, listOf, weekdayTime } from '../../format';
+import { dateTimeUtc, listOf, weekdayTime, weekdayTimeZoned } from '../../format';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { ANONYMOUS_VISIBLE_MS, type DoorView } from '../result';
 
@@ -141,7 +141,7 @@ const EXAMPLE: ChangeRowView[] = [
 function clockOf(d: ViewDataset, check: Check) {
   const account = d.accounts.find((a) => a.id === siteOf(d, check).account_id);
   return (ts: string) =>
-    account ? weekdayTime(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
+    account ? weekdayTimeZoned(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
 }
 
 /**

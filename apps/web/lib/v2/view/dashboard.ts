@@ -22,11 +22,13 @@ import {
   daysBefore,
   dayDate,
   dayMonth,
-  hourMinute,
+  hourMinuteZoned,
+  nextWeekly,
+  zoneName,
   listOf,
   weekday,
   weekdayLong,
-  weekdayTime,
+  weekdayTimeZoned,
 } from '../format';
 import { isAi, isBlocked } from '../sentences';
 import { count, plural } from '../words';
@@ -404,7 +406,7 @@ function lastCheck(v: AccountView, site: Site): string {
     .filter((c) => c.site_id === site.id)
     .sort((a, b) => instant(a.finished_at!) - instant(b.finished_at!))
     .at(-1);
-  const parts = [result ? weekdayTime(result.finished_at!, zone) : '—'];
+  const parts = [result ? weekdayTimeZoned(result.finished_at!, zone) : '—'];
   if (ended && ended !== result && ended.status === 'failed') parts.push('latest check failed');
   for (const f of v.inFlight.filter((x) => x.siteId === site.id)) parts.push(`check ${f.status}`);
   return parts.join(' · ');
@@ -524,16 +526,16 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
   const parts =
     c.kind === 'resolved'
       ? [
-          weekdayTime(c.detected_at, zone),
+          weekdayTimeZoned(c.detected_at, zone),
           ...c.grade_deltas.map((g) => `${GRADES[g.grade]} ${g.from_grade} → ${g.to_grade}`),
           fix && v.d.fix_events.some((e) => e.fix_id === fix.id && e.kind === 'marked_done')
             ? 'from your fix list'
             : null,
         ]
       : [
-          `Detected ${weekdayTime(c.detected_at, zone)}`,
+          `Detected ${weekdayTimeZoned(c.detected_at, zone)}`,
           c.cause?.changed_at
-            ? `${c.where} changed ${weekdayTime(c.cause.changed_at, zone)}`
+            ? `${c.where} changed ${weekdayTimeZoned(c.cause.changed_at, zone)}`
             : null,
           `${count(c.pages_affected)} ${plural(c.pages_affected, 'page', 'pages')}`,
           ...gradeMoves(v, c.check_id).map((m) => `this check: ${m}`),
@@ -724,8 +726,18 @@ function setup(
   // The scheduler's own time where it holds one, as the site page and the next-check line say it.
   const nextAt = next?.get(site.id) ?? null;
   const time = nextAt
-    ? hourMinute(nextAt, zoneOf(v))
-    : `${String(sch?.hour_local).padStart(2, '0')}:00`;
+    ? hourMinuteZoned(nextAt, zoneOf(v))
+    : `${String(sch?.hour_local).padStart(2, '0')}:00 ${zoneName(
+        // The zone at the next such hour, as the header's next check names it.
+        sch?.iso_weekday && sch.hour_local !== null
+          ? nextWeekly(
+              { iso_weekday: sch.iso_weekday, hour_local: sch.hour_local },
+              v.now,
+              zoneOf(v),
+            )
+          : v.now,
+        zoneOf(v),
+      )}`;
   const schedule =
     !firstRun && sch?.cadence === 'weekly'
       ? {
@@ -986,7 +998,7 @@ export function dashboardView(
         line: [
           dayDate(v.now, zone),
           sitesWord,
-          result ? `audited ${hourMinute(result.finished_at!, zone)}` : null,
+          result ? `audited ${hourMinuteZoned(result.finished_at!, zone)}` : null,
           ...flight,
           nextText,
           trialEnds,

@@ -41,10 +41,10 @@ describe('the Changes log', () => {
     expect(v.shell.nav.find((n) => n.current)!.label).toBe('Changes');
   });
 
-  it('dates each row, since a log spans weeks: Sat 24 Oct 22:34 for the first audit’s change', () => {
-    // 2026-10-25T02:34Z is 22:34 the evening before in Indiana (EDT, UTC−4).
-    expect(log().rows.at(-1)!.when).toBe('Sat 24 Oct 22:34');
-    expect(log().rows[0]!.when).toBe('Fri 30 Oct 06:02');
+  it('dates each row, since a log spans weeks: Sat 24 Oct 22:34 EDT for the first audit’s change', () => {
+    // 2026-10-25T02:34Z is 22:34 EDT the evening before in Indiana (EDT, UTC−4).
+    expect(log().rows.at(-1)!.when).toBe('Sat 24 Oct 22:34 EDT');
+    expect(log().rows[0]!.when).toBe('Fri 30 Oct 06:02 EDT');
   });
 
   it('filters by kind, and says how many of how many match', () => {
@@ -114,10 +114,10 @@ describe('the Changes log', () => {
   });
 
   it('reads a notification sent after now as not yet sent', () => {
-    // 10:02:30Z: the morning's changes are found, their email goes out at 10:03.
+    // 10:02:30Z: the morning's changes are found, their email goes out at 10:03 EDT.
     const early = changesLogView(bad, { ...viewer, now: '2026-10-30T10:02:30Z' }, {}, BASE);
     expect(early.rows.find((r) => r.key.endsWith('001'))!.told).toBe('nobody was notified');
-    expect(log().rows[0]!.told).toBe('email and Slack #seo, Fri 30 Oct 06:03');
+    expect(log().rows[0]!.told).toBe('email and Slack #seo, Fri 30 Oct 06:03 EDT');
   });
 });
 

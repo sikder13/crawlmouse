@@ -118,8 +118,8 @@ describe('the client matrix', () => {
 
   it('gives each row its next check, and its schedule with the report’s', () => {
     expect(view.clients.rows.map((r) => [r.nextCheck, r.schedule])).toEqual([
-      ['Fri 6 Nov around 06:00', 'weekly, Fri · report weekly, Mon'],
-      ['Fri 6 Nov around 06:00', 'weekly, Fri · report monthly, first Mon'],
+      ['Fri 6 Nov around 06:00 EST', 'weekly, Fri · report weekly, Mon'],
+      ['Fri 6 Nov around 06:00 EST', 'weekly, Fri · report monthly, first Mon'],
     ]);
     const unscheduled = edit((x) => ({
       sites: x.sites.map((s) =>
@@ -239,7 +239,7 @@ describe('the client matrix', () => {
   it('counts the header from the account’s limits, and names the next weekly check', () => {
     expect(view.header.title).toBe('Since each client’s last check');
     expect(view.header.line).toBe(
-      'Mon 2 Nov · 2 client sites, 23 of 25 unused · next weekly check Fri 6 Nov around 06:00',
+      'Mon 2 Nov · 2 client sites, 23 of 25 unused · next weekly check Fri 6 Nov around 06:00 EST',
     );
     expect(view.clients).toMatchObject({
       title: 'Clients · 2',

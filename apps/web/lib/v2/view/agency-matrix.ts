@@ -17,7 +17,7 @@ import { extrasOffered } from '../agency/extras-bounds';
 import { roleMay } from '../agency/guard';
 import { agencyGateMessage } from '../agency/gates';
 import { CLIENT_COPY, MATRIX_COPY as COPY } from '../copy/agency';
-import { dayDate, hourMinute, listOf, nextWeekly } from '../format';
+import { dayDate, hourMinuteZoned, listOf, nextWeekly } from '../format';
 import {
   addsSites,
   primarySites,
@@ -210,7 +210,7 @@ function nextWeeklyOf(v: AccountView, clients: readonly Site[]): string | null {
         : [],
     )
     .sort((a, b) => instant(a) - instant(b))[0];
-  return next ? `${dayDate(next, zone)} around ${hourMinute(next, zone)}` : null;
+  return next ? `${dayDate(next, zone)} around ${hourMinuteZoned(next, zone)}` : null;
 }
 
 /** A client with no result yet, read as its site page reads it; null once it has one. */

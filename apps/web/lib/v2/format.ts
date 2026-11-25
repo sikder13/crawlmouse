@@ -90,6 +90,23 @@ export function hourMinute(ts: string, timeZone: string): string {
   return `${p.hour}:${p.minute}`;
 }
 
+/** The zone's short name at that instant: "UTC", "EST", "GMT+1" (D-17). */
+export function zoneName(ts: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'short' })
+    .formatToParts(new Date(ts))
+    .find((p) => p.type === 'timeZoneName')!.value;
+}
+
+/** "06:02 EST": the time with its zone named, as the account pages show every time (D-17). */
+export function hourMinuteZoned(ts: string, timeZone: string): string {
+  return `${hourMinute(ts, timeZone)} ${zoneName(ts, timeZone)}`;
+}
+
+/** "Thu 14:12 EST": the weekday and time with its zone named (D-17). */
+export function weekdayTimeZoned(ts: string, timeZone: string): string {
+  return `${weekdayTime(ts, timeZone)} ${zoneName(ts, timeZone)}`;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The calendar date an instant falls on in the zone, as midnight UTC of that date. */
