@@ -92,6 +92,10 @@ export interface CopyChange {
   /**
    * Another reading of the same locked text, for a state the fixture the lock comparison renders
    * does not reach (another plan, a switch hidden): listed with its source, never applied.
+   * Its locked text must also have an applied entry on the same screen (screens.test.tsx checks
+   * this), and a module that registers readings tests them against what its render function
+   * produces, as lib/v2/view/settings-branding.test.ts compares the name hint's registered readings
+   * with the hints `settingsView` renders for each plan and switch state.
    */
   otherReading?: boolean;
 }

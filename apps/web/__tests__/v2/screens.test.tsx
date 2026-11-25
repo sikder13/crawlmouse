@@ -543,4 +543,19 @@ describe('the copy registry', () => {
       expect(squash(c.locked)).not.toBe(squash(c.rendered));
     }
   });
+
+  // An `otherReading` is never applied, so nothing else checks its locked text. An applied entry
+  // throws when its locked text is missing from the lock; requiring one with the identical locked
+  // text on the same screen proves the other reading's text is the lock's.
+  it('gives each otherReading an applied entry with the same locked text on its screen', () => {
+    const others = COPY_CHANGES.filter((c) => c.otherReading);
+    // The settings name hint registers some, so an empty filter would mean this checked nothing.
+    expect(others.length).toBeGreaterThan(0);
+    for (const c of others) {
+      const applied = COPY_CHANGES.filter(
+        (x) => !x.otherReading && x.screen === c.screen && x.locked === c.locked,
+      );
+      expect(applied.length, `${c.screen}: "${c.locked}" → "${c.rendered}"`).toBeGreaterThan(0);
+    }
+  });
 });
