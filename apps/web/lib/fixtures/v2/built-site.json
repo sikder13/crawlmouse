@@ -99,7 +99,13 @@
             "count": 1
           }
         ],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 81.77,

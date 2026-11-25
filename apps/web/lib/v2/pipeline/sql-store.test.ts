@@ -476,6 +476,7 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     const started = Date.parse(shift(first.queued_at, 3 * H));
     await steps.build(event, {
       startedAt: started,
+      pageCap: 500,
       crawlFrom: started,
       pagesCrawled: 0,
       linksFound: 0,

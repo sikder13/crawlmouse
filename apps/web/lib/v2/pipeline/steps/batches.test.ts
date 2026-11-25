@@ -33,6 +33,7 @@ const EVENT: CheckRequested = {
 };
 const SO: RunSoFar = {
   startedAt: T0,
+  pageCap: PAGE_CAP,
   crawlFrom: T0,
   pagesCrawled: 0,
   linksFound: 0,

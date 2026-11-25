@@ -562,6 +562,7 @@ describe('production discovery sends a loopback site nothing (quality 2)', () =>
   const CHECK_ID = 'c0000000-0000-4000-8000-0000000000e2';
   const SO: RunSoFar = {
     startedAt: Date.now(),
+    pageCap: 500,
     crawlFrom: null,
     pagesCrawled: 0,
     linksFound: 0,
