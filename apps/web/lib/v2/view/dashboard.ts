@@ -23,11 +23,13 @@ import {
   daysBefore,
   dayDate,
   dayMonth,
-  hourMinute,
+  hourMinuteZoned,
+  nextWeekly,
+  zoneName,
   listOf,
   weekday,
   weekdayLong,
-  weekdayTime,
+  weekdayTimeZoned,
 } from '../format';
 import { isAi, isBlocked } from '../sentences';
 import { count, plural } from '../words';
@@ -60,6 +62,7 @@ import {
 import { points, type DoorView } from './result';
 import { auditHref } from './audit-hrefs';
 import { nextCheckLine, type NextChecks } from './site';
+import { titleAmong } from './fix-title';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
 import {
@@ -436,7 +439,7 @@ function lastCheck(v: AccountView, site: Site): string {
     .filter((c) => c.site_id === site.id)
     .sort((a, b) => instant(a.finished_at!) - instant(b.finished_at!))
     .at(-1);
-  const parts = [result ? weekdayTime(result.finished_at!, zone) : '—'];
+  const parts = [result ? weekdayTimeZoned(result.finished_at!, zone) : '—'];
   // A check that stopped short is said to be partial, beside its time (D-07); its cause is not
   // named here, because the record does not hold one.
   if (result?.status === 'partial') parts.push('partial');
@@ -590,16 +593,16 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
   const parts =
     c.kind === 'resolved'
       ? [
-          weekdayTime(c.detected_at, zone),
+          weekdayTimeZoned(c.detected_at, zone),
           ...c.grade_deltas.map((g) => `${GRADES[g.grade]} ${g.from_grade} → ${g.to_grade}`),
           fix && v.d.fix_events.some((e) => e.fix_id === fix.id && e.kind === 'marked_done')
             ? 'from your fix list'
             : null,
         ]
       : [
-          `Detected ${weekdayTime(c.detected_at, zone)}`,
+          `Detected ${weekdayTimeZoned(c.detected_at, zone)}`,
           c.cause?.changed_at
-            ? `${c.where} changed ${weekdayTime(c.cause.changed_at, zone)}`
+            ? `${c.where} changed ${weekdayTimeZoned(c.cause.changed_at, zone)}`
             : null,
           `${count(c.pages_affected)} ${plural(c.pages_affected, 'page', 'pages')}`,
           ...gradeMoves(v, c.check_id).map((m) => `this check: ${m}`),
@@ -805,8 +808,18 @@ function setup(
   // The scheduler's own time where it holds one, as the site page and the next-check line say it.
   const nextAt = next?.get(site.id) ?? null;
   const time = nextAt
-    ? hourMinute(nextAt, zoneOf(v))
-    : `${String(sch?.hour_local).padStart(2, '0')}:00`;
+    ? hourMinuteZoned(nextAt, zoneOf(v))
+    : `${String(sch?.hour_local).padStart(2, '0')}:00 ${zoneName(
+        // The zone at the next such hour, as the header's next check names it.
+        sch?.iso_weekday && sch.hour_local !== null
+          ? nextWeekly(
+              { iso_weekday: sch.iso_weekday, hour_local: sch.hour_local },
+              v.now,
+              zoneOf(v),
+            )
+          : v.now,
+        zoneOf(v),
+      )}`;
   const schedule =
     !firstRun && sch?.cadence === 'weekly'
       ? {
@@ -1025,6 +1038,25 @@ export function withoutTrialOffer(
   return query.notice === 'refused' ? { ...view, startPro: null } : view;
 }
 
+/**
+ * The account's next check, for the header (D-04): the soonest of its primary sites' scheduled
+ * checks, each as `nextCheckLine` names it, so a paused site, a staging copy and, on Free, a site
+ * after the first are passed over. Without the scheduler's column (a preview), the first site's
+ * weekly stand-in, as before.
+ */
+function accountNextCheck(
+  v: AccountView,
+  next: NextChecks | undefined,
+  dayDateOf: (ts: string) => string,
+): string | null {
+  if (next === undefined) return nextCheckLine(primarySite(v), v, next, dayDateOf);
+  const soonest = primarySites(v)
+    .filter((s) => nextCheckLine(s, v, next, dayDateOf) !== null)
+    .map((s) => ({ s, at: instant(next.get(s.id)!) }))
+    .sort((a, b) => a.at - b.at || a.s.id.localeCompare(b.s.id))[0];
+  return soonest ? nextCheckLine(soonest.s, v, next, dayDateOf) : null;
+}
+
 export function dashboardView(
   d: AccountDataset,
   viewer: Viewer,
@@ -1068,7 +1100,7 @@ export function dashboardView(
 
   const fixes = result ? fixesAsOf(v.d, result) : [];
   const first = fixes[0];
-  const nextAt = nextCheckLine(primary, v, next, (ts) => dayDate(ts, zone));
+  const nextAt = accountNextCheck(v, next, (ts) => dayDate(ts, zone));
   // The live column's time is the scheduler's, whatever the saved cadence (on Free the first site
   // runs monthly, Q4), so it is named without one; the preview's stand-in is weekly by construction.
   const nextText = nextAt ? `${next ? 'next check' : 'next weekly check'} ${nextAt}` : null;
@@ -1093,7 +1125,8 @@ export function dashboardView(
         line: [
           dayDate(v.now, zone),
           sitesWord,
-          // The newest result of any primary site, with its day when not today (M3, D-05).
+          // The newest result of any primary site, with its day when not today (M3, D-05), and
+          // its zone named (D-17, through whenAgo).
           newestResult(v) ? `audited ${whenAgo(newestResult(v)!.finished_at!, v)}` : null,
           ...flight,
           nextText,
@@ -1246,7 +1279,7 @@ export function dashboardView(
             rows: fixes.slice(0, TOP_FIXES).map((f) => ({
               key: f.id,
               number: f.number,
-              title: f.title,
+              title: titleAmong(f, fixes),
               effort: effortText(f),
               effect: points(f, fixes),
               open: action('packet', 'Open', { checkId: result.id, fixId: f.id }),

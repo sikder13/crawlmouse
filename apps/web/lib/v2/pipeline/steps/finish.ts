@@ -1,9 +1,10 @@
 /**
  * The steps after the batches: render, build, persist, finalize.
  *
- * render runs CC-14's renderCheck over renderCandidates with the daily budget it is given; today that
- * budget throws (Q7, NO_DAILY_BUDGET), so nothing renders. renderCheck has no deadline of its own
- * yet, which rendering needs before it is enabled (RESERVE_S).
+ * render runs CC-14's renderCheck over renderCandidates with the check's daily budget, and stops
+ * RENDER_STEP_MS after the earlier of the step's start and the end of the fetching phases
+ * (`renderEndsAt`), so a retry cannot render past its share of the reserve. With the two render caps
+ * unset, nothing renders.
  *
  * build calls buildCheck on what the check stored and what the database holds (finding 14: the
  * engine SHA is VERCEL_GIT_COMMIT_SHA, 40 hex, or the step fails; the worker release is the batches'
@@ -34,6 +35,7 @@ import { getJson, putJson } from '../evidence';
 import { pageVantage, persistBuiltCheck, readOfFixes } from '../persist';
 import type { FixRead, PageVantage } from '../types';
 import type { StepDeps } from './deps';
+import { renderEndsAt } from './time';
 import {
   assembledSoFar,
   isCrawl,
@@ -59,9 +61,10 @@ export function finishSteps(
   deps: StepDeps,
 ): Pick<CheckSteps, 'render' | 'build' | 'persist' | 'finalize'> {
   return {
-    async render(event) {
+    async render(event, so) {
       // The build's view of the edges (F2): the same pages and PageRank, so the same candidates, at
       // the build's bound; a check past it fails build_failed by name here, not out of memory.
+      const startedAt = deps.now();
       const [seeds, results] = await Promise.all([
         loadSeeds(deps, event),
         loadResultsForBuild(deps, event),
@@ -82,9 +85,13 @@ export function finishSteps(
       } catch {
         // A worker client that cannot be built reads no page: each records measure_failed.
       }
+      const { dailyFor, ...render } = deps.render;
       const outcome = await renderCheck({
         ...renderCandidates(assembled, [...sampled.stage1, ...sampled.stage2], fixes, states),
-        ...deps.render,
+        ...render,
+        daily: dailyFor?.(event.checkId) ?? render.daily,
+        deadlineAt: renderEndsAt(startedAt, so),
+        now: deps.now,
         read: async (staticHtml, renderedHtml, pageUrl) =>
           (await worker?.measureRendered?.(staticHtml, renderedHtml, pageUrl)) ?? null,
       });

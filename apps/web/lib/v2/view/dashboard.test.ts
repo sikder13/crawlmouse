@@ -44,9 +44,9 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
   it('names Thursday’s check and the account’s day in its zone', () => {
     expect(v.firstRun).toBe(false);
     expect(v.header.title).toBe("Since Thursday's check");
-    // last check: 10:02Z = 06:02 EDT; next: Fri 6 Nov 06:00 EST; trial: 8 Nov 02:41Z = Sat 7 Nov.
+    // last check: 10:02 EDTZ = 06:02 EDT; next: Fri 6 Nov 06:00 EST; trial: 8 Nov 02:41 EDTZ = Sat 7 Nov.
     expect(v.header.line).toBe(
-      'Fri 30 Oct · 4 sites · last check today 06:02 · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
+      'Fri 30 Oct · 4 sites · last check today 06:02 EDT · next weekly check Fri 6 Nov around 06:00 EST · trial ends Sat 7 Nov',
     );
   });
 
@@ -76,9 +76,9 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
 
   it('writes each change’s line from its own fields and its check’s grade moves (Q12)', () => {
     expect(v.changed[0]!.line).toBe(
-      'Detected Fri 06:02 · robots.txt changed Thu 19:40 · 214 pages · this check: AI readability D → F · sent to Slack #seo',
+      'Detected Fri 06:02 EDT · robots.txt changed Thu 19:40 EDT · 214 pages · this check: AI readability D → F · sent to Slack #seo',
     );
-    expect(v.changed[2]!.line).toBe('Fri 06:01 · Technical SEO B → B+ · from your fix list');
+    expect(v.changed[2]!.line).toBe('Fri 06:01 EDT · Technical SEO B → B+ · from your fix list');
     // Fix 0 is open, so its change offers it; ClaudeBot's change has no fix; fix 20 is resolved.
     expect(v.changed.map((c) => c.actions.map((a) => a.label))).toEqual([
       ['Diff', 'Copy fix', 'Email to my developer'],
@@ -98,11 +98,11 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
       ['staging.example-outfitter.dev', 'A-', 86, 'A-', 88],
     ]);
     expect(v.sites.rows.map((r) => r.lastCheck)).toEqual([
-      'Fri 06:02',
-      'Fri 06:01',
-      'Fri 06:01',
-      'Fri 06:01 · check queued',
-      'Thu 18:23',
+      'Fri 06:02 EDT',
+      'Fri 06:01 EDT',
+      'Fri 06:01 EDT',
+      'Fri 06:01 EDT · check queued',
+      'Thu 18:23 EDT',
     ]);
     expect(v.sites.rows.map((r) => r.schedule)).toEqual([
       'weekly, Fri',
@@ -215,11 +215,11 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     copy.checks.find((c) => c.id === OUTFITTER_LATEST)!.status = 'partial';
     const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
     expect(w.sites.rows.map((r) => r.lastCheck)).toEqual([
-      'Fri 06:02 · partial',
-      'Fri 06:01',
-      'Fri 06:01',
-      'Fri 06:01 · check queued',
-      'Thu 18:23',
+      'Fri 06:02 EDT · partial',
+      'Fri 06:01 EDT',
+      'Fri 06:01 EDT',
+      'Fri 06:01 EDT · check queued',
+      'Thu 18:23 EDT',
     ]);
   });
 
@@ -272,7 +272,7 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     }
     expect(v.setup!.title).toBe('Everything is set up');
     expect(v.setup!.schedule!.label).toBe(
-      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00)',
+      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00 EST)',
     );
   });
 
@@ -310,7 +310,7 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
       expect(s.items).toEqual([]);
       expect(s.title).toBe('Weekly check schedule');
       expect(s.schedule!.label).toBe(
-        'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00)',
+        'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00 EST)',
       );
     } finally {
       slack.status = 'built';
@@ -360,7 +360,7 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     expect(w.firstRun).toBe(true);
     // No primary result: no "audited" and no "last check"; the first site's schedule and the trial.
     expect(w.header.line).toBe(
-      'Fri 30 Oct · 4 sites · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
+      'Fri 30 Oct · 4 sites · next weekly check Fri 6 Nov around 06:00 EST · trial ends Sat 7 Nov',
     );
   });
 
@@ -413,7 +413,7 @@ describe('Dashboard, day 0: the moment the account begins', () => {
     expect(v.changed).toEqual([]);
     expect(v.header.title).toBe('example-outfitter.com is kept.');
     expect(v.header.line).toBe(
-      'Sat 24 Oct · 1 site · audited today 22:34 · next weekly check Fri 30 Oct around 06:00 · trial ends Sat 7 Nov',
+      'Sat 24 Oct · 1 site · audited today 22:34 EDT · next weekly check Fri 30 Oct around 06:00 EDT · trial ends Sat 7 Nov',
     );
     expect(v.sites.rows.map((r) => r.sinceLabel)).toEqual(['first audit · 13 fixes']);
     reconciles(v);

@@ -524,6 +524,12 @@ const UNUSED_DB: StepStores['persistDb'] = {
   stageCheckRows: async () => {
     throw new Error('persistDb is not called in this test');
   },
+  edgeTarget: async () => {
+    throw new Error('persistDb is not called in this test');
+  },
+  insertEdges: async () => {
+    throw new Error('persistDb is not called in this test');
+  },
 };
 
 describe('stepDeps: the step bodies’ dependencies as production wires them (quality 3, security 3)', () => {
@@ -539,8 +545,22 @@ describe('stepDeps: the step bodies’ dependencies as production wires them (qu
     expect(deps.discover.userAgent).toBe(CRAWL_USER_AGENT);
   });
 
-  it('renders with the daily budget that refuses (Q7)', () => {
-    expect(stepDeps({}, stores).render.daily).toBe(NO_DAILY_BUDGET);
+  it('renders with the daily budget that refuses (Q7) when no durable one is wired', () => {
+    const { render } = stepDeps({}, stores);
+    expect(render.daily).toBe(NO_DAILY_BUDGET);
+    expect(render.dailyFor).toBeUndefined();
+  });
+
+  it('production wires the durable daily budget', () => {
+    const wired = SERVICE_WIRING.stores({
+      NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321',
+      SUPABASE_SERVICE_ROLE_KEY: 'test-only-service-role',
+    });
+    const { render } = stepDeps({}, wired);
+    expect(render.dailyFor).toBe(wired.renderBudget);
+    expect(typeof render.dailyFor?.('00000000-0000-4000-8000-000000000001').reserve).toBe(
+      'function',
+    );
   });
 
   it('runs over the stores it is given', () => {

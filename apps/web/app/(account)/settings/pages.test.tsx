@@ -52,6 +52,7 @@ import { agencyAccount } from '@/lib/v2/agency/test-support';
 import { DeleteScreen } from '@/components/v2/screens/settings/DeleteScreen';
 import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
 import { SettingsScreen } from '@/components/v2/screens/settings/SettingsScreen';
+import { SettingsNotYoursScreen } from '@/components/v2/screens/settings/SettingsNotYoursScreen';
 import { TrialEndedScreen, TrialEndScreen } from '@/components/v2/screens/trial-end/TrialEndScreen';
 import DeletePage from './delete/page';
 import IntegrationsPage from './integrations/page';
@@ -304,9 +305,19 @@ describe('/settings', () => {
     expect(free).toContain('href="/settings/plan"');
   });
 
-  it('is a 404 for a developer', async () => {
+  it('a developer gets a page that says Settings are not theirs to change, never the 404 (D-03)', async () => {
     as(developer);
-    await expect(SettingsPage(q())).rejects.toMatchObject(notFoundError);
+    const el = screen(await SettingsPage(q()));
+    expect(el.type).toBe(SettingsNotYoursScreen);
+    const html = renderToStaticMarkup(el);
+    expect(html).toContain(renderToStaticMarkup(<>{SETTINGS_COPY.notYours}</>));
+    // The rail, so the seat is still in its account.
+    expect(html).toContain('href="/dashboard"');
+    // Nothing that changes the account: no account form, no address, no delete. (The rail's own
+    // controls, the theme and the switcher, stay.)
+    expect(html).not.toContain('action="/api/account"');
+    expect(html).not.toContain(owner.email);
+    expect(html).not.toContain('href="/settings/delete"');
   });
 
   it('says when mail to the reader’s own address is suppressed, and names that address (CC-28 D7)', async () => {

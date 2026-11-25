@@ -48,6 +48,19 @@ describe('POST /api/webhooks/worker', () => {
     });
   });
 
+  // F-333: the sentinel's look posts its access batch as 0 (sentinel-work.ts) and polls it; nothing
+  // waits on its event. The note is answered, so the worker logs no refusal, and sends nothing.
+  it('answers the sentinel look’s note, batch 0, and sends no event', async () => {
+    const res = await call(JSON.stringify({ ...BODY, batch: 0 }));
+    expect(res.status).toBe(204);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('still refuses an unsigned batch 0', async () => {
+    const res = await call(JSON.stringify({ ...BODY, batch: 0 }), { sig: 'ab'.repeat(32) });
+    expect(res.status).toBe(401);
+  });
+
   it('sets no event id, so the worker’s repeat is not dropped as a duplicate', async () => {
     await call(JSON.stringify(BODY));
     expect(send.mock.calls[0]![0 as never]).not.toHaveProperty('id');
@@ -77,7 +90,7 @@ describe('POST /api/webhooks/worker', () => {
   it.each([
     ['extra fields', { ...BODY, url: 'https://x.test' }],
     ['a check id that is no uuid', { ...BODY, check_id: 'x' }],
-    ['batch 0', { ...BODY, batch: 0 }],
+    ['a negative batch', { ...BODY, batch: -1 }],
     ['an unknown status', { ...BODY, status: 'maybe' }],
   ])('refuses a signed body with %s', async (_n, body) => {
     expect((await call(JSON.stringify(body))).status).toBe(400);

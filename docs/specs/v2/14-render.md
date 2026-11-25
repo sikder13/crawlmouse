@@ -349,6 +349,7 @@ No reason below fails the check:
 | `challenged`               | A side of the render matches a challenge title or marker listed in challenge.ts.                                                                               |
 | `nothing_rendered`         | The rendered side has no words, so there is no share.                                                                                                          |
 | `measure_failed`           | Counting the words of the two renders threw.                                                                                                                   |
+| `out_of_time`              | The render step's deadline left too little time for this page's renders, so it was not started or not finished.                                                |
 | `phase_threw`              | A page of the empty-root phase threw out of the render; each page of that phase is left unrendered, and the graded phase's pages stand.                        |
 
 ## Known biases

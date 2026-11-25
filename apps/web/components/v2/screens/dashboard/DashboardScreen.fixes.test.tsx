@@ -49,7 +49,7 @@ describe('the set-up card (home)', () => {
     const table = setup.querySelector('table[aria-label="Set-up"]')!;
     expect(table.textContent).not.toContain('Choose the day and hour');
     expect(setup.querySelector('[data-v2-setup-schedule]')!.textContent).toBe(
-      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00)Set the day',
+      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00 EST)Set the day',
     );
   });
 });

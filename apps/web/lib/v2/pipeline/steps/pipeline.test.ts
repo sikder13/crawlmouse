@@ -16,6 +16,9 @@ import { getJson, putJson } from '../evidence';
 import { objectNames } from '../keep';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
+import { AFTER_RENDER_MIN_S, RENDER_SHARE_S, RESERVE_S } from '../limits';
+import { REQUEST_TIMEOUT_MS } from '@crawlmouse/engine/v2/pipeline';
+import { RENDER_STEP_MS } from './deps';
 import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
 import type { WorkerClient } from '../../../worker-client/types';
 
@@ -55,6 +58,12 @@ const UNUSED_DB = {
   stageCheckRows: async (): Promise<unknown> => {
     throw new Error('persistDb is not called in this test');
   },
+  edgeTarget: async (): Promise<{ lineageId: string; checkMonth: string }> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  insertEdges: async (): Promise<void> => {
+    throw new Error('persistDb is not called in this test');
+  },
 };
 const EVENT: CheckRequested = {
   checkId: CHECK,
@@ -78,7 +87,8 @@ function recordedFromOne(): Map<number, BatchResult> {
 
 async function runRecorded(
   over: {
-    render?: Partial<StepDeps['render']>;
+    /** The render deps, or a function of the step's clock that gives them (QA B1's moving clock). */
+    render?: Partial<StepDeps['render']> | ((clock: { now: number }) => object);
     measure?: NonNullable<WorkerClient['measureRendered']>;
   } = {},
 ) {
@@ -114,7 +124,7 @@ async function runRecorded(
       caps: { perCheckMs: 3_600_000, perDayMs: 36_000_000 },
       daily: NO_DAILY_BUDGET,
       inFlight: 2,
-      ...over.render,
+      ...(typeof over.render === 'function' ? over.render(clock) : over.render),
     },
     discover: { fetch: (async () => ({})) as never, userAgent: 'UA', now: () => clock.now },
   };
@@ -218,6 +228,148 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     expect(render.pages.length).toBeGreaterThan(0);
     for (const p of render.pages)
       expect(p).toMatchObject({ rendered: false, reason: 'daily_budget_unavailable' });
+  });
+
+  const renderedPages = async (evidence: Awaited<ReturnType<typeof runRecorded>>['evidence']) =>
+    (
+      (await getJson(evidence, `anon/${SITE_ID}/${CHECK}/render.json.gz`)) as {
+        pages: { rendered: boolean; reason?: string }[];
+      }
+    ).pages;
+
+  it('asks the budget of this check when one is wired', async () => {
+    const asked: string[] = [];
+    const { evidence } = await runRecorded({
+      render: () => ({
+        dailyFor: (checkId: string) => {
+          asked.push(checkId);
+          return { reserve: async () => false, settle: async () => undefined };
+        },
+      }),
+    });
+    expect(asked).toEqual([CHECK]);
+    const pages = await renderedPages(evidence);
+    expect(pages.length).toBeGreaterThan(0);
+    for (const p of pages) expect(p).toMatchObject({ rendered: false, reason: 'daily_cap' });
+  });
+
+  // Review of the render budget (B1): a 240 s render step did not fit the 180 s the run keeps for
+  // render, build, persist and finalize together, so a full render would run the check past its
+  // finish timeout. Render takes its share of RESERVE_S; the rest is left for the steps after it.
+  it('renders within its share of the reserve, leaving the rest for build, persist and finalize', () => {
+    expect(RENDER_STEP_MS).toBe(RENDER_SHARE_S * 1000);
+    expect(RESERVE_S - RENDER_SHARE_S).toBeGreaterThanOrEqual(AFTER_RENDER_MIN_S);
+  });
+
+  it(`stops rendering ${RENDER_STEP_MS / 1000} s after the render step began`, async () => {
+    let contents = 0;
+    const { evidence } = await runRecorded({
+      render: (clock) => ({
+        admit: async () => undefined,
+        client: {
+          content: async () => {
+            contents++;
+            return { ok: false, reason: 'page_failed', retryAfterMs: null, browserMs: 1 };
+          },
+        },
+        dailyFor: () => ({
+          reserve: async () => {
+            clock.now += RENDER_STEP_MS;
+            return true;
+          },
+          settle: async () => undefined,
+        }),
+      }),
+    });
+    expect(contents).toBe(0);
+    const pages = await renderedPages(evidence);
+    expect(pages.length).toBeGreaterThan(0);
+    expect(pages.filter((p) => p.reason === 'out_of_time').length).toBeGreaterThan(0);
+  });
+
+  it('counts the deadline from the start of the step, so slow loads shorten the render', async () => {
+    let reserves = 0;
+    const { evidence } = await runRecorded({
+      render: (clock) => ({
+        admit: async () => undefined,
+        // Called once the step has loaded what it reads: those loads took almost the whole allowance.
+        dailyFor: () => {
+          clock.now += RENDER_STEP_MS - 1;
+          return {
+            reserve: async () => {
+              reserves++;
+              return true;
+            },
+            settle: async () => undefined,
+          };
+        },
+      }),
+    });
+    expect(reserves).toBe(0);
+    const pages = await renderedPages(evidence);
+    expect(pages.length).toBeGreaterThan(0);
+    for (const p of pages) expect(p).toMatchObject({ rendered: false, reason: 'out_of_time' });
+  });
+
+  // QA's B1 on #172: the deadline left no room for one page once any time passed in the step's
+  // loads (1 ms: 0 of 27 rendered), because it was tested against both renders up front and the
+  // two together are the step's whole share. It is now tested before each request.
+  describe('renders through the step while the clock moves (QA B1)', () => {
+    const HTML =
+      '<html><head><title>A page</title></head><body><main><p>' +
+      'Words a reader can read without JavaScript. '.repeat(20) +
+      '</p></main></body></html>';
+    /** A run whose loads take `loadsMs`, and each request `requestMs`, on the step's own clock. */
+    async function moving(loadsMs: number, requestMs: number) {
+      const starts: number[] = [];
+      let stepStart = 0;
+      const { evidence } = await runRecorded({
+        render: (clock) => ({
+          admit: async () => undefined,
+          client: {
+            content: async () => {
+              starts.push(clock.now);
+              clock.now += requestMs;
+              return { ok: true, html: HTML, browserMs: requestMs };
+            },
+          },
+          // Called once the step has loaded what it reads: the loads took `loadsMs`.
+          dailyFor: () => {
+            stepStart = clock.now;
+            clock.now += loadsMs;
+            return { reserve: async () => true, settle: async () => undefined };
+          },
+        }),
+        // The worker reads each rendered page (questions/042); here it answers at once.
+        measure: async () => ({
+          raw_words: 40,
+          rendered_words: 40,
+          challenged: false,
+          links: null,
+        }),
+      });
+      return { pages: await renderedPages(evidence), starts, stepStart };
+    }
+
+    it.each([1, 1_000, 30_000])(
+      'renders every sampled page when the loads took %i ms and each request is quick',
+      async (loadsMs) => {
+        const { pages, starts } = await moving(loadsMs, 1);
+        expect(pages.length).toBeGreaterThan(0);
+        expect(pages.filter((p) => p.rendered)).toHaveLength(pages.length);
+        expect(starts).toHaveLength(2 * pages.length);
+      },
+    );
+
+    it('starts no request that could not finish by the deadline, and renders what fits', async () => {
+      // Each request takes 20 s on the step's clock, so the 90 s share holds a few and not all.
+      const { pages, starts, stepStart } = await moving(1_000, 20_000);
+      const deadline = stepStart + RENDER_STEP_MS;
+      expect(starts.length).toBeGreaterThan(0);
+      for (const at of starts) expect(at + REQUEST_TIMEOUT_MS).toBeLessThanOrEqual(deadline);
+      expect(pages.some((p) => p.rendered)).toBe(true);
+      expect(pages.some((p) => p.reason === 'out_of_time')).toBe(true);
+    });
   });
 
   describe('with the budget granted, each rendered page is read on the worker (questions/042)', () => {
