@@ -18,9 +18,11 @@ const og =
   readFileSync(resolve(__dirname, '..', 'lib/og-report-model.ts'), 'utf8');
 
 describe('per-report OG card contract (§6, V12)', () => {
-  it('is 1200×630 and deterministically cached (a viral unfurl never re-runs satori per hit)', () => {
+  it('is 1200×630 and carries the short CDN lifetime', () => {
     expect(og).toMatch(/size\s*=\s*\{\s*width:\s*1200,\s*height:\s*630\s*\}/);
-    expect(og).toMatch(/revalidate\s*=\s*3600/);
+    // F-241: a short CDN lifetime replaced the hour-long route cache, which a takedown could not
+    // reach; the header itself is pinned in app/r/[slug]/opengraph-image.test.tsx.
+    expect(og).toContain('headers: OG_CARD_HEADERS');
   });
 
   it('is slug-scoped — reads the report by slug, and a gone/missing report gets the placeholder', () => {
