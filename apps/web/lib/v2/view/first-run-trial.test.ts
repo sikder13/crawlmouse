@@ -20,7 +20,8 @@ const viewer = ACCOUNT_VIEWERS.home();
 const ADD_NOTE =
   'Adding a site starts its first check. Its grades, crawlers and fixes appear here when that check ends.';
 const PRO =
-  'You have Pro until Sat 7 Nov: weekly checks, every fix with its packet, Slack alerts and one competitor per site, on up to 5 sites.';
+  // Competitors are not built (CAPABILITIES.competitors is coming), so the sentence names none (D-16).
+  'You have Pro until Sat 7 Nov: weekly checks, every fix with its packet and Slack alerts, on up to 5 sites.';
 
 const withAccount = (
   d: FixtureDataset,
@@ -54,7 +55,7 @@ describe('a new trial with no site', () => {
       ],
     });
     expect(dashboardView(d, viewer).sites.foot).toContain(
-      'You have Agency until Sat 7 Nov: weekly checks, every fix with its packet, Slack alerts and three competitors per site, on up to 25 sites.',
+      'You have Agency until Sat 7 Nov: weekly checks, every fix with its packet and Slack alerts, on up to 25 sites.',
     );
   });
 

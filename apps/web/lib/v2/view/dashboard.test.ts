@@ -14,7 +14,10 @@ import {
   type DashboardView,
   withoutTrialOffer,
 } from './dashboard';
-import { CLEAN_VIEWER } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
+import {
+  CLEAN_VIEWER,
+  dashboardPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 
 const BAD_ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
 const C9 = 'a0000000-0000-4000-8000-0000000000c9';
@@ -149,9 +152,9 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.crawlersNow!.map((r) => r.ua)).toHaveLength(8);
   });
 
-  it('lists what is left to set up from the Pro gates: two of five (FACTS l.57)', () => {
-    expect(v.setup!.title).toBe('Two things left to set up');
-    expect(v.setup!.items.map((i) => i.done)).toEqual([true, true, false, true, false]);
+  it('lists what is left to set up from the Pro gates and what is built: none of one (FACTS l.57, D-16)', () => {
+    expect(v.setup!.title).toBe('Everything is set up');
+    expect(v.setup!.items.map((i) => i.done)).toEqual([true]);
   });
 
   it('carries the trial card that follows the first run', () => {
@@ -169,6 +172,129 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.header.actions.filter((a) => a.primary).map((a) => a.label)).toEqual([
       'Run a check now',
     ]);
+  });
+});
+
+describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 Nov)', () => {
+  const v = home();
+  const OUTFITTER_LATEST = 'c0000000-0000-4000-8000-000000000006';
+  const NAHLTECH_LATEST = 'c0000000-0000-4000-8000-00000000000c';
+
+  it('(e) says beside "4 of 5" which of the five rows holds no slot, counted from the records', () => {
+    // Five rows; staging.example-outfitter.dev is the staging copy of example-outfitter.com.
+    expect(v.sites.rows).toHaveLength(5);
+    expect(v.sites.note).toBe('4 of 5 on Pro');
+    expect(v.sites.apart).toBe('1 staging copy holds no slot');
+  });
+
+  it('(l) counts the same four sites in the rail, the header line, the add-site button and the card', () => {
+    // The 1280 and 390-dark baselines drew "Sites 5" and "5 sites" from before F-097.
+    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('4');
+    expect(v.header.line).toContain(' · 4 sites · ');
+    expect(v.header.actions.map((a) => a.label)).toContain('Add a site · 4 of 5 on Pro');
+  });
+
+  it('D-05: "last check" is the newest result of any site, not the first site’s', () => {
+    const copy = structuredClone(bad);
+    // nahltech.com's latest result moved to 10:04Z (06:04 in Indiana), after the first site's 06:02.
+    copy.checks.find((c) => c.id === NAHLTECH_LATEST)!.finished_at = '2026-10-30T10:04:00Z';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.header.line).toContain('last check today 06:04');
+  });
+
+  it('D-07: a partial result says "partial" beside its time in the sites table', () => {
+    const copy = structuredClone(bad);
+    copy.checks.find((c) => c.id === OUTFITTER_LATEST)!.status = 'partial';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.sites.rows.map((r) => r.lastCheck)).toEqual([
+      'Fri 06:02 · partial',
+      'Fri 06:01',
+      'Fri 06:01',
+      'Fri 06:01 · check queued',
+      'Thu 18:23',
+    ]);
+  });
+
+  it('D-09: an AI crawler blocked on a site the panels do not read is listed, with its site', () => {
+    expect(v.crawlersSite).toBe('example-outfitter.com');
+    expect(v.blockedElsewhere).toEqual([]);
+    const copy = structuredClone(bad);
+    const c = copy.checks.find((x) => x.id === NAHLTECH_LATEST)!;
+    c.crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'disallowed_by_robots';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.blockedTitle).toBe('AI crawlers blocked on your other sites');
+    expect(w.blockedElsewhere.map((b) => [b.host, b.ua, b.verdict, b.href])).toEqual([
+      [
+        'nahltech.com',
+        'GPTBot',
+        'disallowed_by_robots',
+        '/sites/50000000-0000-4000-8000-000000000002',
+      ],
+    ]);
+  });
+
+  it('D-10: with no site carrying both grades, the tile shows the Technical SEO mean, named as that', () => {
+    expect(v.strip!.health.seoOnly).toBeNull();
+    const copy = structuredClone(bad);
+    const latestIds = [
+      OUTFITTER_LATEST,
+      NAHLTECH_LATEST,
+      'c0000000-0000-4000-8000-000000000016',
+      'c0000000-0000-4000-8000-000000000020',
+      'c0000000-0000-4000-8000-00000000002a',
+    ];
+    for (const id of latestIds) {
+      const ai = copy.checks.find((x) => x.id === id)!.ai_readability!;
+      ai.withheld = true;
+      ai.withheld_reasons = ['readable_unmeasured'];
+    }
+    const h = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).strip!.health;
+    expect(h.value).toBe('—');
+    expect(h.excluded).toBe('5 sites excluded: AI readability withheld');
+    // 79 + 84 + 74 + 73 + 86 = 396 / 5 = 79.2 → 79.
+    expect(h.seoOnly).toEqual({
+      label: 'Technical SEO, mean of 5 sites · no site has both grades',
+      value: '79',
+    });
+  });
+
+  it('D-06: the set-up title counts the rows it lists as left; the schedule is not one of them', () => {
+    for (const w of [v, day0()]) {
+      const s = w.setup!;
+      expect(s.items.map((i) => i.key)).not.toContain('schedule');
+      if (!w.firstRun) {
+        expect(s.title).toBe(DASHBOARD_COPY.setupLeftTitle(s.items.filter((i) => !i.done).length));
+      }
+    }
+    expect(v.setup!.title).toBe('Everything is set up');
+    expect(v.setup!.schedule!.label).toBe(
+      'Choose the day and hour the weekly check runs (now Fri around 06:00)',
+    );
+  });
+
+  it('D-16: offers only built, shown set-up items whose control has a page', () => {
+    // Slack (built) is done; competitors and staging are "coming" (CAPABILITIES); Search Console has
+    // no capability; observed activity is "coming"; and the three Connect buttons open
+    // /settings/integrations, which no page serves yet (ACCOUNT_ACTIONS.integrations.owner 'later').
+    expect(v.setup!.items.map((i) => [i.key, i.label, i.done])).toEqual([
+      ['slack', 'Slack alerts connected', true],
+    ]);
+    expect(day0().setup!.items.map((i) => i.key)).toEqual(['slack']);
+    expect(day0().setup!.foot).toBe(
+      'It stops when the 14 days end unless you keep Pro. The site, its audits and its monthly check do not.',
+    );
+  });
+
+  it('D-16: the trial offer names no competitor while competitors are not built', () => {
+    expect(dashboardPreview('clean').startPro!.body).toBe(
+      'Weekly checks, every fix with its packet and Slack alerts, on up to 5 sites, for 14 days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.',
+    );
+  });
+
+  it('D-15: the schedule link opens the first site’s settings card by its anchor', () => {
+    expect(v.setup!.schedule!.action!.href).toBe(
+      '/sites/50000000-0000-4000-8000-000000000001#settings',
+    );
   });
 });
 

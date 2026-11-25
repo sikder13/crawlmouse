@@ -2,6 +2,7 @@ import '../../../styles/v2/tokens.css';
 import * as Sentry from '@sentry/nextjs';
 import { notFound, redirect } from 'next/navigation';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { shownFeatures } from '@/lib/feature-switch';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { DashboardScreen } from '@/components/v2/screens/dashboard/DashboardScreen';
@@ -64,7 +65,8 @@ export default async function V2Dashboard({
     <LiveActions>
       <DashboardScreen
         data={withSwitcher(
-          withoutTrialOffer(dashboardView(d, viewer, next, earlier), query),
+          // The Goal 1 switch's record: the set-up card offers nothing it hides (D-16).
+          withoutTrialOffer(dashboardView(d, viewer, next, earlier, shownFeatures()), query),
           accounts,
           account.id,
         )}
