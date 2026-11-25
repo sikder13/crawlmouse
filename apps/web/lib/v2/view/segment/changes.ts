@@ -24,7 +24,8 @@ export interface ChangeRowView {
   /** The site's host, on a list that spans an account's sites (the Changes log); absent here. */
   site?: string;
   when: string;
-  kind: ChangeKind;
+  /** `checked`: a Changes log entry for a re-check that recorded no change (F-214), not a change. */
+  kind: ChangeKind | 'checked';
   pill: DoorView['pill'];
   summary: string;
   /** Null on the example rows, which the locked page writes without one. */
@@ -78,7 +79,7 @@ export const GRADES: Record<GradeName, string> = {
   ai_readability: 'AI readability',
 };
 
-const TRIGGERS: Record<CheckTrigger, string> = {
+export const TRIGGERS: Record<CheckTrigger, string> = {
   first_audit: 'First audit',
   manual: 'Re-run',
   scheduled: 'Scheduled check',
@@ -144,17 +145,45 @@ function clockOf(d: ViewDataset, check: Check) {
     account ? weekdayTime(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
 }
 
-/** "First observed after robots.txt changed Thu 19:40: …": when we saw it, and what we found. */
-function causeOf(c: Change): string {
-  if (!c.cause) return 'First observed at this check; we found no cause.';
-  const text = c.cause.text.replace(/\.$/, '');
-  return c.cause.changed_at
-    ? `First observed after ${text}.`
-    : `First observed at this check. What we found: ${text}.`;
+/**
+ * Where the fix an `opened` row reopened was first seen, when that was an earlier check than the
+ * row's own (F-213): that check, or `'earlier'` when the dataset does not hold it. Null for any other
+ * row, including a fix first seen at this check, which is what "first observed at this check" means.
+ */
+export type FirstSeen = Check | 'earlier' | null;
+
+export function firstSeenOf(d: Pick<ViewDataset, 'fixes' | 'checks'>, c: Change): FirstSeen {
+  if (c.kind !== 'opened' || c.fix_id === null) return null;
+  const fix = d.fixes.find((f) => f.id === c.fix_id);
+  if (!fix || fix.first_seen_check_id === c.check_id) return null;
+  const seen = d.checks.find((x) => x.id === fix.first_seen_check_id);
+  return seen?.finished_at ? seen : 'earlier';
 }
 
-/** One change as a row: `check` is the check that found it, `at` the clock its times are read by. */
-export function rowOf(c: Change, check: Check, at: (ts: string) => string): ChangeRowView {
+/** "First observed after robots.txt changed Thu 19:40: …": when we saw it, and what we found. */
+function causeOf(c: Change, seen: FirstSeen, at: (ts: string) => string): string {
+  const lead =
+    seen === null
+      ? 'First observed at this check'
+      : seen === 'earlier'
+        ? 'First seen at an earlier check'
+        : `First seen at the ${at(seen.finished_at!)} check`;
+  if (!c.cause) return `${lead}; we found no cause.`;
+  const text = c.cause.text.replace(/\.$/, '');
+  if (c.cause.changed_at && seen === null) return `First observed after ${text}.`;
+  return `${lead}. What we found: ${text}.`;
+}
+
+/**
+ * One change as a row: `check` is the check that found it, `at` the clock its times are read by,
+ * `seen` where the fix it reopened was first seen (`firstSeenOf`).
+ */
+export function rowOf(
+  c: Change,
+  check: Check,
+  at: (ts: string) => string,
+  seen: FirstSeen,
+): ChangeRowView {
   const crawler = c.ua ? check.crawlers.find((x) => x.ua === c.ua) : undefined;
   const n = c.notified;
   const channels = n
@@ -175,7 +204,7 @@ export function rowOf(c: Change, check: Check, at: (ts: string) => string): Chan
       ? c.grade_deltas.map((g) => `${GRADES[g.grade]} ${g.from_score} → ${g.to_score}`).join(', ')
       : 'none',
     verdict: crawler ? { verdict: crawler.verdict, evidence: crawler.evidence_class } : null,
-    cause: causeOf(c),
+    cause: causeOf(c, seen, at),
     diff: [
       ...(c.cause?.diff?.removed ?? []).map((line) => ({ sign: '−' as const, line })),
       ...(c.cause?.diff?.added ?? []).map((line) => ({ sign: '+' as const, line })),
@@ -283,7 +312,9 @@ export function changesView(
     };
   }
 
-  const rows = d.changes.filter((c) => c.check_id === check.id).map((c) => rowOf(c, check, at));
+  const rows = d.changes
+    .filter((c) => c.check_id === check.id)
+    .map((c) => rowOf(c, check, at, firstSeenOf(d, c)));
   const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);
   return {
