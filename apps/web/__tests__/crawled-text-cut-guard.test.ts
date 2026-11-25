@@ -459,7 +459,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice over check records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The same six checks, for the crawler-access-by-check rows under the chart.',
   ],
   [
-    'apps/web/lib/v2/view/dashboard.ts :: rows: fixes.slice(0, TOP_FIXES).map((f) => ({',
+    'apps/web/lib/v2/view/dashboard.ts :: rows: fixes.slice(0, TOP_FIXES).map((f, i) => ({',
     'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The three fixes the first-run dashboard starts with; the line under them states how many more there are.',
   ],
   [
@@ -467,8 +467,8 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the five the site page lists, shown as one row that states their count, sections and summed effect.',
   ],
   [
-    'apps/web/lib/v2/view/site.ts :: const rows = inTable.slice(0, shownFixes).map((f) => fixRow(v, result, f, fixes));',
-    'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The five fixes the site page lists by number; the rest are the row above.',
+    'apps/web/lib/v2/view/site.ts :: const rows = inTable.slice(0, shownFixes).map((f, i) => fixRow(v, result, f, fixes, i + 1));',
+    'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The five fixes the site page lists, in place order; the rest are the row above.',
   ],
   [
     'apps/web/lib/v2/view/site.ts :: const shown = all.slice(-SHOWN_CHECKS);',
