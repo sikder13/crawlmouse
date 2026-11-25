@@ -284,12 +284,17 @@ jobs:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           NEXT_PUBLIC_POSTHOG_KEY: ci-placeholder-posthog-key
           NEXT_PUBLIC_SENTRY_DSN: https://ciplaceholder@o0.ingest.sentry.invalid/0
+          # The build fails when its whole process tree holds more than this at once (CTO 094). Vercel's
+          # standard build machine has 8 GB; this build also runs the type check and lint, which
+          # Vercel's does not (lib/build-checks.mjs).
+          BUILD_PEAK_BUDGET_MB: 6000
         run: |
           set -euo pipefail
           set -a
           . ./.env.ci
           set +a
-          pnpm build
+          # The build's memory, measured (CTO 094): the peak of its whole process tree.
+          ../../.github/workflows/scripts/build-peak.sh pnpm build
       # Named by the run, not the attempt: "Re-run failed jobs" re-runs the two jobs that download it
       # without re-running a build that passed, so they must find the earlier attempt's upload. A
       # full re-run builds again under the same name, hence overwrite.

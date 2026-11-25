@@ -155,6 +155,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice of the sampled-page records: the ones taken after stage 1 (CC-20a). No string is indexed.',
   ],
   [
+    'packages/engine/src/v2/render/challenge.ts :: return close < 0 ? null : lower.slice(tagEnd + 1, close).trim();',
+    "STRING slice of a rendered page between its first `<title…>`'s `>` and the next `</title>`: it starts just after an ASCII `>` and ends at an ASCII `<`, so it cannot split a surrogate pair. The title is only compared with fixed challenge titles in challengeIn and is never persisted or shown (#150).",
+  ],
+  [
     'packages/engine/src/v2/build/record.ts :: const top = ranks.slice(0, hubs).reduce((n, v) => n + v, 0);',
     "ARRAY slice of PageRank numbers, sorted high to low: v1's top hub tier, summed for Check.structure " +
       '(CC-20a). No string is indexed.',
@@ -240,6 +244,10 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'apps/web/app/api/audits/[id]/export/route.ts :: .slice()',
     'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "apps/web/app/api/agency/brand/route.ts :: const hash = createHash('sha256').update(logo.bytes).digest('hex').slice(0, 16);",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
     "apps/web/app/api/reports/[slug]/logo/route.ts :: const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);",

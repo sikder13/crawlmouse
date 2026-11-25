@@ -39,8 +39,8 @@ async function purgeHost(sb: SupabaseClient, domain: string): Promise<number> {
  * safe. The queue write is scoped to 'pending' and 'verified', so a decided request keeps its status.
  *
  * What this does not reach: the embed badge's CDN cache (`s-maxage=300`,
- * `stale-while-revalidate=600`), and a report minted after the flip by a mint that had already read
- * `hostTakenDown`.
+ * `stale-while-revalidate=600`), each OG card's CDN copy (`s-maxage=300`, `lib/og-card-cache.ts`),
+ * and a report minted after the flip by a mint that had already read `hostTakenDown`.
  */
 export async function processTakedown(sb: SupabaseClient, slug: string): Promise<number> {
   const now = new Date().toISOString();

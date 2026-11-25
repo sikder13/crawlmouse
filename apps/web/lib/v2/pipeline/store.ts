@@ -19,6 +19,8 @@ import { isFailureReason, type FailureReason } from '../../../../../inngest/chec
 import type { ReapedCheck } from '../../../../../inngest/check-reaper';
 import { checkFromRow, diffInputsFromRow, fixEventFromRow, fixFromRow, siteFromRow } from './rows';
 import type { CrawlBatchRow, CrawlBatchStatus } from './types';
+import type { EntitlementClock } from '../../entitlement-v2';
+import { readAccountClock } from './load-for';
 
 export type ClaimOutcome = 'claimed' | 'site_busy' | 'gone';
 
@@ -64,6 +66,15 @@ export interface PipelineStore {
    * retried call); false when it had ended otherwise.
    */
   fail(checkId: string | null, reason: FailureReason, runId: string | null): Promise<boolean>;
+  /**
+   * F-260: a check running under `runId` back to queued, as `checks`' constraints require of a queued
+   * check (no start, no progress, no run), with its heartbeat at `at` so the reaper counts from now.
+   * True when the check is queued with no run after the call: a retried call finds it so. False when
+   * it is another run's or has ended, and then nothing is changed.
+   */
+  requeue(checkId: string, runId: string, at: string): Promise<boolean>;
+  /** F-260: a requeued check's batch rows, deleted once their stored results are removed. */
+  deleteBatches(checkId: string): Promise<void>;
   /** `reap_stalled_checks`: checks whose heartbeat (or queue time) is before `cutoff`. */
   reap(cutoff: string): Promise<ReapedCheck[]>;
   /** The check a run claimed, if any. */
@@ -75,6 +86,11 @@ export interface PipelineStore {
   check(checkId: string): Promise<Check>;
   site(siteId: string): Promise<Site>;
   requestSite(siteId: string): Promise<RequestSite>;
+  /**
+   * The entitlement clock of the account `accountId`, which sets a check's page cap (page-cap.ts). Every
+   * store `requestCheck` runs on must read it: there is no default to fall back to.
+   */
+  accountClock(accountId: string): Promise<EntitlementClock>;
   /**
    * The diff's baseline: the site's other finished or partial check that finished last, with its diff
    * inputs. By `finished_at`, not queue order: claims are not in queue order (correctness 4). Its id
@@ -193,6 +209,38 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
       return row ? String(row.site_id) : null;
     },
 
+    async requeue(checkId, runId, at) {
+      const moved = must<Row[]>(
+        'requeue',
+        await sb
+          .from('checks')
+          .update({
+            status: 'queued',
+            started_at: null,
+            progress: null,
+            inngest_run_id: null,
+            heartbeat_at: at,
+          })
+          .eq('id', checkId)
+          .eq('status', 'running')
+          .eq('inngest_run_id', runId)
+          .select('id'),
+      );
+      if ((moved ?? []).length === 0) {
+        const now = must<Row[]>(
+          'requeue status',
+          await sb.from('checks').select('status, inngest_run_id').eq('id', checkId),
+        );
+        const r = (now ?? [])[0];
+        if (r?.status !== 'queued' || r.inngest_run_id !== null) return false;
+      }
+      return true;
+    },
+
+    async deleteBatches(checkId) {
+      must('delete batches', await sb.from('crawl_batches').delete().eq('check_id', checkId));
+    },
+
     async progress(checkId, progress, at) {
       must(
         'progress',
@@ -229,6 +277,10 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
           .eq('id', siteId)
           .single(),
       );
+    },
+
+    async accountClock(accountId) {
+      return readAccountClock(sb, accountId);
     },
 
     async previousGraded(siteId, checkId) {

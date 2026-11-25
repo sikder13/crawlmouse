@@ -275,6 +275,28 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
     expect(stepDeps({}, stores).ledger).toBe(stores.ledger);
   });
 
+  // QA's F1 on #150: `render.admit` can replace the engine's SSRF admission, so production must
+  // not set it; the engine's default then decides (packages/engine/src/v2/render/run-admission.test.ts).
+  it('production wiring leaves render.admit unset, rendering configured or not (QA F1 on #150)', () => {
+    const stores = SERVICE_WIRING.stores({
+      NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321',
+      SUPABASE_SERVICE_ROLE_KEY: 'test-only-service-role',
+    });
+    for (const env of [
+      {},
+      {
+        CLOUDFLARE_ACCOUNT_ID: 'acct',
+        CLOUDFLARE_BROWSER_RENDERING_TOKEN: 'test-only-token',
+        RENDER_MAX_BROWSER_SECONDS_PER_CHECK: '600',
+        RENDER_MAX_BROWSER_SECONDS_PER_DAY: '36000',
+      },
+    ]) {
+      const { render } = stepDeps(env, stores);
+      expect(Object.hasOwn(render, 'admit')).toBe(false);
+      expect(render.admit).toBeUndefined();
+    }
+  });
+
   it('registers the scheduler (CC-28 D4) only with V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1', () => {
     const tick = `crawlmouse-${SCHEDULE_TICK_FN_ID}`;
     for (const [env, registered] of [
@@ -562,6 +584,7 @@ describe('production discovery sends a loopback site nothing (quality 2)', () =>
   const CHECK_ID = 'c0000000-0000-4000-8000-0000000000e2';
   const SO: RunSoFar = {
     startedAt: Date.now(),
+    pageCap: 500,
     crawlFrom: null,
     pagesCrawled: 0,
     linksFound: 0,
