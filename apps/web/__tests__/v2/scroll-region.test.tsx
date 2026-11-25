@@ -122,3 +122,59 @@ describe('ScrollRegion', () => {
     expect(reads()).toBe(before + 1);
   });
 });
+
+describe('a region that marks the ends it can scroll to (`edges`, Table shade)', () => {
+  it('marks more at the end at the start, both in the middle, more at the start at the end, none when it fits', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() =>
+      root!.render(
+        <ScrollRegion label="Sites" edges>
+          <p>wide</p>
+        </ScrollRegion>,
+      ),
+    );
+    const region = host.querySelector<HTMLElement>('[data-v2-scroll-region]')!;
+    let width = 500;
+    let left = 0;
+    Object.defineProperty(region, 'clientWidth', { get: () => 300 });
+    Object.defineProperty(region, 'scrollWidth', { get: () => width });
+    Object.defineProperty(region, 'scrollLeft', {
+      get: () => left,
+      set: (x: number) => (left = x),
+    });
+    const at = (x: number) => {
+      left = x;
+      act(() => {
+        region.dispatchEvent(new Event('scroll'));
+      });
+      return [region.hasAttribute('data-v2-more-start'), region.hasAttribute('data-v2-more-end')];
+    };
+    expect(at(0)).toEqual([false, true]);
+    expect(at(100)).toEqual([true, true]);
+    expect(at(200)).toEqual([true, false]);
+    width = 300;
+    expect(at(0)).toEqual([false, false]);
+  });
+
+  it('marks nothing without `edges`', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() =>
+      root!.render(
+        <ScrollRegion label="Sites">
+          <p>wide</p>
+        </ScrollRegion>,
+      ),
+    );
+    const region = host.querySelector<HTMLElement>('[data-v2-scroll-region]')!;
+    Object.defineProperty(region, 'clientWidth', { get: () => 300 });
+    Object.defineProperty(region, 'scrollWidth', { get: () => 500 });
+    act(() => {
+      region.dispatchEvent(new Event('scroll'));
+    });
+    expect(region.hasAttribute('data-v2-more-end')).toBe(false);
+  });
+});

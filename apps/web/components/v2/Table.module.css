@@ -6,21 +6,40 @@
 }
 
 /* `shade` (the signed-in app's tables, not the public pages'): a table wider than its card shows a
-   shade at the edge it continues past, so a phone reader sees that it scrolls (QA dashboard walk
-   D-19, D-20, D-21). The two covers scroll with the content (local) and sit over the two shades,
-   which stay put (scroll): at an end the cover hides that end's shade; a table that fits shows
-   none. The covers are the surface the table sits on, --v2-table-surface, the card's (s1) unless a
-   sunken card sets its own; the shade is the text colour thinned, so it reads on light and dark. */
+   shade at each edge it continues past, so a phone reader sees that it scrolls (QA dashboard walk
+   D-19, D-20, D-21). The shades are two strips laid over the scroll region, not a background
+   behind its cells: a background image under the text left axe unable to read the cells' contrast
+   (CI run 45600609996). They take no pointer events, so the stack a point's background is read
+   from does not include them. Each shows while the region marks more to scroll that way
+   (ScrollRegion `edges`); a table that fits shows none. The shade is the text colour thinned, so
+   it reads on light and dark. */
 .shade {
-  background:
-    linear-gradient(to right, var(--v2-table-surface) 30%, transparent) left center / 40px 100%
-      no-repeat local,
-    linear-gradient(to left, var(--v2-table-surface) 30%, transparent) right center / 40px 100%
-      no-repeat local,
-    linear-gradient(to right, var(--v2-table-shade), transparent) left center / 14px 100% no-repeat
-      scroll,
-    linear-gradient(to left, var(--v2-table-shade), transparent) right center / 14px 100% no-repeat
-      scroll;
+  position: relative;
+}
+
+.edgeStart,
+.edgeEnd {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.edgeStart {
+  left: 0;
+  background: linear-gradient(to right, var(--v2-table-shade), transparent);
+}
+
+.edgeEnd {
+  right: 0;
+  background: linear-gradient(to left, var(--v2-table-shade), transparent);
+}
+
+.shade:has(> [data-v2-more-start]) > .edgeStart,
+.shade:has(> [data-v2-more-end]) > .edgeEnd {
+  opacity: 1;
 }
 
 .scroll:focus-visible {

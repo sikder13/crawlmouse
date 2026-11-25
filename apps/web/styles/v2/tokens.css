@@ -28,8 +28,6 @@
   --v2-line2: #edf0f3; /* base: --line2 */
   --v2-ctl: #808996; /* base: --ctl */
   --v2-railbg: #f1f3f6; /* base: --railbg */
-  /* The surface a wide table's scroll covers are painted in; a card sets its own (Card.module.css) */
-  --v2-table-surface: var(--v2-s1); /* derived: the card surface a table sits on by default */
   /* A wide table's edge shade: the text colour thinned, so it reads on light and dark alike */
   --v2-table-shade: color-mix(
     in srgb,

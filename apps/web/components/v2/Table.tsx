@@ -90,10 +90,11 @@ export function Table({
   const headerColumn = typeof rowHeader === 'number' ? rowHeader : rowHeader ? 0 : null;
   const role = (r: string) => (roles ? { role: r } : {});
 
-  return (
+  const region = (
     <ScrollRegion
       label={label}
-      className={[styles.scroll, shade ? styles.shade : null, className].filter(Boolean).join(' ')}
+      className={[styles.scroll, className].filter(Boolean).join(' ')}
+      edges={shade}
     >
       {heading}
       <table className={styles.table} aria-label={label} {...role('table')}>
@@ -144,5 +145,16 @@ export function Table({
         </tbody>
       </table>
     </ScrollRegion>
+  );
+  if (!shade) return region;
+  // The edge shades are drawn over the region, not behind its text: a background image behind the
+  // cells left axe unable to read their contrast (CI run 45600609996). They take no pointer events,
+  // so a point's background is read without them; the region marks the ends it can scroll to.
+  return (
+    <div className={styles.shade}>
+      {region}
+      <span className={styles.edgeStart} aria-hidden="true" />
+      <span className={styles.edgeEnd} aria-hidden="true" />
+    </div>
   );
 }

@@ -4,6 +4,8 @@
  * markup is what it was (OPERATING-RULES §13); the dashboard's sites table and the site page's
  * settings table, which a phone lays out as grids, carry the roles.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -85,5 +87,33 @@ describe('the app’s tables opt in', () => {
       'cell',
       'cell',
     ]);
+  });
+});
+
+describe('the shade is laid over the region, never behind its text (CI run 45600609996, axe)', () => {
+  const css = readFileSync(
+    join(__dirname, '..', '..', 'components', 'v2', 'Table.module.css'),
+    'utf8',
+  );
+  const rule = (sel: string) => css.match(new RegExp(`\\n${sel} \\{([^}]*)\\}`))![1]!;
+
+  it('no rule on the wrapper or the scroll region paints a background behind the cells', () => {
+    expect(rule('\\.shade')).not.toMatch(/background/);
+    expect(rule('\\.scroll')).not.toMatch(/background/);
+  });
+
+  it('the two strips take no pointer events and sit beside the region, not around its table', () => {
+    expect(rule('\\.edgeStart,\\n\\.edgeEnd')).toMatch(/pointer-events: none;/);
+    const d = doc(<DashboardScreen data={dashboardPreview('home')} />);
+    const wrap = d.querySelector('[class*="_shade_"]')!;
+    expect([...wrap.children].map((c) => c.getAttribute('class')!.match(/_(\w+)_/)![1])).toEqual([
+      'scroll',
+      'edgeStart',
+      'edgeEnd',
+    ]);
+    for (const strip of wrap.querySelectorAll('[class*="_edge"]')) {
+      expect(strip.querySelector('table')).toBeNull();
+      expect(strip.getAttribute('aria-hidden')).toBe('true');
+    }
   });
 });

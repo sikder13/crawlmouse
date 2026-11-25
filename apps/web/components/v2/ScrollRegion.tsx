@@ -13,8 +13,14 @@ export function ScrollRegion({
   className,
   startAtEnd = false,
   describedBy,
+  edges = false,
   children,
 }: {
+  /**
+   * Mark the ends it can scroll towards (`data-v2-more-start`, `data-v2-more-end`), for a parent that
+   * shades those edges (Table's `shade`). Off by default.
+   */
+  edges?: boolean;
   label: string;
   /**
    * The id of text that says what the region holds, for content a screen reader cannot read
@@ -28,14 +34,22 @@ export function ScrollRegion({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [scrolls, setScrolls] = useState(false);
+  const [more, setMore] = useState({ start: false, end: false });
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     if (startAtEnd) el.scrollLeft = el.scrollWidth;
     // While it holds focus it stays in the tab order, or focus would fall back to the page.
-    const check = () =>
+    const check = () => {
       setScrolls(el.scrollWidth > el.clientWidth + 1 || document.activeElement === el);
+      if (edges) {
+        const start = el.scrollLeft > 1;
+        const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+        setMore((m) => (m.start === start && m.end === end ? m : { start, end }));
+      }
+    };
+    if (edges) el.addEventListener('scroll', check, { passive: true });
     check();
     // Once focus leaves it, it is checked again, so a tab stop kept only for focus is let go.
     const left = () => setTimeout(check, 0);
@@ -57,17 +71,20 @@ export function ScrollRegion({
     ro?.observe(el);
     return () => {
       el.removeEventListener('focusout', left);
+      el.removeEventListener('scroll', check);
       cancelAnimationFrame(frame);
       mo?.disconnect();
       ro?.disconnect();
     };
-  }, [startAtEnd]);
+  }, [startAtEnd, edges]);
 
   return (
     <div
       ref={ref}
       className={className}
       data-v2-scroll-region=""
+      {...(more.start ? { 'data-v2-more-start': '' } : {})}
+      {...(more.end ? { 'data-v2-more-end': '' } : {})}
       {...(scrolls
         ? {
             role: 'region',
