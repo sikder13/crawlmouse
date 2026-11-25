@@ -53,6 +53,7 @@ export function check(n: number, edit: (c: Check) => void = () => {}): Check {
       gradeable: 90,
       excluded: [],
       excluded_by_robots: 0,
+      stopped: null,
     },
     technical_seo: {
       score: 79,

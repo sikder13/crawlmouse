@@ -1,11 +1,16 @@
 import { BatchResultSchema, type BatchResult, type LinkEdge } from '@crawlmouse/types/v2';
-import { describe, expect, it } from 'vitest';
-import { MAX_OTHER_EDGES_PER_PAGE } from '@crawlmouse/engine/v2/pipeline';
+import { totalmem } from 'node:os';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  LARGE_CHECK_OTHER_EDGES_PER_PAGE,
+  MAX_OTHER_EDGES_PER_PAGE,
+  ownEdgeBound as ownEdgeBoundFor,
+} from '@crawlmouse/engine/v2/pipeline';
 import { readRecorded } from '../../../../../../packages/engine/fixtures/v2/build/recorded';
 import { putJson } from '../evidence';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import type { StepDeps } from './deps';
-import { isCrawl, loadResults, loadResultsForBuild } from './stored';
+import { buildMemoryMb, isCrawl, loadResults, loadResultsForBuild } from './stored';
 
 /** The build step's loader (F-248): unchanged within the bound, bounded and streamed over it. */
 const EVENT = { checkId: 'c0000000-0000-4000-8000-000000000001' } as never;
@@ -94,6 +99,38 @@ describe('loadResultsForBuild (F-248)', () => {
     expect(dropped).toBeGreaterThan(0);
     // What the build counts as links (one per from and to, plus what was left out) is the uncut count.
     expect(distinct(bounded) + dropped).toBe(distinct(full));
+  });
+
+  it('keeps fewer edges elsewhere a page on a check of more than 500 pages (inbox 079)', async () => {
+    const s = await setup(40);
+    const large = { checkId: 'c0000000-0000-4000-8000-000000000001', pageCap: 2000 } as never;
+    const bounded = await loadResultsForBuild(s.deps, large, Math.floor(s.edges(s.results) / 4));
+    const whole = (e: LinkEdge) => !e.to_url.includes('/never-crawled/') || e.is_generic_anchor;
+    const elsewhere = new Map<string, number>();
+    for (const e of bounded.filter(isCrawl).flatMap((b) => b.link_edges))
+      if (!whole(e)) elsewhere.set(e.from_url, (elsewhere.get(e.from_url) ?? 0) + 1);
+    expect(new Set(elsewhere.values())).toEqual(new Set([LARGE_CHECK_OTHER_EDGES_PER_PAGE]));
+  });
+
+  it('holds the bound the function’s memory allows: 100,000 own-page edges at 2 GB, 250,000 at 4 GB', () => {
+    expect(ownEdgeBoundFor(2048)).toBe(100_000);
+    expect(ownEdgeBoundFor(4096)).toBe(250_000);
+    expect(buildMemoryMb()).toBeGreaterThan(0);
+  });
+
+  it('reads memory as the smaller of the container’s limit and the machine’s, the machine’s when there is no limit', () => {
+    const machine = Math.floor(totalmem() / 2 ** 20);
+    const limit = vi.spyOn(process, 'constrainedMemory');
+    try {
+      limit.mockReturnValue(2048 * 2 ** 20);
+      expect(buildMemoryMb()).toBe(Math.min(2048, machine));
+      limit.mockReturnValue(0);
+      expect(buildMemoryMb()).toBe(machine);
+      limit.mockReturnValue(Number.MAX_SAFE_INTEGER);
+      expect(buildMemoryMb()).toBe(machine);
+    } finally {
+      limit.mockRestore();
+    }
   });
 
   it('fails the check build_failed, by name, when the own-page edges pass their bound', async () => {

@@ -753,10 +753,10 @@ describe('createCheckFn (D3)', () => {
       triggers: [{ event: 'check.requested' }],
       concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: 16 }],
       idempotency: 'event.data.checkId',
-      timeouts: { finish: '37m' },
+      timeouts: { finish: '5260s' },
       cancel: [{ event: 'check.cancel.requested', if: 'event.data.checkId == async.data.checkId' }],
     });
-    expect(PACE.finishS).toBe(37 * 60);
+    expect(PACE.finishS).toBe(5260);
     expect((main!.steps as Record<string, { retries: unknown }>).step!.retries).toEqual({
       attempts: 2,
     });

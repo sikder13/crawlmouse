@@ -168,6 +168,7 @@ export function batchSteps(
       now,
       budget.max_seconds,
       tailOf(at.kind),
+      so.pageCap,
     );
     if (seconds === null) return { status: 'none', why: 'no_time' };
 

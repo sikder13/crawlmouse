@@ -107,24 +107,24 @@ function contractRecord<T>(schema: ObjectSchema<T>, row: Row, derived: Row = {})
 const PROGRESS_ADDED = { waiting_since: null, sitemap_urls: null, robots_txt: null } as const;
 
 /**
- * Fields a check's coverage gains in the next deployment, which this one leaves out when it reads a
- * row (inbox 084: `stopped`). Deployed before any row holds them, so a rollback from that deployment
- * to this one still reads every check it wrote. Any other unknown field is still refused.
+ * The field a check's coverage gained after rows were first written with it (inbox 084): a row
+ * written before then lacks it, and is read with `stopped: null`, which says no reason is known.
  */
-const COVERAGE_NEXT = new Set(['stopped']);
+const COVERAGE_ADDED = { stopped: null } as const;
 
 const isRecord = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** A coverage without the next deployment's fields (COVERAGE_NEXT); any other value as it is. */
-export const withoutCoverageNext = (coverage: unknown): unknown =>
-  isRecord(coverage)
-    ? Object.fromEntries(Object.entries(coverage).filter(([key]) => !COVERAGE_NEXT.has(key)))
-    : coverage;
+/**
+ * A coverage written before `stopped` was kept, with it as null; any other value as it is. Rows and
+ * checks built before the deploy (a build stored, then persisted after it) are both read through it.
+ */
+export const withCoverageAdded = (coverage: unknown): unknown =>
+  isRecord(coverage) ? { ...COVERAGE_ADDED, ...coverage } : coverage;
 
 export function checkFromRow(row: Row): Check {
   const derived: Row = {};
   if (isRecord(row.progress)) derived.progress = { ...PROGRESS_ADDED, ...row.progress };
-  if (isRecord(row.coverage)) derived.coverage = withoutCoverageNext(row.coverage);
+  if (isRecord(row.coverage)) derived.coverage = withCoverageAdded(row.coverage);
   return contractRecord(CheckSchema, row, derived);
 }
 export const pageResultFromRow = (row: Row): PageResult => contractRecord(PageResultSchema, row);

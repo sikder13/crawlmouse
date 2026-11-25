@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CheckRequested } from '../../../../../../inngest/check-events';
 import { getJson } from '../evidence';
-import { DISCOVER_S, PACE, REAP_AFTER_S, RESERVE_S } from '../limits';
+import {
+  cadenceFor,
+  DISCOVER_S,
+  MAX_PAGE_CAP,
+  PACE,
+  REAP_AFTER_S,
+  RESERVE_S,
+  reserveS,
+} from '../limits';
 import type { PipelineStore } from '../store';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import type { StepDeps } from './deps';
@@ -112,6 +120,7 @@ describe('discover', () => {
     const { d, evidence, store } = deps();
     const out = await lifecycleSteps(d).discover(EVENT, {
       startedAt: T0,
+      pageCap: 500,
       crawlFrom: null,
       pagesCrawled: 0,
       linksFound: 0,
@@ -233,9 +242,9 @@ describe('failCancelled (finding 4, correctness 2)', () => {
 });
 
 describe('the reaper’s cutoff (D13)', () => {
-  it('is forty-five minutes before now', () => {
-    expect(REAP_AFTER_S).toBe(45 * 60);
-    expect(reapCutoff(T0)).toBe('2026-11-08T11:15:00.000Z');
+  it('is ninety-five minutes before now', () => {
+    expect(REAP_AFTER_S).toBe(95 * 60);
+    expect(reapCutoff(T0)).toBe('2026-11-08T10:25:00.000Z');
   });
 
   it('fails no check whose run may still be alive: REAP_AFTER_S is above the finish timeout plus the longest wait between heartbeats (correctness 10)', () => {
@@ -246,10 +255,13 @@ describe('the reaper’s cutoff (D13)', () => {
     const waits = {
       'a queued check’s claim waits while the site is busy': PACE.claimWaits * PACE.claimWaitS,
       'discovery, claim to its end': DISCOVER_S,
-      'a post answered busy, to the next post': PACE.busyWaitS,
-      'a post, or a poll, to the next poll': PACE.pollMaxS,
-      'the last batch to the end of the run': RESERVE_S,
+      // A large check's waits are the longer ones (cadenceFor, reserveS: inbox 079).
+      'a post answered busy, to the next post': cadenceFor(MAX_PAGE_CAP).busyWaitS,
+      'a post, or a poll, to the next poll': cadenceFor(MAX_PAGE_CAP).pollMaxS,
+      'the last batch to the end of the run': reserveS(MAX_PAGE_CAP),
     };
+    expect(cadenceFor(MAX_PAGE_CAP).busyWaitS).toBeGreaterThanOrEqual(PACE.busyWaitS);
+    expect(reserveS(MAX_PAGE_CAP)).toBeGreaterThanOrEqual(RESERVE_S);
     const longest = Math.max(...Object.values(waits));
     expect(longest).toBe(waits['a queued check’s claim waits while the site is busy']);
     // A run lives at most PACE.finishS (Inngest cancels it then, and the cancel handler fails its
@@ -260,6 +272,6 @@ describe('the reaper’s cutoff (D13)', () => {
   it('is what reapStalled asks the store for', async () => {
     const reap = vi.fn(async () => []);
     await reapStalled({ reap }, () => T0);
-    expect(reap).toHaveBeenCalledWith('2026-11-08T11:15:00.000Z');
+    expect(reap).toHaveBeenCalledWith('2026-11-08T10:25:00.000Z');
   });
 });

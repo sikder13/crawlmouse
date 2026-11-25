@@ -29,11 +29,14 @@ export type {
 export { nothingReadReason } from './build/nothing-read.js';
 export {
   boundedEdges,
+  LARGE_CHECK_OTHER_EDGES_PER_PAGE,
   MAX_CHECK_EDGES,
   MAX_OTHER_EDGES_PER_PAGE,
   MAX_OWN_EDGES,
   noEdgesKept,
+  otherEdgesPerPage,
   OwnEdgesOverBound,
+  ownEdgeBound,
   rowAddresses,
   type EdgesKept,
 } from './build/edge-scope.js';

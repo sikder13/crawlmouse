@@ -6,7 +6,7 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { AccessTest, CrawlPage } from '@crawlmouse/types/v2';
+import type { AccessTest, BatchPartialReason, CrawlPage } from '@crawlmouse/types/v2';
 import {
   accessBatch,
   accessRow,
@@ -518,5 +518,79 @@ describe('answeredAt (F-252)', () => {
     expect(
       answeredAt(crawlRow({ url: HOME, outcome: 'fetched', status: 200, final_url: `${HOME}/` })),
     ).toBe(HOME);
+  });
+});
+
+// Why a crawl ended, stored for the result's copy (B's question, inbox 082, 084): a crawl stopped at
+// the plan's cap and one stopped by time read the same before. The coverage now says which, with the cap.
+describe('coverage.stopped: why the crawl ended', () => {
+  const seeds: Seed[] = [{ url: HOME, source: 'homepage', lastmod: null }];
+  const stopped = (batch: ReturnType<typeof crawlBatch>, page_cap = 500) =>
+    assemble(
+      {
+        check: { id: CHECK, site_id: SITE, page_cap } as never,
+        homepage_url: HOME,
+        seeds,
+        render: null,
+      },
+      readBatches([batch], { id: CHECK, site_id: SITE }, 'unreleased'),
+    ).coverage.stopped;
+  const home = () => crawlRow({ url: HOME, outcome: 'fetched', status: 200 });
+  const none = { at_cap: false, time_ran_out: false, site_stopped: false };
+
+  it('nothing: the crawl read everything it found', () => {
+    expect(stopped(crawlBatch(0, [home()]))).toEqual({ page_cap: 500, ...none });
+  });
+
+  it('at_cap: the crawl asked for its cap and more was found', () => {
+    const rows = [home(), crawlRow({ url: at('/a'), outcome: 'fetched', status: 200 })];
+    expect(stopped(crawlBatch(0, rows, [], [at('/b')]), 2)).toEqual({
+      page_cap: 2,
+      ...none,
+      at_cap: true,
+    });
+  });
+
+  it('time_ran_out: the planner still had URLs and no batch says why, or a batch’s time budget ran out', () => {
+    expect(stopped(crawlBatch(0, [home()], [], [at('/b')]))).toEqual({
+      page_cap: 500,
+      ...none,
+      time_ran_out: true,
+    });
+    const timed = crawlBatch(0, [home()], [], [at('/b')], { reasons: ['budget_seconds'] });
+    expect(stopped(timed)?.time_ran_out).toBe(true);
+  });
+
+  it('site_stopped: a crawl batch says the site stopped it; another batch reason is not time', () => {
+    const by = (reason: BatchPartialReason) =>
+      stopped(crawlBatch(0, [home()], [], [at('/b')], { reasons: [reason] }));
+    expect(by('site_stopped')).toEqual({ page_cap: 500, ...none, site_stopped: true });
+  });
+
+  it('a batch reason that does not end the crawl leaves time to end it (review of 7a73b839)', () => {
+    for (const reason of ['result_size', 'budget_requests', 'budget_bytes'] as const) {
+      const r = stopped(crawlBatch(0, [home()], [], [at('/b')], { reasons: [reason] }));
+      expect(r, reason).toEqual({ page_cap: 500, ...none, time_ran_out: true });
+    }
+  });
+
+  it('at_cap counts the rows asked across every batch', () => {
+    const row = (p: string) => crawlRow({ url: at(p), outcome: 'fetched', status: 200 });
+    const batches = [
+      crawlBatch(0, [home(), row('/a')], [], [at('/c')]),
+      crawlBatch(1, [row('/b')], [], [at('/c')]),
+    ];
+    const coverage = (cap: number) =>
+      assemble(
+        {
+          check: { id: CHECK, site_id: SITE, page_cap: cap } as never,
+          homepage_url: HOME,
+          seeds,
+          render: null,
+        },
+        readBatches(batches, { id: CHECK, site_id: SITE }, 'unreleased'),
+      ).coverage.stopped;
+    expect(coverage(3)?.at_cap).toBe(true);
+    expect(coverage(4)?.at_cap).toBe(false);
   });
 });

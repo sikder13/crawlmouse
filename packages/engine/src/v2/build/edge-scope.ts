@@ -11,12 +11,14 @@
  *   - every edge with generic anchor text is kept, wherever it points: the generic-anchor detector
  *     counts a page's generic links against its `links_out`, so it decides as it would uncut, except
  *     that a page keeping fewer links can be `indeterminate` where it was `not_detected`;
- *   - any other edge to an address the crawl never fetched is kept only up to
- *     MAX_OTHER_EDGES_PER_PAGE per source page, in the order the worker recorded them. Such edges
+ *   - any other edge to an address the crawl never fetched is kept only up to `maxOther` per
+ *     source page (otherEdgesPerPage: 20, or 5 on a check of more than 500 pages), in the order the
+ *     worker recorded them. Such edges
  *     reach no grade; they tell the detectors the crawl left pages unread (`unfetched`). The loader
  *     records how many it left out (`link_edges_dropped`), and `internal_links` counts them;
- *   - when the edges kept whole (to own pages, or generic) pass MAX_OWN_EDGES, the build is not
- *     attempted (OwnEdgesOverBound): a graph that large is not held, and no grade is given from part
+ *   - when the edges kept whole (to own pages, or generic) pass `maxOwn` (ownEdgeBound: 250,000
+ *     with 3.5 GiB of memory or more, 100,000 otherwise), the build is not attempted
+ *     (OwnEdgesOverBound): a graph that large is not held, and no grade is given from part
  *     of one.
  */
 import type { CrawlPage, LinkEdge } from '@crawlmouse/types/v2';
@@ -24,11 +26,36 @@ import { canonicalizeUrl } from '../../url-canonical.js';
 
 export const MAX_CHECK_EDGES = 50_000;
 export const MAX_OTHER_EDGES_PER_PAGE = 20;
+/** Edges elsewhere kept a page on a check of more than LARGE_CHECK_PAGES pages (inbox 079). */
+export const LARGE_CHECK_OTHER_EDGES_PER_PAGE = 5;
+export const LARGE_CHECK_PAGES = 500;
+/**
+ * The own-page edges a build holds at most with 2,048 MB, the function's size until 24 Nov: at 2,000
+ * pages it built at 1,765 MiB (#165's harness).
+ */
 export const MAX_OWN_EDGES = 100_000;
+/**
+ * With 4 GB (inbox 080): 2,000 pages × 100 own links, the densest staging site's (react.dev, 104 a
+ * page), built at 1,818 MiB, and at 2,358 MiB with 20 edges elsewhere a page.
+ */
+export const MAX_OWN_EDGES_LARGE_MEMORY = 250_000;
+/** The memory from which a build holds MAX_OWN_EDGES_LARGE_MEMORY: 3.5 GiB, short of 4 GB. */
+export const LARGE_MEMORY_MB = 3_584;
+
+/** The own-page edges a build may hold with `memoryMb` of memory; unknown memory is the smaller. */
+export const ownEdgeBound = (memoryMb: number | null): number =>
+  memoryMb !== null && memoryMb >= LARGE_MEMORY_MB ? MAX_OWN_EDGES_LARGE_MEMORY : MAX_OWN_EDGES;
+
+/** The edges elsewhere a build keeps a page, by the check's page cap. */
+export const otherEdgesPerPage = (pageCap: number): number =>
+  pageCap > LARGE_CHECK_PAGES ? LARGE_CHECK_OTHER_EDGES_PER_PAGE : MAX_OTHER_EDGES_PER_PAGE;
 
 export class OwnEdgesOverBound extends Error {
-  constructor(readonly own: number) {
-    super(`the crawl's own pages hold more than ${MAX_OWN_EDGES} link edges`);
+  constructor(
+    readonly own: number,
+    readonly bound: number = MAX_OWN_EDGES,
+  ) {
+    super(`the crawl's own pages hold more than ${bound} link edges`);
     this.name = 'OwnEdgesOverBound';
   }
 }
@@ -64,24 +91,25 @@ export const noEdgesKept = (): EdgesKept => ({ own: 0, other: new Map() });
 
 /**
  * A batch's edges over the bound: every edge to `addresses` or with generic anchor text, and up to
- * MAX_OTHER_EDGES_PER_PAGE per source page of the rest. Throws OwnEdgesOverBound once the edges kept
- * whole pass MAX_OWN_EDGES.
+ * `maxOther` per source page of the rest. Throws OwnEdgesOverBound once the edges kept whole pass
+ * `maxOwn`.
  */
 export function boundedEdges(
   edges: readonly LinkEdge[],
   addresses: ReadonlySet<string>,
   kept: EdgesKept,
   maxOwn: number = MAX_OWN_EDGES,
+  maxOther: number = MAX_OTHER_EDGES_PER_PAGE,
 ): LinkEdge[] {
   const out: LinkEdge[] = [];
   for (const e of edges) {
     if (addresses.has(e.to_url) || e.is_generic_anchor) {
-      if (++kept.own > maxOwn) throw new OwnEdgesOverBound(kept.own);
+      if (++kept.own > maxOwn) throw new OwnEdgesOverBound(kept.own, maxOwn);
       out.push(e);
       continue;
     }
     const n = kept.other.get(e.from_url) ?? 0;
-    if (n >= MAX_OTHER_EDGES_PER_PAGE) continue;
+    if (n >= maxOther) continue;
     kept.other.set(e.from_url, n + 1);
     out.push(e);
   }

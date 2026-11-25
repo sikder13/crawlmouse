@@ -200,6 +200,7 @@ export function coverageOf(
     gradeable: pages.filter((p) => p.kind === 'content' && p.status_code === 200).length,
     excluded: [],
     excluded_by_robots: excludedByRobots,
+    stopped: null,
   });
 }
 

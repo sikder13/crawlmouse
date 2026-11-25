@@ -4,9 +4,13 @@ import { recordedBuild } from '../../../fixtures/v2/build/recorded.js';
 import { buildCheck } from './build.js';
 import {
   boundedEdges,
+  LARGE_MEMORY_MB,
   MAX_OTHER_EDGES_PER_PAGE,
+  MAX_OWN_EDGES,
   noEdgesKept,
+  otherEdgesPerPage,
   OwnEdgesOverBound,
+  ownEdgeBound,
   rowAddresses,
 } from './edge-scope.js';
 
@@ -127,5 +131,49 @@ describe('the bound on the edges a build holds (F-248)', () => {
         { url: 'https://example.com/c', final_url: null },
       ]),
     ).toEqual(['https://example.com/a', 'https://example.com/b-moved', 'https://example.com/c']);
+  });
+});
+
+// Inbox 079 and 080: a 2,000-page check needs about 200,000 own-page edges, which build in 4 GB and
+// not in 2 GB (measured: 1,818 MiB at 200,000; 2,358 MiB with 20 edges elsewhere a page). The bound
+// follows the memory the function has, and a large check keeps fewer edges elsewhere.
+describe('the bound by memory and by page cap (2,000 pages)', () => {
+  it('holds 250,000 own-page edges with 4 GB, and 100,000 otherwise or when memory is unknown', () => {
+    expect(ownEdgeBound(4096)).toBe(250_000);
+    expect(ownEdgeBound(LARGE_MEMORY_MB)).toBe(250_000);
+    expect(ownEdgeBound(LARGE_MEMORY_MB - 1)).toBe(MAX_OWN_EDGES);
+    expect(ownEdgeBound(2048)).toBe(100_000);
+    expect(ownEdgeBound(null)).toBe(100_000);
+  });
+
+  it('keeps 5 edges elsewhere a page on a check of more than 500 pages, and 20 up to 500', () => {
+    expect(otherEdgesPerPage(500)).toBe(MAX_OTHER_EDGES_PER_PAGE);
+    expect(otherEdgesPerPage(501)).toBe(5);
+    expect(otherEdgesPerPage(2000)).toBe(5);
+    const page = 'https://shop.test/p';
+    const elsewhere = Array.from({ length: 30 }, (_, i) => ({
+      check_id: 'c',
+      from_url: page,
+      to_url: `https://shop.test/never/${i}`,
+      anchor_text: 'Article',
+      is_generic_anchor: false,
+      js_only: false,
+    }));
+    expect(boundedEdges(elsewhere, new Set([page]), noEdgesKept(), 10, 5)).toHaveLength(5);
+  });
+
+  it('names the bound it stopped at', () => {
+    const own = Array.from({ length: 4 }, (_, i) => ({
+      check_id: 'c',
+      from_url: 'https://shop.test/a',
+      to_url: `https://shop.test/b${i}`,
+      anchor_text: 'B',
+      is_generic_anchor: false,
+      js_only: false,
+    }));
+    const addresses = new Set(own.map((e) => e.to_url));
+    expect(() => boundedEdges(own, addresses, noEdgesKept(), 3, 5)).toThrow(
+      /more than 3 link edges/,
+    );
   });
 });
