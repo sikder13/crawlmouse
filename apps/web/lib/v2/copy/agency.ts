@@ -6,6 +6,7 @@
 import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
 import { count, plural } from '../words';
 import { formatPlanPrice } from './plan-price';
+import { FIX_PLACE_HEADER } from './site';
 
 /** The agency rail's plan card and the account switcher (the switcher is outside the artboards). */
 export const AGENCY_RAIL_COPY = {
@@ -107,7 +108,7 @@ export const CLIENT_COPY = {
   sitePage: 'Site page, all checks',
   fixesTitle: (n: number) => `Open fixes · ${count(n)} to raise`,
   fixesLabel: 'Open fixes',
-  fixColumns: { number: 'No.', fix: 'Fix', effect: 'Effect', packet: 'Packet' },
+  fixColumns: { place: FIX_PLACE_HEADER, fix: 'Fix', effect: 'Effect', packet: 'Packet' },
   more: (n: number) => `${count(n)} more on the site page`,
   noFixes: 'Nothing is open to raise with this client.',
   clientTitle: 'This client',

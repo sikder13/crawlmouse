@@ -14,7 +14,7 @@ import { CardHead } from '../account/parts';
 import { verdictCell } from '../account/verdict-cells';
 import { CopyText } from '../segment/CopyText';
 import { AlertSwitch } from './AlertSwitch';
-import { SITE_COPY } from '../../../../lib/v2/copy/site';
+import { FIX_PLACE_HEADER, SITE_COPY } from '../../../../lib/v2/copy/site';
 import shared from '../account/AccountScreen.module.css';
 import styles from './SiteScreen.module.css';
 
@@ -135,7 +135,7 @@ export function SiteScreen({
           <Table
             label="Fixes"
             columns={[
-              { header: 'No.', mono: true, muted: true },
+              { header: FIX_PLACE_HEADER, mono: true, muted: true },
               { header: 'Fix' },
               { header: 'Section' },
               { header: 'Effect, estimated', numeric: true, mono: true },

@@ -7,7 +7,7 @@ import { Table } from '../../Table';
 import { VERDICTS } from '../../verdicts';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import { SETUP_STATE } from '../../../../lib/v2/copy/dashboard';
-import { TAGGED_UA_LINE } from '../../../../lib/v2/copy/site';
+import { FIX_PLACE_HEADER, TAGGED_UA_LINE } from '../../../../lib/v2/copy/site';
 import type { DashboardView } from '../../../../lib/v2/view/dashboard';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
@@ -317,7 +317,7 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
         label="Top fixes"
         headersHidden
         columns={[
-          { header: 'No.', mono: true, muted: true },
+          { header: FIX_PLACE_HEADER, mono: true, muted: true },
           { header: 'Fix' },
           { header: 'Effect', numeric: true, mono: true },
           { header: 'Open', numeric: true },

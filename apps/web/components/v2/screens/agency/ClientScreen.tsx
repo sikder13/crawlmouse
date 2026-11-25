@@ -63,7 +63,7 @@ export function ClientScreen({
               rowHeader={1}
               className={shared.rowHeaded}
               columns={[
-                { header: F.number, mono: true, muted: true },
+                { header: F.place, mono: true, muted: true },
                 { header: F.fix },
                 { header: F.effect, numeric: true, mono: true },
                 { header: F.packet, numeric: true },

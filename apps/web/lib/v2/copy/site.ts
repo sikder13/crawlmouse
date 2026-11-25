@@ -14,6 +14,12 @@ import { railChanges } from './dashboard';
 export const TAGGED_UA_LINE =
   'Tested with tagged user agents from published IPs — crawlmouse.com/bot.';
 
+/**
+ * The head of a fix table's first column, a row's place in rank order (F-276, CTO 081): not "No.",
+ * which would label the place as a number beside the fix's name "Fix 2".
+ */
+export const FIX_PLACE_HEADER = 'Order';
+
 export const SITE_COPY = {
   fixesSub: `Mark one done and it is re-checked in about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}; it closes only when the next crawl agrees.`,
   copyAll: 'Copy all as one prompt',
@@ -286,6 +292,13 @@ const PLACE_SOURCE =
   'V2R register, F-276 (CTO 081): the first column is the row’s place in rank order, 1 first; the fix’s stored number is its name (“Fix 9”), never its order';
 
 SITE_CHANGES.push(
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked: 'No. Fix Section Effect, estimated Status',
+    rendered: `${FIX_PLACE_HEADER} Fix Section Effect, estimated Status`,
+    source: PLACE_SOURCE,
+  },
   {
     screen: 'site',
     kind: 'ruling',
