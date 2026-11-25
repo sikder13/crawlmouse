@@ -26,6 +26,7 @@ describe('the rail', () => {
       ['Competitors', null],
       ['Reports', null],
       ['Integrations', null],
+      ['Seats', null],
       ['Settings', null],
     ]);
     expect(nav.filter((n) => n.current).map((n) => n.label)).toEqual(['Sites']);

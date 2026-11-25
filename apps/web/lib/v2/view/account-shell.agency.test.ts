@@ -196,7 +196,9 @@ describe('accountShellView, the rail', () => {
     expect(current(v, 'Sites')).toEqual(['Clients']);
     expect(current(v, 'Seats')).toEqual(['Seats']);
     expect(current(v, 'Competitors')).toEqual([]);
-    expect(current(view('home'), 'Seats')).toEqual([]);
+    // The account rail holds Seats too (D-24, F-287).
+    expect(current(view('home'), 'Seats')).toEqual(['Seats']);
+    expect(current(view('home'), 'Competitors')).toEqual(['Competitors']);
     expect(current(view('home'), 'Clients')).toEqual(['Sites']);
   });
 });
