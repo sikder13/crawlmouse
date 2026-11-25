@@ -2,7 +2,7 @@ import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Switch } from '../../Switch';
 import { Table } from '../../Table';
-import type { FieldView, SettingsView } from '../../../../lib/v2/view/settings';
+import type { FieldView, SelectFieldView, SettingsView } from '../../../../lib/v2/view/settings';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
@@ -44,6 +44,37 @@ function Input({ f, type }: { f: FieldView; type: 'email' | 'text' }) {
 }
 
 /**
+ * D-17: the account's time zone, a select pre-set to its zone, posted with the card's other fields.
+ * The locked Final-Settings has no such field, so it is marked as an addition.
+ */
+function Select({ f }: { f: SelectFieldView }) {
+  const hint = `${f.id}-hint`;
+  return (
+    <div className={field.stack} data-v2-addition="">
+      <label htmlFor={f.id} className={field.label}>
+        {f.label}
+      </label>
+      <select
+        id={f.id}
+        name={f.name}
+        defaultValue={f.value}
+        aria-describedby={hint}
+        className={`${field.input} ${styles.input} ${styles.text}`}
+      >
+        {f.options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <div id={hint} className={styles.hint}>
+        {f.hint}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Final-Settings: the account's address and name, its three kinds of email, deleting it, and its
  * plan. The one orange element is Save. Nothing posts in the preview (CC-27b builds the routes).
  */
@@ -76,6 +107,7 @@ export function SettingsScreen({
               ))}
               <Input f={account.email} type="email" />
               <Input f={account.name} type="text" />
+              {account.zone ? <Select f={account.zone} /> : null}
               <div className={styles.signIn}>
                 <span className={styles.signInTitle}>{account.signIn.title}</span>
                 <div className={styles.hint}>{account.signIn.text}</div>

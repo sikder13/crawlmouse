@@ -43,6 +43,7 @@ import { EMAIL_UNDO_DAYS } from '../account/email-change-page';
 import type { SeatRole } from '../account/profile';
 import { SUPPORT_COPY } from '../copy/support';
 import { supportMailto } from '../support/mailto';
+import { ZONE_OPTIONS, listedZone, type ZoneOption } from './zone-field';
 
 export const CC27B_ROUTES = {
   accountAlertRules: {
@@ -231,6 +232,16 @@ export interface FieldView {
   readOnly: boolean;
 }
 
+/** A labelled select pre-set to the account's value, its hint tied to it (D-17's time zone). */
+export interface SelectFieldView {
+  id: string;
+  label: string;
+  name: string;
+  value: string;
+  options: readonly ZoneOption[];
+  hint: string;
+}
+
 export interface EmailKindRowView {
   kind: EmailKind;
   label: string;
@@ -246,6 +257,8 @@ export interface SettingsView {
     title: string;
     email: FieldView;
     name: FieldView;
+    /** The account's time zone (D-17); null where its stored zone is not one this runtime lists. */
+    zone: SelectFieldView | null;
     signIn: { title: string; text: string };
     /** The account form's submit: name and address together (CC27B_ROUTES.account). */
     save: ActionView;
@@ -377,6 +390,18 @@ export function settingsView(
   const owner = role === 'owner';
   const a = v.account;
   const zone = a.timezone;
+  const listed = listedZone(zone);
+  const zoneField: SelectFieldView | null =
+    listed === null
+      ? null
+      : {
+          id: 'account-zone',
+          label: COPY.zoneLabel,
+          name: 'timezone',
+          value: listed,
+          options: ZONE_OPTIONS,
+          hint: COPY.zoneHint,
+        };
   const trial = a.state === 'pro_trial' || a.state === 'agency_trial';
   const plan = PLAN_NAMES[v.tier];
   const days = trial ? calendarDays(v.now, a.trial_ends_at!, zone) : null;
@@ -516,6 +541,7 @@ export function settingsView(
         hint: COPY.nameHint(agency),
         readOnly: false,
       },
+      zone: zoneField,
       signIn: { title: COPY.signInTitle, text: COPY.signIn(AUTH_LINK_MINUTES) },
       save: routeAction('account', COPY.save, {}, { primary: true }),
     },
