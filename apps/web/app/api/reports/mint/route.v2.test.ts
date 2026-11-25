@@ -10,6 +10,8 @@ const s = vi.hoisted(() => ({
   capAllowed: true,
   turnstileOk: true,
   member: true,
+  /** The caller's session answers its RPCs with an error, so `mintV2` throws. */
+  rpcFails: false,
   limits: [] as [string, number, number][],
   verified: [] as [string, string | undefined][],
   /** Every call on the service-role client, as `table.method` or `rpc:name`. */
@@ -18,6 +20,8 @@ const s = vi.hoisted(() => ({
   session: [] as string[],
 }));
 
+const sentry = vi.hoisted(() => ({ captureException: vi.fn() }));
+vi.mock('@sentry/nextjs', () => sentry);
 vi.mock('@/lib/client-ip', () => ({ getClientIp: () => '9.9.9.9' }));
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: async (key: string, limit: number, windowMs: number) => {
@@ -46,7 +50,9 @@ vi.mock('@/lib/supabase/server', () => ({
     }),
     rpc: async (name: string) => {
       s.session.push(`rpc:${name}`);
-      return { data: s.member, error: null };
+      return s.rpcFails
+        ? { data: null, error: { message: 'connection reset' } }
+        : { data: s.member, error: null };
     },
   }),
 }));
@@ -77,13 +83,17 @@ beforeEach(() => {
     capAllowed: true,
     turnstileOk: true,
     member: true,
+    rpcFails: false,
     limits: [],
     verified: [],
     admin: [],
     session: [],
   });
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  sentry.captureException.mockClear();
+});
 
 describe('POST /api/reports/mint, the body union', () => {
   it('with the flag off, a checkId body is the 400 an unknown body is, before any work', async () => {
@@ -127,6 +137,25 @@ describe('POST /api/reports/mint, the body union', () => {
     expect([res.status, await res.json()]).toEqual([404, { error: 'not_found' }]);
     expect(s.session).toEqual(['checks.select', 'rpc:is_member_for_site']);
     expect(s.admin).toEqual([]);
+  });
+});
+
+describe('POST /api/reports/mint, a throw (F-261)', () => {
+  it('is reported and answered with the JSON 500 the control words, never an empty one', async () => {
+    s.rpcFails = true;
+    const res = await POST(req({ checkId: CHECK }));
+    expect(res.headers.get('content-type')).toMatch(/^application\/json/);
+    expect([res.status, await res.json()]).toEqual([500, { error: 'could not mint' }]);
+    expect(sentry.captureException).toHaveBeenCalledTimes(1);
+    const [err, context] = sentry.captureException.mock.calls[0]!;
+    expect((err as Error).message).toBe('is_member_for_site failed: connection reset');
+    expect(context).toEqual({ tags: { route: 'api/reports/mint', mint: 'v2' } });
+  });
+
+  it('a refusal is not reported', async () => {
+    s.member = false;
+    expect((await POST(req({ checkId: CHECK }))).status).toBe(404);
+    expect(sentry.captureException).not.toHaveBeenCalled();
   });
 });
 

@@ -5,6 +5,7 @@ import { stateAt } from '../progress';
 import { CHECKS, recording } from '../recordings';
 import { HOME_CRAWLERS, homeView } from './home';
 import { mapDrawing } from './map';
+import { ALL_SHOWN } from '../features';
 
 const d = fixture('bad-site');
 const check = findCheck(d, CHECKS.badFirstAudit);
@@ -46,5 +47,38 @@ describe('Home’s example audit', () => {
       expect(duration(ms), `${ms} ms`).toBe(m ? `${m} min ${sec} s` : `${sec} s`);
     }
     expect(view.example.duration).toBe(duration(end.elapsed_ms));
+  });
+});
+
+describe('Home’s crawler table with `nojs` hidden', () => {
+  const nojsHidden = { ...ALL_SHOWN, nojs: false };
+  const rowsOf = (variant: typeof d) =>
+    homeView(
+      variant,
+      CHECKS.badFirstAudit,
+      { map: mapDrawing('bad-site'), end },
+      nojsHidden,
+    ).crawlers.rows.map((r) => r.crawler);
+
+  it('leaves out a crawler that reads a template thin, whatever its cause', () => {
+    const variant = structuredClone(d);
+    const googlebot = findCheck(variant, CHECKS.badFirstAudit).crawlers.find(
+      (c) => c.ua === 'Googlebot',
+    )!;
+    expect(googlebot.cause).toBeNull();
+    expect(rowsOf(variant)).toContain('Googlebot');
+    googlebot.by_template.at(-1)!.verdict = 'allowed_thin';
+    expect(rowsOf(variant)).not.toContain('Googlebot');
+  });
+
+  it('leaves out a crawler whose cause is a client-rendered template, with no thin verdict', () => {
+    const variant = structuredClone(d);
+    const perplexity = findCheck(variant, CHECKS.badFirstAudit).crawlers.find(
+      (c) => c.ua === 'PerplexityBot',
+    )!;
+    expect(perplexity.by_template.some((t) => t.verdict === 'allowed_thin')).toBe(false);
+    expect(rowsOf(variant)).toContain('PerplexityBot');
+    perplexity.cause = 'client_rendered_template';
+    expect(rowsOf(variant)).not.toContain('PerplexityBot');
   });
 });

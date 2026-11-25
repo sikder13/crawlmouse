@@ -114,6 +114,7 @@ const GATE_ROWS: Readonly<Record<keyof TierGates, { label: string; source: strin
   schedule: { label: 'Scheduled checks', source: 'ARCH-2 §3.1' },
   fixesVisible: { label: 'Fixes visible', source: 'ARCH-2 §3.1' },
   packets: { label: 'Fix packets', source: 'ARCH-2 §3.1' },
+  fixProofs: { label: 'Verified fixes shown before and after', source: 'Goal 1 row 22 (CTO 062)' },
   competitorsPerSite: { label: 'Competitors per site', source: 'ARCH-2 §3.1' },
   exports: { label: 'Exports (PDF, CSV, JSON)', source: 'ARCH-2 §3.1' },
   slack: { label: 'Slack', source: 'ARCH-2 §3.1' },

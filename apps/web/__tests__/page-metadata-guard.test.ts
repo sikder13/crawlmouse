@@ -14,6 +14,8 @@ import type { Metadata } from 'next';
 // none of them is called by an import.
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
 vi.mock('@/lib/supabase/server', () => ({ supabaseServer: async () => ({}) }));
+// /agencies reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
 
 const APP = join(__dirname, '..', 'app');
 

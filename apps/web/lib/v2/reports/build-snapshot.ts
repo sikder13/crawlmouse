@@ -10,20 +10,41 @@ import { keptOutClauses, thinSentence } from '../sentences';
 import { capitalise } from '../words';
 import { findCheck, siteOf, type ViewDataset } from '../fixtures';
 import { CAUSE_SHORT } from '../view/segment/access';
-import { crawlerRows, resultView } from '../view/result';
+import { crawlerRows, resultView, type ResultView } from '../view/result';
 import { freeFixes } from '../view/free-fixes';
 import { PublicSnapshotV2Schema, type PublicSnapshotV2 } from './snapshot';
 
-function headline(check: Check, host: string): string {
+/**
+ * The report's one-line verdict. `withThin` false (the Goal 1 switch hides `nojs`) leaves out the
+ * sentence naming the templates that are empty without JavaScript; with no crawler kept out either,
+ * it says every crawler was let in, and nothing of what they read.
+ */
+export function headline(check: Check, host: string, withThin = true): string {
   const keptOut = keptOutClauses(check.crawlers);
-  const thin = thinSentence(check);
+  const thin = withThin ? thinSentence(check) : null;
   const sentences = [
     ...(keptOut.length ? [`${keptOut.join('; ')}.`] : []),
     ...(thin ? [thin] : []),
   ];
-  return sentences.length
-    ? sentences.map(capitalise).join(' ')
-    : `Every crawler we tested reads ${host}.`;
+  if (sentences.length) return sentences.map(capitalise).join(' ');
+  return withThin
+    ? `Every crawler we tested reads ${host}.`
+    : `Every crawler we tested is let in to ${host}.`;
+}
+
+/**
+ * The fix rows a snapshot lists: the overview's rows, in its order, of the fixes Free opens, each with
+ * the id of its fix (`key`), which the snapshot itself does not keep.
+ */
+export function openFixRows(
+  d: ViewDataset,
+  check: Check,
+  view: ResultView = resultView(d, check.id, { map: null }),
+): { key: string; title: string; scope: string | null; points: string }[] {
+  const opened = new Set(freeFixes(d, check).map((f) => f.id));
+  return (view.fixes?.rows ?? [])
+    .filter((r) => opened.has(r.key))
+    .map(({ key, title, scope, points }) => ({ key, title, scope, points }));
 }
 
 /**
@@ -37,8 +58,7 @@ export function buildPublicSnapshot(
 ): PublicSnapshotV2 {
   const check = findCheck(d, checkId);
   const view = resultView(d, checkId, { map: null });
-  const opened = new Set(freeFixes(d, check).map((f) => f.id));
-  const rows = (view.fixes?.rows ?? []).filter((r) => opened.has(r.key));
+  const rows = openFixRows(d, check, view);
   return PublicSnapshotV2Schema.parse({
     version: 2,
     host: siteOf(d, check).host,

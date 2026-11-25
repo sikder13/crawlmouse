@@ -3,15 +3,17 @@
  * nothing else; every number on them comes from a constant; the flag and the inputs that decide
  * the copy do decide it.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { SignupScreen } from '../../components/v2/screens/signup/SignupScreen';
 import { CheckEmailScreen } from '../../components/v2/screens/check-email/CheckEmailScreen';
 import { ContinueScreen } from '../../components/v2/screens/continue/ContinueScreen';
 import { checkEmailHref } from '../../components/v2/screens/signup/SignupForm';
-import { emailKindsSentence, planGroups } from '../../components/v2/screens/signup/door-copy';
+import { emailKindsSentence } from '../../components/v2/screens/signup/door-copy';
+import { planGroups } from '../../components/v2/screens/signup/plan-table';
 import { maskEmail } from '../../lib/auth/mask-email';
 import { GATES } from '../../lib/entitlement-v2';
+import { count } from '../../lib/v2/words';
 import { TRIAL_DAYS } from '../../lib/billing/state-machine';
 import * as prices from '../../lib/billing/prices';
 import {
@@ -24,6 +26,9 @@ import {
 import { ANONYMOUS_VISIBLE_MS } from '../../lib/v2/view/result';
 import { PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/registry';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
+
+// The Sign-up page reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
 
 const signup = (checksPublic = false) =>
   renderToStaticMarkup(<SignupScreen checksPublic={checksPublic} />);
@@ -78,6 +83,7 @@ describe('every number on the door comes from a constant', () => {
     prices.PRO_MONTHLY,
     prices.AGENCY_MONTHLY,
     GATES.free.pagesPerCheck,
+    GATES.pro.pagesPerCheck,
     GATES.pro.sites,
     GATES.agency.sites,
     ANONYMOUS_VISIBLE_MS / 3_600_000,
@@ -105,7 +111,9 @@ describe('every number on the door comes from a constant', () => {
   it('the plan table is built from GATES', () => {
     const rows = planGroups().flatMap((g) => g.rows.map((r) => r.what));
     expect(rows).toContain(`One site, up to ${GATES.free.pagesPerCheck} pages, re-checked monthly`);
-    expect(rows).toContain(`Weekly checks, alerts to Slack, up to ${GATES.pro.sites} sites`);
+    expect(rows).toContain(
+      `Weekly checks, alerts to Slack, up to ${GATES.pro.sites} sites of up to ${count(GATES.pro.pagesPerCheck)} pages each`,
+    );
     expect(rows).toContain('Three complete fixes per audit, with packets');
   });
 

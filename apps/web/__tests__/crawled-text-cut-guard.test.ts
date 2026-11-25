@@ -475,6 +475,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice over fix records in the v2 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The fixes the Free plan opens (FACTS: three per audit), the one rule the Result, the segments and the fix page share.',
   ],
   [
+    'apps/web/lib/v2/view/fix.ts :: if (!proven.slice(0, allowed).includes(f.id)) {',
+    'ARRAY slice over fix ids, never persisted: no string is indexed, so no surrogate pair can be split. The proven fixes Free sees a "Fixed, and proven" card for (GATES.free.fixProofs, one).',
+  ],
+  [
     'apps/web/lib/v2/view/result.ts :: const named = locked.slice(0, 2);',
     'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The two Pro fixes named in the table; the rest are one row that states their count.',
   ],

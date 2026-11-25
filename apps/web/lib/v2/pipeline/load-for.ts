@@ -10,11 +10,10 @@
  * decides which fixes open, and the stored map drawing.
  */
 import type { MapDrawing } from '@crawlmouse/engine/v2/pipeline';
-import { FixtureDatasetSchema, instant } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import { effectiveTier, type EntitlementClock } from '../../entitlement-v2';
 import { gunzipJson } from './evidence';
-import { loadCheck } from './load';
+import { loadCheck, withSiteHistory } from './load';
 import {
   isExpired,
   readableCheck,
@@ -24,10 +23,7 @@ import {
   type PublicCheckDeps,
   type Viewer,
 } from './public';
-import { checkFromRow } from './rows';
 import type { CheckDataset } from './types';
-
-const CheckDatasetSchema = FixtureDatasetSchema.extend({ provenance: z.literal('measured') });
 
 const PointSchema = z.strictObject({ x: z.number().finite(), y: z.number().finite() });
 const MapDrawingSchema = z.strictObject({
@@ -93,15 +89,7 @@ async function readyDataset(
     loadCheck(deps.read, access.checkId),
     deps.read.rows('checks', 'site_id', [access.siteId]),
   ]);
-  const until = instant(access.queuedAt);
-  const checks = siteChecks
-    .map(checkFromRow)
-    .filter((c) => instant(c.queued_at) <= until)
-    .sort(
-      (a, b) =>
-        instant(a.queued_at) - instant(b.queued_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    );
-  return CheckDatasetSchema.parse({ ...dataset, checks });
+  return withSiteHistory(dataset, access.checkId, siteChecks);
 }
 
 export async function loadCheckFor(

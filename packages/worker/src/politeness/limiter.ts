@@ -29,6 +29,9 @@ export type Scheduled<T> = { ran: true; value: T } | { ran: false };
 
 interface Waiting {
   start: () => void;
+  /** The latest moment this task may start; past it, it is dropped rather than waited for. */
+  latestAt?: number;
+  drop: () => void;
 }
 
 export class SiteLimiter {
@@ -61,6 +64,32 @@ export class SiteLimiter {
     }
   }
 
+  /** Holds the next start until `at`, a moment on this limiter's clock. Never brings it forward. */
+  pauseUntil(at: number): void {
+    if (Number.isFinite(at)) this.nextStartAt = Math.max(this.nextStartAt, at);
+    // A task queued for another batch may now be unable to start before its deadline.
+    this.dropLate();
+  }
+
+  /** The earliest a queued task could start now. */
+  private startAt(): number {
+    return Math.max(this.nextStartAt, this.clock.now());
+  }
+
+  /**
+   * Drops every queued task that cannot start by its `latestAt`. Called by `pauseUntil` and in the
+   * pump; `schedule` checks a new task the same way before queueing it. The pump may be asleep
+   * through a long pause, and a task queued meanwhile must not wait for it to wake. A start moved
+   * later by `raiseGapMs` is not checked at once: the pump, waking at the earlier start, drops the
+   * task then, which is still before its deadline.
+   */
+  private dropLate(): void {
+    const startAt = this.startAt();
+    const late = this.queue.filter((w) => w.latestAt !== undefined && w.latestAt < startAt);
+    for (const w of late) this.queue.splice(this.queue.indexOf(w), 1);
+    for (const w of late) w.drop();
+  }
+
   get started(): number {
     return this.startedCount;
   }
@@ -76,7 +105,17 @@ export class SiteLimiter {
     );
   }
 
-  schedule<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<Scheduled<T>> {
+  /**
+   * `latestAt`: a task that could not start by then (a pause or the gap holds the site past it) is
+   * dropped, answering `{ ran: false }`, instead of being waited for: when it is queued, when a pause
+   * makes it late, and when the pump reaches it. A batch passes its own deadline, so a long wait asked
+   * by the site, for this batch or another one on the same site, does not run it past its time.
+   */
+  schedule<T>(
+    task: () => Promise<T>,
+    signal?: AbortSignal,
+    latestAt?: number,
+  ): Promise<Scheduled<T>> {
     if (signal?.aborted) return Promise.resolve({ ran: false });
     return new Promise<Scheduled<T>>((resolve, reject) => {
       const onAbort = () => {
@@ -91,7 +130,13 @@ export class SiteLimiter {
           signal?.removeEventListener('abort', onAbort);
           this.run(task).then((value) => resolve({ ran: true, value }), reject);
         },
+        ...(latestAt !== undefined && { latestAt }),
+        drop: () => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve({ ran: false });
+        },
       };
+      if (latestAt !== undefined && latestAt < this.startAt()) return resolve({ ran: false });
       signal?.addEventListener('abort', onAbort, { once: true });
       this.queue.push(waiting);
       void this.pump();
@@ -125,6 +170,9 @@ export class SiteLimiter {
     this.pumping = true;
     try {
       while (this.queue.length > 0 && this.inFlight < this.maxConcurrent()) {
+        const before = this.queue.length;
+        this.dropLate();
+        if (this.queue.length !== before) continue;
         const wait = this.nextStartAt - this.clock.now();
         if (wait > 0) {
           await this.clock.sleep(wait);

@@ -17,10 +17,10 @@
  * stored, logged or returned, since a view's or a parser's message can quote what was crawled.
  */
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
-import { FixtureDatasetSchema, instant } from '@crawlmouse/types/v2';
+import { instant } from '@crawlmouse/types/v2';
 import { z } from 'zod';
-import { loadCheck } from '../pipeline/load';
-import { changeFromRow, checkFromRow } from '../pipeline/rows';
+import { loadCheck, loadCheckWithHistory } from '../pipeline/load';
+import { changeFromRow } from '../pipeline/rows';
 import type { CheckReader } from '../pipeline/types';
 import { checkJson, edgeListCsv, pagesCsv } from './csv';
 import {
@@ -106,24 +106,9 @@ export type Generated =
   /** The row was not pending, before or after the file was made: the row is left as it is. */
   | { outcome: 'not_pending' };
 
-const CheckDatasetSchema = FixtureDatasetSchema.extend({ provenance: z.literal('measured') });
-
-/**
- * A check as its audit pages read it: `loadCheck`'s records, with the site's checks queued at or
- * before it (the views look other checks up by id, and read `checks` as the site's history).
- */
+/** A check as its audit pages read it (`loadCheckWithHistory`). */
 async function recordsOf(read: CheckReader, checkId: string): Promise<CheckRecords> {
-  const dataset = await loadCheck(read, checkId);
-  const check = dataset.checks[0]!;
-  const until = instant(check.queued_at);
-  const checks = (await read.rows('checks', 'site_id', [check.site_id]))
-    .map(checkFromRow)
-    .filter((c) => instant(c.queued_at) <= until)
-    .sort(
-      (a, b) =>
-        instant(a.queued_at) - instant(b.queued_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    );
-  return { dataset: CheckDatasetSchema.parse({ ...dataset, checks }), checkId };
+  return { dataset: await loadCheckWithHistory(read, checkId), checkId };
 }
 
 /**

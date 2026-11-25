@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DECLARATION_PATHS } from '@crawlmouse/types/v2';
 import { createFetcher, MAX_BODY_BYTES } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS, type Identity } from '../identities.js';
-import { Sites } from '../politeness/sites.js';
+import { STOP_AFTER_429S, Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
 import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js';
 import { whoSent } from '../test-support/discriminators.js';
@@ -126,7 +126,11 @@ async function runFake(
     robotsCache: new RobotsCache(clock),
     reader,
   });
-  return { result, requested: fetcher.calls.map((c) => c.url).filter((u) => !isDeclaration(u)) };
+  return {
+    result,
+    requested: fetcher.calls.map((c) => c.url).filter((u) => !isDeclaration(u)),
+    calls: fetcher.calls,
+  };
 }
 /** example.com/a redirects to www.example.com/t; `www` answers the rest. */
 const toWww =
@@ -673,7 +677,8 @@ describe('review fixes: budgets, stops and coverage', () => {
 
   it("records a stop the batch's own last request caused, without calling the batch partial for it", async () => {
     const s = await serve({ page: (_p, _u, res) => void ((res.statusCode = 429), res.end()) });
-    const { result } = await run(crawlReq(s.base, ['/1', '/2', '/3']));
+    // Each page is asked for 1 + RETRIES_ON_429 times, so two pages make STOP_AFTER_429S answers.
+    const { result } = await run(crawlReq(s.base, ['/1', '/2']));
     expect(result.findings).toContainEqual(
       expect.objectContaining({
         kind: 'site_stopped',
@@ -1212,7 +1217,7 @@ describe('review round 2: behaviour the tests did not pin', () => {
     const s = await serve({});
     const clock = new InstantClock();
     const sites = new Sites(clock);
-    for (let i = 0; i < 3; i++) sites.record429('127.0.0.1');
+    for (let i = 0; i < STOP_AFTER_429S; i++) sites.record429('127.0.0.1');
     const result = await runBatch(crawlReq(s.base, ['/']), {
       clock,
       sites,
@@ -1508,8 +1513,11 @@ describe('round 4: behaviour review round 3 found unpinned', () => {
         url.endsWith('/robots.txt') ? { status: 429, body: '' } : html200('<p>t</p>'),
       ),
       (sites) => {
-        sites.record429(siteKeyOf('https://example.com'));
-        sites.record429(siteKeyOf('https://example.com'));
+        // One 429 short of a stop. The apex's robots.txt answers 404 first, which would end the run
+        // of 429s; this test is about a stop cutting a chain, so the run is kept through it.
+        sites.recordAnswer = () => {};
+        for (let i = 1; i < STOP_AFTER_429S; i++)
+          sites.record429(siteKeyOf('https://example.com'), '0');
       },
     );
     return { result, targetRequested: requested.includes('https://www.example.com/t') };
@@ -1965,5 +1973,88 @@ describe('round 5: a robots.txt redirect the batch could not follow', () => {
     expect(result.pages[0]!.limitations[0]).toBe(
       "Not requested: the batch's requests budget was spent. The user agent shown is the one that would have been sent.",
     );
+  });
+});
+
+describe('the batch result carries its request timing (F-247)', () => {
+  it('times every request the batch made, for crawl and access batches alike', async () => {
+    const served = () => ({
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+      body: '<p>a</p>',
+    });
+    for (const req of [
+      crawlReq('https://example.com', ['/a', '/b']),
+      accessReq('https://example.com', ['/a']),
+    ]) {
+      const { result, calls } = await runFake(req, served);
+      expect(result.timing?.requests).toBe(calls.length);
+      expect(calls.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('times a redirect hop as a request of its own', async () => {
+    const { result, calls } = await runFake(
+      crawlReq('https://example.com', ['/a']),
+      toWww(() => ({ status: 200, headers: { 'content-type': 'text/html' }, body: '<p>w</p>' })),
+    );
+    expect(calls.some((c) => c.url === 'https://www.example.com/t')).toBe(true);
+    expect(result.timing?.requests).toBe(calls.length);
+  });
+});
+
+describe('the access batch’s control request on a 429 (review of the back-off, B2)', () => {
+  const served = { status: 200, headers: { 'content-type': 'text/html' }, body: '<p>served</p>' };
+
+  it('waits as the site asks, asks again, and is then served', async () => {
+    const asked = new Map<string, number>();
+    const { calls } = await runFake(accessReq('https://example.com', ['/a']), (url, identity) => {
+      if (identity.role !== 'control' || url.endsWith('/robots.txt')) return served;
+      const n = (asked.get(url) ?? 0) + 1;
+      asked.set(url, n);
+      return n === 1 ? { status: 429, headers: { 'retry-after': '5' }, body: '' } : served;
+    });
+    const control = calls.filter((c) => c.identity.role === 'control' && c.url.endsWith('/a'));
+    expect(control).toHaveLength(2);
+    expect(control[1]!.at - control[0]!.at).toBeGreaterThanOrEqual(5_000);
+  });
+
+  it('counts toward the site’s stop, so a site refusing the control is stopped', async () => {
+    const { result } = await runFake(
+      accessReq('https://example.com', ['/a', '/b']),
+      (url, identity) =>
+        identity.role === 'control' && !url.endsWith('/robots.txt')
+          ? { status: 429, headers: {}, body: '' }
+          : served,
+    );
+    if (result.kind !== 'access') throw new Error('access');
+    // Each page is asked for 1 + RETRIES_ON_429 times, so two pages make STOP_AFTER_429S answers.
+    expect(result.findings.filter((f) => f.kind === 'site_stopped')).not.toEqual([]);
+  });
+});
+
+describe('a site that answers 429 only to crawler names (review of the back-off, M4)', () => {
+  it('measures every crawler as rate limited, without waiting, retrying or stopping the site', async () => {
+    // Each crawler name's requests, by page: a crawler that is refused is not asked again.
+    const asked = new Map<string, number>();
+    const { result } = await runFake(
+      accessReq('https://example.com', ['/a', '/b']),
+      (url, identity) => {
+        if (identity.role === 'crawler') {
+          const key = `${identity.userAgent} ${url}`;
+          asked.set(key, (asked.get(key) ?? 0) + 1);
+        }
+        return url.endsWith('/robots.txt') || identity.role === 'control'
+          ? { status: 200, headers: { 'content-type': 'text/html' }, body: '<p>served</p>' }
+          : { status: 429, headers: { 'retry-after': '30' }, body: '' };
+      },
+    );
+    if (result.kind !== 'access') throw new Error('access');
+    const crawlerRows = result.access_tests.filter((r) => r.ua !== null);
+    expect(crawlerRows.length).toBeGreaterThan(0);
+    expect(new Set(crawlerRows.map((r) => r.verdict))).toEqual(new Set(['rate_limited']));
+    expect(result.findings.filter((f) => f.kind === 'site_stopped')).toEqual([]);
+    expect(asked.size).toBeGreaterThan(0);
+    expect(Math.max(...asked.values())).toBe(1);
   });
 });
