@@ -943,3 +943,60 @@ describe('the step deadline', () => {
     expect(out.pages.every((p) => p.rendered || p.reason !== 'out_of_time')).toBe(true);
   });
 });
+
+describe('measuring a page somewhere bounded (questions/042, design C)', () => {
+  it('measures each page through the reader it is given, with both sides and the URL', async () => {
+    const seen: string[] = [];
+    const out = await renderCheck(
+      input({
+        read: async (s, r, url) => {
+          seen.push(url);
+          expect(s.length).toBeGreaterThan(0);
+          expect(r.length).toBeGreaterThan(0);
+          return { raw_words: 10, rendered_words: 40, challenged: false, links: null };
+        },
+      }),
+    );
+    expect(seen.sort()).toEqual(THREE.map((c) => c.url).sort());
+    for (const p of out.pages) {
+      expect(p).toMatchObject({
+        rendered: true,
+        without_js: { raw_words: 10, rendered_words: 40, text_share: 0.25 },
+      });
+      expect(p).not.toHaveProperty('links');
+    }
+  });
+
+  it.each([
+    ['answers null', async () => null],
+    [
+      'throws',
+      async () => {
+        throw new Error('the reader went away');
+      },
+    ],
+  ])('records measure_failed when the reader %s', async (_name, read) => {
+    const out = await renderCheck(input({ read }));
+    expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual([
+      'measure_failed',
+      'measure_failed',
+      'measure_failed',
+    ]);
+  });
+
+  it('reads a challenge from the reader as challenged', async () => {
+    const out = await renderCheck(
+      input({
+        read: async () => ({ raw_words: 0, rendered_words: 9, challenged: true, links: null }),
+      }),
+    );
+    expect(out.pages.every((p) => !p.rendered && p.reason === 'challenged')).toBe(true);
+  });
+
+  it('gives the same pages without a reader as with the inline one', async () => {
+    const { readRendered } = await import('./page.js');
+    const inline = await renderCheck(input());
+    const given = await renderCheck(input({ read: async (s, r, u) => readRendered(s, r, u) }));
+    expect(given.pages).toEqual(inline.pages);
+  });
+});
