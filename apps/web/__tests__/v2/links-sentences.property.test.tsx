@@ -1052,6 +1052,27 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     },
   ],
   [
+    '(n) /old and /new reach one page whose two answers differ: it is read off /new, the row requested there',
+    [
+      whole('/', 2),
+      redirecting('/old', '/new', 200),
+      page('/new', 200, { meta_description: text(null) }),
+    ],
+    [edge('/', '/old'), edge('/', '/new')],
+    {
+      pill: 'no 404 or 410',
+      body: '1 page redirects. 1 page has no meta description.',
+      doorBody:
+        'None of the 3 pages we checked answers an error. ' +
+        '1 page redirects. 1 page has no meta description.',
+      tab: 'Next: Links and pages · no 404 or 410',
+      brokenEmpty: 'None of the 3 pages we checked answers an error.',
+      headline: '0 missing pages found · 1 redirect · titles and descriptions read on 2 pages',
+      titles: ['Missing: none', 'Shared by more than one page: none'],
+      descriptions: ['Missing: 1 page', 'Shared by more than one page: none'],
+    },
+  ],
+  [
     '(m) the control: /a and /b are two pages, each answering 200 with the title "Same"',
     [
       whole('/', 2),
