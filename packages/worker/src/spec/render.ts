@@ -364,7 +364,7 @@ export function renderSpec(): string {
         ],
         [
           code('links_read'),
-          `Every link on the page was read: the whole response parsed, no link past the first ${MAX_LINKS_READ} or over ${MAX_URL_LENGTH} characters, and the page's own URL within the cap. False whenever the page was not read.`,
+          `Every link on the page was read and is in the record: the whole response parsed, no link past the first ${MAX_LINKS_READ} or over ${MAX_URL_LENGTH} characters, the page's own URL within the cap, no same-host link past the first ${MAX_EDGES_PER_PAGE} withheld, and the page's links recorded within the batch's ${MAX_RESULT_TEXT_BYTES / (1024 * 1024)} MiB. False whenever the page was not read. \`links_out\` keeps the count found either way.`,
         ],
         [
           `${code('title')}, ${code('meta_description')}`,

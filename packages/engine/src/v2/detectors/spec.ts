@@ -164,7 +164,7 @@ const FACT_FIELDS: Readonly<Record<keyof PageFacts, [string, string]>> = {
   ],
   links_read: [
     'links_read',
-    'Every link on the page was read; false for a page read in part (a cut body, the tag or nesting limit, links past the read limit) or not at all.',
+    'Every link on the page was read and is in the record; false for a page read in part (a cut body, the tag or nesting limit, links past the read limit), for one whose links were not all stored (past the per-page edge limit, or for the batch’s result room), or not at all.',
   ],
   html: [
     'is_html',
