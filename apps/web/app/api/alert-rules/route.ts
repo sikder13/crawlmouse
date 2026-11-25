@@ -1,4 +1,5 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import {
@@ -14,6 +15,26 @@ export const dynamic = 'force-dynamic';
 
 /** The page the Alerts screen's forms post from. */
 const BACK = '/alerts';
+/** Test messages an account may send in a day. */
+const TESTS_PER_DAY = 10;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The page the Slack form posts from. */
+const INTEGRATIONS = '/settings/integrations';
+
+/** Where a form returns: Integrations when `Referer` is that page on this origin, or Alerts. */
+function backOf(req: Request): string {
+  const referer = req.headers.get('referer');
+  if (!referer) return BACK;
+  try {
+    const from = new URL(referer);
+    return from.origin === new URL(req.url).origin && from.pathname === INTEGRATIONS
+      ? INTEGRATIONS
+      : BACK;
+  } catch {
+    return BACK;
+  }
+}
 
 /**
  * The account's alert rules and Slack destination (CC-27b D7, spec 27 `accountAlertRules`), for a
@@ -22,8 +43,12 @@ const BACK = '/alerts';
  * to set one: 402). Membership and role are read through the caller's own session (`member_role`,
  * `seat_may`) before the service-role client is made, and the writes name that account only, so
  * another account's rule is a 404. The answer carries whether a
- * URL is set and its last four characters, never the URL. A form is sent back to Alerts, a refused
- * one with `?error=<code>`.
+ * URL is set and its last four characters, never the URL. `{ testSlack: true }` posts the fixed test
+ * message, at most ten a day per account, failing closed (429 `rate_limited`): 409
+ * `slack_not_connected` with none set, 502 `slack_failed` when Slack refused it, 503
+ * `slack_unreachable` when Slack could not be reached. A form is sent back to the page it came from
+ * (`backOf`), a refused one with `?error=<code>`, and from Integrations one saved with `?saved=1`, a
+ * test sent with `?tested=1`.
  */
 async function update(req: Request, method: 'PUT' | null): Promise<Response> {
   const sb = await supabaseServer();
@@ -34,10 +59,11 @@ async function update(req: Request, method: 'PUT' | null): Promise<Response> {
 
   const body = await readBody(req);
   if (body === null) return refuse(400, 'invalid');
-  // A form is sent back to Alerts with the refusal's code to show; JSON gets JSON.
+  // A form is sent back with the refusal's code to show; JSON gets JSON.
+  const back = backOf(req);
   const no = (status: number, code: string, detail: Record<string, unknown> = {}): Response =>
     body.kind === 'form'
-      ? respond('form', `${BACK}?error=${encodeURIComponent(code)}`)
+      ? respond('form', `${back}?error=${encodeURIComponent(code)}`)
       : refuse(status, code, detail);
 
   const viewer = await loadViewer();
@@ -65,13 +91,22 @@ async function update(req: Request, method: 'PUT' | null): Promise<Response> {
       : no(400, decision.code);
   }
 
+  // A test posts to Slack, so it is bounded per account, failing closed.
+  if (decision.plan.slack === 'test') {
+    const limit = await checkRateLimit(`slack-test:account:${account.id}`, TESTS_PER_DAY, DAY_MS, {
+      failClosed: true,
+    });
+    if (!limit.allowed) return no(429, 'rate_limited');
+  }
   const outcome = await applyAlertRules(
     supabaseAlertRulePorts(supabaseAdmin()),
     account.id,
     decision.plan,
   );
-  if (!outcome.ok) return no(404, 'not_found');
-  return body.kind === 'form' ? respond('form', BACK) : Response.json({ slack: outcome.slack });
+  if (!outcome.ok) return no(outcome.status, outcome.code);
+  if (body.kind !== 'form') return Response.json({ slack: outcome.slack, tested: outcome.tested });
+  if (back !== INTEGRATIONS) return respond('form', back);
+  return respond('form', `${INTEGRATIONS}?${outcome.tested ? 'tested' : 'saved'}=1`);
 }
 
 export async function PUT(req: Request) {

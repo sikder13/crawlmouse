@@ -310,8 +310,16 @@ export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
       action: null,
     },
     {
-      label: COPY.slackPerSite,
-      value: COPY.slackPerSiteValue,
+      label: COPY.slackSettings,
+      // Integrations is a 404 for a role that may not edit the account's alerts.
+      value: canEdit ? COPY.slackSettingsValue : COPY.slackSettingsOwner,
+      data: false,
+      state: null,
+      action: canEdit ? action('integrations', COPY.openIntegrations) : null,
+    },
+    {
+      label: COPY.alertsPerSite,
+      value: COPY.alertsPerSiteValue,
       data: false,
       state: null,
       action: primary ? action('sitePage', COPY.openSite, { id: primary.id }) : null,

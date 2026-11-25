@@ -236,6 +236,8 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
     case 'check_ledger_drafts':
       await needCheck();
       return ROWS.check_ledger_drafts(check);
+    case 'full_render_uses':
+      return ROWS.full_render_uses(world.accountId, randomUUID(), '2026-11-01');
   }
 }
 
@@ -348,6 +350,8 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   qa_accounts: null,
   account_attribution: null,
   check_ledger_drafts: null,
+  // V2R A2, row 17: service only.
+  full_render_uses: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -423,6 +427,8 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   // and the writer reads and deletes it.
   if (table === 'account_attribution') expectedTable.service_role = 'ar';
   if (table === 'check_ledger_drafts') expectedTable.service_role = 'ard';
+  // V2R A2, row 17: its functions take and give back a use; the service reads the count.
+  if (table === 'full_render_uses') expectedTable.service_role = 'ard';
   // 028 lets service_role read its ledgers and suppressions; its functions write them.
   if (['email_sends', 'email_suppressions', 'slack_sends'].includes(table))
     expectedTable.service_role = 'r';

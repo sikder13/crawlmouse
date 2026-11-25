@@ -435,6 +435,12 @@ export const ROWS = {
     landing_path: '/blog/x',
     first_seen_at: T0,
   }),
+  // V2R A2, row 17: a full render an account took this month; service only.
+  full_render_uses: (accountId: string, checkId: string, month: string): Row => ({
+    account_id: accountId,
+    month,
+    check_id: checkId,
+  }),
   // CC-41: a check's ledger draft, held until the writer records it; service only.
   check_ledger_drafts: (checkId: string): Row => ({
     check_id: checkId,
@@ -594,6 +600,8 @@ export const TABLES_033: readonly NewTable[] = ['operators', 'operator_actions',
 export const TABLES_038: readonly NewTable[] = ['qa_accounts'];
 /** The public tables CC-41's migration creates. */
 export const TABLES_041: readonly NewTable[] = ['account_attribution', 'check_ledger_drafts'];
+/** The public tables V2R A2's full-render migration creates (row 17). */
+export const TABLES_FULL_RENDER: readonly NewTable[] = ['full_render_uses'];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
   .filter(
@@ -606,7 +614,8 @@ export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
       !TABLES_029.includes(t) &&
       !TABLES_033.includes(t) &&
       !TABLES_038.includes(t) &&
-      !TABLES_041.includes(t),
+      !TABLES_041.includes(t) &&
+      !TABLES_FULL_RENDER.includes(t),
   )
   .sort();
 /** Every public table 003, 006b, 008, 026b, 027b, 028, 029, 033, CC-38's and CC-41's migrations create. */
@@ -684,6 +693,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.account_attribution')::text as t`,
   );
   const with041 = ft[0]!.t !== null;
+  // Nor, migrated before V2R A2's full-render migration, full_render_uses.
+  const { rows: fr } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.full_render_uses')::text as t`,
+  );
+  const withFullRender = fr[0]!.t !== null;
   // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
   const { rows: identity } = await db.query<{ n: number }>(
     `select count(*)::int as n from pg_attribute
@@ -919,6 +933,15 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       'account_attribution',
       ROWS.account_attribution(accountId),
       { account_id: accountId },
+      'account',
+    );
+  }
+  if (withFullRender) {
+    const usedBy = randomUUID();
+    await put(
+      'full_render_uses',
+      ROWS.full_render_uses(accountId, usedBy, '2026-11-01'),
+      { account_id: accountId, month: '2026-11-01', check_id: usedBy },
       'account',
     );
   }

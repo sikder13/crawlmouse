@@ -11,7 +11,7 @@
  */
 import type { MapDrawing } from '@crawlmouse/engine/v2/pipeline';
 import { z } from 'zod';
-import { effectiveTier, type EntitlementClock } from '../../entitlement-v2';
+import { effectiveTier, GATES, type EntitlementClock } from '../../entitlement-v2';
 import { gunzipJson } from './evidence';
 import { loadCheck, withSiteHistory } from './load';
 import {
@@ -137,10 +137,12 @@ export async function loadCheckFor(
       kept,
     };
   }
-  const [dataset, map, plan] = await Promise.all([
+  const [dataset, map, tier] = await Promise.all([
     readyDataset(deps, access),
     storedDrawing(deps.evidence, access.mapPath),
     access.accountId === null ? ('free' as const) : deps.planOf(access.accountId),
   ]);
-  return { state: 'ready', checkId, host, kept, plan, dataset, map };
+  const plan = tier === 'free' ? 'free' : 'pro';
+  const competitors = GATES[tier].competitorsPerSite;
+  return { state: 'ready', checkId, host, kept, plan, competitors, dataset, map };
 }
