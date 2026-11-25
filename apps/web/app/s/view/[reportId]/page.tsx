@@ -14,6 +14,7 @@ import { isShareToken, SHARE_COOKIE, sharedProof } from '@/lib/v2/reports/share'
 import { parseStoredDoc } from '@/lib/v2/reports/share-doc';
 import { pageCapture } from '@/lib/v2/reports/share-proof';
 import { supabaseShareFiles, supabaseShareStore } from '@/lib/v2/reports/share-store';
+import { logoSrcOf, supabaseBrandReader } from '@/lib/v2/reports/brand';
 import { proofView } from '@/lib/v2/view/proof';
 
 /** Views of shared pages one address may ask for in an hour: the link's own bound (`/s/[token]`). */
@@ -63,8 +64,20 @@ export default async function SharedProofPage({
   );
   const doc = shared && parseStoredDoc(shared.bytes);
   if (!shared || !doc) return notFound();
+  // White-label: the agency stamped on the report, its logo read by its stored path from the
+  // report's own account's folder and checked again, never fetched by URL (lib/v2/reports/brand.ts).
+  const brand = doc.brand
+    ? {
+        name: doc.brand.name,
+        logoSrc: await logoSrcOf(
+          supabaseBrandReader(admin),
+          shared.report.accountId,
+          doc.brand.logoPath,
+        ),
+      }
+    : undefined;
   await (
     await pageCapture()
   )('proof_viewed', { accountId: shared.report.accountId, visitor: true }, { via: 'share' });
-  return <ProofScreen data={proofView(doc)} />;
+  return <ProofScreen data={proofView(doc)} {...(brand ? { brand } : {})} />;
 }

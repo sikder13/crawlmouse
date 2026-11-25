@@ -20,6 +20,7 @@ import {
   type ReportMailHandlers,
 } from '../../../../../inngest/mail';
 import { captureServerEvent } from '../../analytics-server';
+import { supabaseBrandReader } from '../reports/brand';
 import { siteUrl } from '../../site-url';
 import { agencyCaptureWithoutRequest } from '../agency/events';
 import { supabaseCheckReader } from '../pipeline/load';
@@ -84,6 +85,7 @@ export function productionReportMailHandlers(env: Env): ReportMailHandlers {
             bucket: supabaseReportBucket(sb),
             read: supabaseCheckReader(sb),
             home: siteUrl('/'),
+            brand: supabaseBrandReader(sb),
           },
           reportId,
         ),

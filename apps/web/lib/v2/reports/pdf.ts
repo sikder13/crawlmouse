@@ -17,9 +17,26 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import fontkit from '@pdf-lib/fontkit';
-import { PDFDocument, PDFName, PDFString, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import {
+  PDFDocument,
+  PDFName,
+  PDFString,
+  rgb,
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+} from 'pdf-lib';
+import type { BrandLogo } from './brand-doc';
 import type { ReportDoc } from './generate';
-import { drawDoc, PAGE, type Face, type Measure, type PdfSink, type Tone } from './pdf-layout';
+import {
+  drawDoc,
+  logoSize,
+  PAGE,
+  type Face,
+  type Measure,
+  type PdfSink,
+  type Tone,
+} from './pdf-layout';
 
 /** The font file of each face, in `lib/v2/reports/fonts/`. */
 export const FONT_FILES: Record<Face, string> = {
@@ -93,7 +110,7 @@ function linkTarget(href: string): string | null {
 }
 
 /** A sink that draws on pages added to `pdf`. Distances from the top become PDF's from the bottom. */
-function pdfSink(pdf: PDFDocument, fonts: Fonts): PdfSink {
+function pdfSink(pdf: PDFDocument, fonts: Fonts, logo: PDFImage | null = null): PdfSink {
   let page: PDFPage | null = null;
   const current = (): PDFPage => {
     if (page === null) throw new Error('pdf: drawn before a page was started');
@@ -130,6 +147,15 @@ function pdfSink(pdf: PDFDocument, fonts: Fonts): PdfSink {
         color: COLOR.muted,
       });
     },
+    image(i) {
+      if (logo === null) return;
+      current().drawImage(logo, {
+        x: i.x,
+        y: PAGE.height - i.y - i.height,
+        width: i.width,
+        height: i.height,
+      });
+    },
     link(l) {
       const target = linkTarget(l.href);
       if (target === null) return;
@@ -151,11 +177,37 @@ function pdfSink(pdf: PDFDocument, fonts: Fonts): PdfSink {
   };
 }
 
-/** `doc` as the bytes of a PDF file, on A4 pages. */
-export async function renderPdf(doc: ReportDoc): Promise<Uint8Array> {
+/**
+ * `doc` as the bytes of a PDF file, on A4 pages. A branded document (white-label) carries its
+ * agency's name in a header above the title, and `logo` above that when one was read and checked
+ * (`BrandReader.logo`). PDF embeds PNG and JPEG; a WebP logo is not drawn, and the name stands
+ * alone. With no brand, `logo` is not read and the file is what it was before white-label.
+ */
+export async function renderPdf(
+  doc: ReportDoc,
+  logo: BrandLogo | null = null,
+): Promise<Uint8Array> {
   const { pdf, fonts } = await openPdf();
   pdf.setTitle(doc.title);
   pdf.catalog.set(PDFName.of('Lang'), PDFString.of('en'));
-  drawDoc(doc, measureWith(fonts), pdfSink(pdf, fonts));
+  const image = doc.brand ? await embedLogo(pdf, logo) : null;
+  drawDoc(
+    doc,
+    measureWith(fonts),
+    pdfSink(pdf, fonts, image),
+    image === null ? undefined : logoSize(image),
+  );
   return pdf.save();
+}
+
+/** The logo embedded in `pdf`, or null: none, a WebP, or bytes pdf-lib cannot read. */
+async function embedLogo(pdf: PDFDocument, logo: BrandLogo | null): Promise<PDFImage | null> {
+  if (logo === null) return null;
+  try {
+    if (logo.format === 'png') return await pdf.embedPng(logo.bytes);
+    if (logo.format === 'jpeg') return await pdf.embedJpg(logo.bytes);
+  } catch {
+    return null;
+  }
+  return null;
 }

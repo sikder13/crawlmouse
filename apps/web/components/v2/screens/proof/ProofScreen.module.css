@@ -21,6 +21,29 @@
   color: var(--v2-fg2);
 }
 
+/* A shared report's agency (white-label): its logo, then its name, above the title. */
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.brandLogo {
+  display: block;
+  max-width: 200px;
+  max-height: 40px;
+  width: auto;
+  height: auto;
+}
+
+.brandName {
+  margin: 0;
+  color: var(--v2-fg2);
+  font-weight: 600;
+}
+
 .section {
   display: flex;
   flex-direction: column;

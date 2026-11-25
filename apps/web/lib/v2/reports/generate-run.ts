@@ -39,6 +39,7 @@ import {
   type CheckRecords,
   type DocOptions,
 } from './generate-doc';
+import type { BrandReader, DocBrand } from './brand-doc';
 import { renderPdf } from './pdf';
 
 /**
@@ -98,6 +99,11 @@ export interface GenerateDeps {
   read: CheckReader;
   /** The home page's address, for a document's footer. */
   home: string;
+  /**
+   * The agency's brand for a client's documents (white-label): `supabaseBrandReader` in production,
+   * `NO_BRAND` where reports carry none.
+   */
+  brand: BrandReader;
 }
 
 export type Generated =
@@ -146,16 +152,34 @@ async function compareDocOf(read: CheckReader, row: ReportRow, options: DocOptio
   return compareDoc(before, await withChangesSince(read, before, later), options);
 }
 
-/** The bytes of `row`'s file. */
-async function build(read: CheckReader, row: ReportRow, options: DocOptions): Promise<Uint8Array> {
+/** `doc` with `brand` stamped on it, first in its keys; `doc` itself when there is none. */
+const branded = (doc: ReportDoc, brand: DocBrand | null): ReportDoc =>
+  brand === null ? doc : { brand, ...doc };
+
+/**
+ * The bytes of `row`'s file. A document a client reads (the audit PDF, a comparison, a client
+ * report) carries the account's brand when `BrandReader.brandFor` answers one; a raw export never.
+ */
+async function build(
+  deps: Pick<GenerateDeps, 'read' | 'brand'>,
+  row: ReportRow,
+  options: DocOptions,
+): Promise<Uint8Array> {
+  const { read } = deps;
   const [checkId] = row.covers_check_ids as [string, ...string[]];
   const made = `${row.kind} ${row.format}`;
   switch (made) {
-    case 'audit_pdf pdf':
-      return renderPdf(auditDoc(await recordsOf(read, checkId), options));
+    case 'audit_pdf pdf': {
+      const brand = await deps.brand.brandFor(row.account_id);
+      const doc = branded(auditDoc(await recordsOf(read, checkId), options), brand);
+      const logo =
+        brand?.logoPath == null ? null : await deps.brand.logo(row.account_id, brand.logoPath);
+      return renderPdf(doc, logo);
+    }
     case 'compare html':
     case 'client_report html': {
-      const doc: ReportDoc = await compareDocOf(read, row, options);
+      const brand = await deps.brand.brandFor(row.account_id);
+      const doc: ReportDoc = branded(await compareDocOf(read, row, options), brand);
       return text(JSON.stringify(doc));
     }
     case 'raw_export csv':
@@ -200,7 +224,7 @@ export async function generateReport(deps: GenerateDeps, reportId: string): Prom
 
   let bytes: Uint8Array;
   try {
-    bytes = await build(deps.read, row, { home: deps.home });
+    bytes = await build(deps, row, { home: deps.home });
   } catch {
     return fail('build_failed');
   }

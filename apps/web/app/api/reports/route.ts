@@ -1,5 +1,6 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { supabaseBrandReader } from '@/lib/v2/reports/brand';
 import { siteUrl } from '@/lib/site-url';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -185,6 +186,7 @@ export async function POST(req: Request) {
       bucket: supabaseReportBucket(admin),
       read: supabaseCheckReader(admin),
       home: siteUrl('/'),
+      brand: supabaseBrandReader(admin),
     },
     reportId,
   );
