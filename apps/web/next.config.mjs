@@ -18,9 +18,10 @@ const nextConfig = {
     // Compile in Next's build worker. Next turns it on by default only without a custom webpack
     // config (next 15.5 dist/build/index.js: `webpackBuildWorker === undefined && !config.webpack`),
     // and this file has one, so it was off and every compilation shared one process (CTO 094).
-    webpackBuildWorker: true,
+    // MEASUREMENT ONLY (reverted before merge): CI's build job turns each setting off to measure it.
+    webpackBuildWorker: process.env.MEASURE_NO_WORKER === '1' ? undefined : true,
     // Lower webpack's peak memory at some cost in build time (Next 15.0+, CTO 094).
-    webpackMemoryOptimizations: true,
+    webpackMemoryOptimizations: process.env.MEASURE_NO_MEMOPT !== '1',
   },
   typescript: { ignoreBuildErrors: SKIP_BUILD_CHECKS },
   eslint: { ignoreDuringBuilds: SKIP_BUILD_CHECKS },

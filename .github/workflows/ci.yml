@@ -269,7 +269,7 @@ jobs:
   # fetching fonts. The build is kept for the two jobs that run it on next start.
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -289,8 +289,16 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          # The build's memory, measured (CTO 094): the peak of its whole process tree.
-          ../../.github/workflows/scripts/build-peak.sh pnpm build
+          # MEASUREMENT ONLY (reverted before merge, CTO 094): five builds in one job, each from an
+          # empty .next, so every change's saving is read from the same runner.
+          peak=../../.github/workflows/scripts/build-peak.sh
+          m() { echo "::group::measure $1"; rm -rf .next; shift; "$@"; echo "::endgroup::"; }
+          m "A main's settings, checks on" env MEASURE_NO_WORKER=1 MEASURE_NO_MEMOPT=1 $peak pnpm exec next build
+          m "B + build worker, checks on" env MEASURE_NO_MEMOPT=1 $peak pnpm exec next build
+          m "C + memory optimizations, checks on" $peak pnpm exec next build
+          m "F Vercel-like, main's settings (checks off, previews in)" env VERCEL=1 MEASURE_NO_WORKER=1 MEASURE_NO_MEMOPT=1 $peak pnpm exec next build
+          VERCEL=1 node scripts/prebuild.mjs
+          m "E Vercel-like, all changes (checks off, previews out)" env VERCEL=1 $peak pnpm exec next build
       # Named by the run, not the attempt: "Re-run failed jobs" re-runs the two jobs that download it
       # without re-running a build that passed, so they must find the earlier attempt's upload. A
       # full re-run builds again under the same name, hence overwrite.
