@@ -12,6 +12,9 @@
     },
     "api/large.mjs": {
       "maxDuration": 10
+    },
+    "api/dense.mjs": {
+      "maxDuration": 10
     }
   },
   "routes": [
@@ -239,6 +242,16 @@
         }
       ],
       "dest": "/api/large?path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "dense.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/dense?path=/$1"
     },
     {
       "src": "/(.*)",

@@ -37,6 +37,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as prettier from 'prettier';
 import { HOSTS as LARGE_HOSTS } from './api/large.mjs';
+import { HOSTS as DENSE_HOSTS } from './api/dense.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const ZONE = 'lab.crawlmouse.com';
@@ -1463,6 +1464,14 @@ function vercelJson(sites) {
       dest: '/api/large?path=/$1',
     });
   }
+  // The dense lab: 2,000 pages of about 100 links each, rendered by its own function (api/dense.mjs).
+  for (const host of Object.values(DENSE_HOSTS)) {
+    routes.push({
+      src: '/(.*)',
+      has: [{ type: 'host', value: host }],
+      dest: '/api/dense?path=/$1',
+    });
+  }
   routes.push({ src: '/(.*)', status: 404, dest: '/404.html' });
   return `${JSON.stringify(
     {
@@ -1472,6 +1481,7 @@ function vercelJson(sites) {
         'api/slow.mjs': { includeFiles: 'sites/slow/**', maxDuration: 10 },
         'api/sentinel.mjs': { includeFiles: 'sites/sentinel/**', maxDuration: 10 },
         'api/large.mjs': { maxDuration: 10 },
+        'api/dense.mjs': { maxDuration: 10 },
       },
       routes,
     },
@@ -1543,6 +1553,7 @@ const SOURCES = [
   'api/slow.mjs',
   'api/sentinel.mjs',
   'api/large.mjs',
+  'api/dense.mjs',
 ];
 // `vercel link` writes .vercel/ and .env.local; both are gitignored and never uploaded.
 const generated = listed(ROOT).filter(
