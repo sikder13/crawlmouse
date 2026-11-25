@@ -89,6 +89,23 @@ describe('/agency-trial', () => {
     expect(h.reads).toBe(0);
   });
 
+  it('while paying is kept to one user, anyone else signed in is sent to For agencies, before the reads', async () => {
+    vi.stubEnv('V2_BILLING_ONLY_USER', 'someone-else');
+    h.viewer = signedIn;
+    await expect(render()).rejects.toMatchObject({
+      digest: expect.stringContaining('NEXT_REDIRECT;replace;/agencies;'),
+    });
+    // The session is read, to know who is asking.
+    expect(h.reads).toBe(1);
+  });
+
+  it('while paying is kept to one user, that user gets the form', async () => {
+    vi.stubEnv('V2_BILLING_ONLY_USER', 'u1');
+    h.viewer = signedIn;
+    const html = renderToStaticMarkup(await render());
+    expect(html).toContain('<form');
+  });
+
   it('its layout does the same', async () => {
     const { default: Layout } = await import('./layout');
     vi.stubEnv('V2_AGENCY_SALES', '');
