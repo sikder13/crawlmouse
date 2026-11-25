@@ -3,6 +3,13 @@ import { accountDoorEnabled } from '@/lib/auth/flags';
 import { featureShown } from '@/lib/feature-switch';
 import { MAX_LOGO_BYTES, validateLogo } from '@/lib/logo-validation';
 import { checkRateLimit } from '@/lib/rate-limit';
+import {
+  BRAND_EDITORS,
+  BRAND_FIELDS,
+  BRAND_NAME_MAX,
+  BRAND_NAME_RULE,
+  BRAND_SAVES_PER_HOUR,
+} from '@/lib/v2/agency/brand-rules';
 import { LOGO_BUCKET } from '@/lib/report-brand';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -14,26 +21,20 @@ import { readEntitlement } from '@/lib/v2/account/viewer-read';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const UPLOADS_PER_HOUR = 5;
+const UPLOADS_PER_HOUR = BRAND_SAVES_PER_HOUR;
 const HOUR_MS = 60 * 60 * 1000;
 /** The request body's cap: the logo's, plus room for the two text fields and the multipart framing. */
 const BODY_MAX = MAX_LOGO_BYTES + 16 * 1024;
-const NAME_MAX = 60;
+const NAME_MAX = BRAND_NAME_MAX;
+/** What a refused name must change, said with the refusal (lib/v2/agency/brand-rules.ts). */
+const NAME_RULE = BRAND_NAME_RULE;
 /**
  * Controls (`Cc`: C0, DEL and C1), format characters (`Cf`: the bidi marks, embeddings, overrides and
  * isolates U+200E/F, U+202A–U+202E and U+2066–U+2069, the Arabic letter mark U+061C, the zero-width
  * U+200B–U+200D and U+FEFF among them), and the line and paragraph separators (`Zl`, `Zp`).
  */
-/**
- * What a refused name must change, said with the refusal: the length, and the shapes the mail
- * templates' `LINKABLE` guard refuses (an @, a colon or a slash, a dot followed by another
- * character, seven digits or more).
- */
-const NAME_RULE =
-  'Use 1 to 60 characters, with no @, colon or slash, no dot followed by another character, and no number of 7 digits or more.';
-
 const CONTROLS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
-const EDITORS: ReadonlySet<unknown> = new Set(['owner', 'account_manager']);
+const EDITORS: ReadonlySet<unknown> = new Set<unknown>(BRAND_EDITORS);
 
 /**
  * The name as stored: the controls removed, then trimmed; null unless 1 to 60 code points remain,
@@ -160,12 +161,12 @@ export async function POST(req: Request) {
   if (form === null) return refuse(400, 'invalid');
 
   // 8. The brand name.
-  const agencyName = cleanName(form.get('agencyName'));
+  const agencyName = cleanName(form.get(BRAND_FIELDS.name));
   if (agencyName === null) return refuse(400, 'invalid_name', { message: NAME_RULE });
 
   // 9. The logo, if one was sent: the part's size first, then the validator decides on its bytes.
   //    A form's empty file input arrives as a nameless, empty file part, which is no logo.
-  const part = form.get('logo');
+  const part = form.get(BRAND_FIELDS.logo);
   const file = part instanceof Blob && isEmptyFileField(part) ? null : part;
   let logo: { bytes: Uint8Array; contentType: string; ext: string } | null = null;
   if (file !== null) {
