@@ -172,7 +172,13 @@ function Gate({ data }: { data: AgencyGateView }) {
 /** Acting in an account that is not an agency, with a seat on one: the switch to it. */
 function Open({ data }: { data: AgencyOpenView }) {
   return (
-    <div className={styles.state} data-v2-addition="" data-v2-agency-state="open">
+    // Names accounts, which can be an address (D-22): kept out of autocapture and replay.
+    <div
+      className={`${styles.state} ph-no-capture`}
+      data-ph-mask=""
+      data-v2-addition=""
+      data-v2-agency-state="open"
+    >
       <h1 className={shared.title}>{data.title}</h1>
       <Card as="section" className={styles.message}>
         <p className={styles.body}>{data.body}</p>

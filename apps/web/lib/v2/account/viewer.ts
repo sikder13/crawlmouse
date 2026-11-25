@@ -9,7 +9,9 @@
  * service role reads one value, the caller's own `users.default_account_id` (the caller's column
  * grant leaves it out), and only to choose among those seats; an id that is not among them is
  * ignored. An account id or seat id of an account the caller does not sit on is therefore never
- * in the result, and the only email in it is the caller's own, from their session.
+ * in the result, and the only email in it is the caller's own, from their session. The switcher's
+ * list may carry a site host per account (D-22), read with the caller's client, so a seat whose
+ * scope covers only some of an account's sites reads only those.
  *
  * Which account, for a person with several seats: the one their switcher cookie names when it is one
  * of those seats (CC-31 D2b, viewer-cookie.ts), else `landingSeat`'s (viewer-read.ts). Nothing here writes

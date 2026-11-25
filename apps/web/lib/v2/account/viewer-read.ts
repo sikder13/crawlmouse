@@ -38,8 +38,9 @@ export interface AccountViewer {
   /**
    * Every account the caller holds an active seat on, this one included: what the switcher lists.
    * An unnamed account is told apart by `ownerEmail`, the caller's own email on an account they own
-   * and null on any other, and by `firstSite`, the host of its oldest live site, read with the
-   * caller's client (D-22). Both are null for a caller with one account: no switcher names it.
+   * and null on any other, and by `firstSite`, the host of its oldest live site the caller's seat
+   * may read, through the caller's client (D-22). `firstSite` is read only for an account with no
+   * name and no `ownerEmail`. Both are null for a caller with one account: no switcher names it.
    */
   accounts: {
     id: string;
@@ -157,15 +158,16 @@ async function seatAccounts(
   const rows = z.array(SwitcherRow).parse(accounts.data);
   const owned = new Set(mine.filter((s) => s.role === 'owner').map((s) => s.account_id));
   const several = rows.length > 1;
-  const first = several
-    ? await firstSites(
-        session,
-        rows.map((a) => a.id),
-      )
-    : new Map();
+  const ownerEmail = (id: string) => (several && owned.has(id) ? email : null);
+  // Only an account the switcher could not otherwise name needs its first site: unnamed, and not
+  // the caller's own with an address. Usually none, and then nothing more is read.
+  const unnamed = several
+    ? rows.filter((a) => !a.name?.trim() && !ownerEmail(a.id)?.trim()).map((a) => a.id)
+    : [];
+  const first = unnamed.length ? await firstSites(session, unnamed) : new Map<string, string>();
   return rows.map((a) => ({
     ...a,
-    ownerEmail: several && owned.has(a.id) ? email : null,
+    ownerEmail: ownerEmail(a.id),
     firstSite: first.get(a.id) ?? null,
   }));
 }

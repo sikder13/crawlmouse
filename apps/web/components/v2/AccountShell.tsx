@@ -99,7 +99,7 @@ export function AccountShell({
         {/* After the feedback button for the same reason (D-23, F-286): the logout route ends the
             session on the server, clears its cookies and sends the browser to the home page. */}
         <span className={styles.signOut} data-v2-addition="">
-          <SignOutForm className={styles.signOut}>
+          <SignOutForm>
             <button type="submit" className={styles.feedback}>
               {SIGN_OUT}
             </button>

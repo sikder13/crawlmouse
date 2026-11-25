@@ -47,7 +47,7 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
   const v = seatsPreview(OWNER);
 
   it('marks Seats in the rail as the page it is (D-24), on the agency rail and the account rail', () => {
-    for (const path of [OWNER, PRO_FULL, FREE]) {
+    for (const path of [OWNER, PRO_FULL, FREE] as const) {
       expect(
         seatsPreview(path)
           .shell.nav.filter((n) => n.current)

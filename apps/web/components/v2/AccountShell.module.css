@@ -98,8 +98,14 @@
   margin-top: auto;
 }
 
-/* The sign-out's marker and form only hold its button, which wears the feedback button's look. */
+/* The sign-out's marker is a box of its own, so the rail's last child has a size to measure; the
+   form inside it only holds its button, which wears the feedback button's look. */
 .signOut {
+  display: flex;
+  flex-direction: column;
+}
+
+.signOut form {
   display: contents;
 }
 
