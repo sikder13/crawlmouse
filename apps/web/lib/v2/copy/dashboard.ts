@@ -154,6 +154,12 @@ export const SETUP_COPY = {
   schedule: (when: string) => `Choose the day and hour the weekly check runs (now ${when})`,
 };
 
+/**
+ * The set-up table's Done column, one pill per row (F-304): "done" in the OK pill, "not done" in a
+ * neutral one, both on screen.
+ */
+export const SETUP_STATE = { done: 'done', notDone: 'not done' } as const;
+
 // ── Where the dashboards differ from their locked HTML ─────────────────────────────────────
 // Applied in order by the lock comparison (__tests__/v2/dashboard.test.tsx). The rail's rows are
 // shared with the site page (railChanges).
@@ -329,6 +335,14 @@ const DAY0: CopyChange[] = [
     rendered: 'Add a staging URL so audits run after each staging deploy',
     source:
       'V2R register, F-097 (CTO 057): the deploy hook fires once a staging deploy has finished, so the audit runs after it',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Add a staging URL so audits run after each staging deploy',
+    rendered: 'not done Add a staging URL so audits run after each staging deploy',
+    source:
+      'V2R register, F-304 (D-42): the set-up table’s Done column shows a row still to do as “not done” on screen, in a neutral pill beside the done rows’ “done” pill; the locked page left that cell empty',
   },
   {
     screen: 'dashboard-day0',
@@ -570,6 +584,14 @@ const HOME: CopyChange[] = [
     locked: '(now Fri 06:00)',
     rendered: '(now Fri around 06:00)',
     source: 'FACTS H4 (row 272)',
+  },
+  {
+    screen: 'dashboard',
+    kind: 'ruling',
+    locked: 'Choose the day and hour the weekly check runs',
+    rendered: 'not done Choose the day and hour the weekly check runs',
+    source:
+      'V2R register, F-304 (D-42): the set-up table’s Done column shows a row still to do as “not done” on screen, in a neutral pill beside the done rows’ “done” pill; the locked page left that cell empty',
   },
   {
     screen: 'dashboard',

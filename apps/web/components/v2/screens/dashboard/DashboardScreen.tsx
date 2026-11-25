@@ -6,6 +6,7 @@ import { Glyph, StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
 import { VERDICTS } from '../../verdicts';
 import { VisuallyHidden } from '../../VisuallyHidden';
+import { SETUP_STATE } from '../../../../lib/v2/copy/dashboard';
 import { TAGGED_UA_LINE } from '../../../../lib/v2/copy/site';
 import type { DashboardView } from '../../../../lib/v2/view/dashboard';
 import { AccountFrame } from '../account/AccountFrame';
@@ -366,10 +367,12 @@ function Setup({ setup }: { setup: NonNullable<DashboardView['setup']> }) {
           cells: [
             i.done ? (
               <StatusPill key="d" state="ok">
-                done
+                {SETUP_STATE.done}
               </StatusPill>
             ) : (
-              <VisuallyHidden key="d">not done</VisuallyHidden>
+              <StatusPill key="d" state="neutral">
+                {SETUP_STATE.notDone}
+              </StatusPill>
             ),
             i.label,
             i.action ? <ActionControl key="a" action={i.action} /> : '',
