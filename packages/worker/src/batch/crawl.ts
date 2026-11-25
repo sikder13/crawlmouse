@@ -73,11 +73,15 @@ export interface CrawlOutput {
   complete: number;
   /** URLs a page's chain ended on and requested: what the crawl has read, besides its own URLs. */
   landed: string[];
+  /** Each edge target (canonical) with its address as first linked, in page order (F-252). */
+  linked: Map<string, string>;
 }
 
 interface PageOutcome {
   page: CrawlPage;
   edges: LinkEdge[];
+  /** Each recorded edge's target with its address as the page linked it. */
+  linked?: ReadonlyMap<string, string>;
   complete: boolean;
   /** The URL the chain ended on, when it was requested; null when it stopped short or failed. */
   landed?: string | null;
@@ -136,7 +140,16 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
     link_edges: outcomes.flatMap((o) => o.edges),
     complete: outcomes.filter((o) => o.complete).length,
     landed: outcomes.flatMap((o) => (o.landed ? [o.landed] : [])),
+    linked: firstLinked(outcomes),
   };
+}
+
+/** The address each edge target was first linked at, over the batch's pages in order. */
+function firstLinked(outcomes: readonly PageOutcome[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const o of outcomes)
+    for (const [to, href] of o.linked ?? []) if (!out.has(to)) out.set(to, href);
+  return out;
 }
 
 async function crawlPage(
@@ -204,6 +217,7 @@ async function crawlPage(
   const r = await politeFetch(run.ctx, url, CRAWL, {
     offSite: 'stop',
     gate: run.robots.gate(CRAWL),
+    retryOn429: true,
   });
   if ('notRequested' in r) {
     run.findings.notRequested(r.notRequested);
@@ -276,7 +290,7 @@ async function crawlPage(
   const fromUrl = bounded(canonicalizeUrl(f.finalUrl), CAPS.url);
   const edges =
     fromUrl === null
-      ? { kept: [], distinct: 0, withheld: 0, tooLong: 0 }
+      ? { kept: [], linked: new Map<string, string>(), distinct: 0, withheld: 0, tooLong: 0 }
       : edgesFrom(run.checkId, fromUrl, extracted.links);
   if (fromUrl === null) {
     limitations.push(
@@ -354,7 +368,13 @@ async function crawlPage(
     main_text_chars: read.mainTextChars,
     noindex: headerNoindex(f) || read.metaNoindex,
   });
-  return { page, edges: recorded ? edges.kept : [], complete: true, landed };
+  return {
+    page,
+    edges: recorded ? edges.kept : [],
+    linked: recorded ? edges.linked : undefined,
+    complete: true,
+    landed,
+  };
 }
 
 /**
@@ -400,9 +420,16 @@ function edgesFrom(
   checkId: string,
   fromUrl: string,
   links: PageLinks['links'],
-): { kept: LinkEdge[]; distinct: number; withheld: number; tooLong: number } {
+): {
+  kept: LinkEdge[];
+  linked: Map<string, string>;
+  distinct: number;
+  withheld: number;
+  tooLong: number;
+} {
   const seen = new Set<string>();
   const kept: LinkEdge[] = [];
+  const linked = new Map<string, string>();
   let tooLong = 0;
   for (const l of links) {
     // A link to the page itself is not an edge, as in the v1 graph; to_url is already canonical.
@@ -414,6 +441,8 @@ function edgesFrom(
     }
     seen.add(l.toUrl);
     if (kept.length >= MAX_EDGES_PER_PAGE) continue;
+    // The address to ask it at; its canonical spelling when the written one is past the URL cap.
+    linked.set(toUrl, l.href.length <= MAX_URL_LENGTH ? l.href : toUrl);
     kept.push(
       LinkEdgeSchema.parse({
         check_id: checkId,
@@ -426,7 +455,7 @@ function edgesFrom(
       }),
     );
   }
-  return { kept, distinct: seen.size, withheld: seen.size - kept.length, tooLong };
+  return { kept, linked, distinct: seen.size, withheld: seen.size - kept.length, tooLong };
 }
 
 /**
@@ -540,8 +569,10 @@ function pageRow(
   const v = run.vantage ?? LOCAL_VANTAGE;
   return CrawlPageSchema.parse({
     check_id: run.checkId,
-    // A request URL, which the request schema already holds within this cap.
-    url: bounded(url, CAPS.url),
+    // Keyed on the canonical spelling (F-252): the crawl may ask `/about/` where pages are compared
+    // as `/about`. The request schema holds the URL within this cap, and the planner plans only URLs
+    // whose canonical spelling is within it too.
+    url: bounded(canonicalizeUrl(url), CAPS.url),
     outcome,
     response,
     evidence_class: evidence,

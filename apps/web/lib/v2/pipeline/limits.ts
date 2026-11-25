@@ -23,7 +23,12 @@ export { FAILURE_REASONS, type FailureReason } from '../../../../../inngest/chec
 export const RESERVE_S = 180;
 /** The crawl phase's ceiling: ENGINE-GAP §8's Free-tier HTTP-phase ceiling. */
 export const CRAWL_CEILING_S = 480;
-/** What the access stages keep for themselves out of the fetching time: stage 1 is ~25 pages. */
+/**
+ * What the access stages keep for themselves out of the fetching time: stage 1 is ~25 pages. In a run
+ * whose crawl ends here rather than at its ceiling, the last crawl batch's grace and poll fall in this
+ * slice (steps/time.ts, F-247), so the stages keep at least this less two graces and polls, before
+ * step latency and any busy answer to the access post.
+ */
 export const ACCESS_SLICE_S = 300;
 /** A batch that could be given less than this is not posted; its phase ends instead. */
 export const MIN_BATCH_S = 60;

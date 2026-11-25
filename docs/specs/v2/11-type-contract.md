@@ -862,6 +862,13 @@ The whole result (`worker-batch.ts`), parsed with `BatchResultSchema`: one of tw
 | `declarations[].bytes_complete`                            | `boolean`                 | yes  |
 | `declarations[].not_requested`                             | `DeclarationNotRequested` | yes  |
 | `declarations[].from_cache`                                | `boolean`                 | no   |
+| `timing`                                                   | `object`                  | no   |
+| `timing.requests`                                          | `integer`                 | no   |
+| `timing.fetch_ms_p50`                                      | `integer`                 | no   |
+| `timing.fetch_ms_p90`                                      | `integer`                 | no   |
+| `timing.fetch_ms_max`                                      | `integer`                 | no   |
+| `timing.fetch_ms_total`                                    | `integer`                 | no   |
+| `timing.idle_ms_total`                                     | `integer`                 | no   |
 | `kind`                                                     | `"crawl"`                 | no   |
 | `pages`                                                    | `object[]`                | no   |
 | `pages[].check_id`                                         | `uuid`                    | no   |
@@ -966,6 +973,7 @@ The whole result (`worker-batch.ts`), parsed with `BatchResultSchema`: one of tw
 | `link_edges[].is_generic_anchor`                           | `boolean`                 | no   |
 | `link_edges[].js_only`                                     | `boolean`                 | no   |
 | `discovered_urls`                                          | `url[]`                   | no   |
+| `link_edges_dropped`                                       | `integer`                 | no   |
 
 ### Access batch result
 
@@ -1034,6 +1042,13 @@ The rows are `AccessTest` (above).
 | `declarations[].bytes_complete`          | `boolean`                 | yes  |
 | `declarations[].not_requested`           | `DeclarationNotRequested` | yes  |
 | `declarations[].from_cache`              | `boolean`                 | no   |
+| `timing`                                 | `object`                  | no   |
+| `timing.requests`                        | `integer`                 | no   |
+| `timing.fetch_ms_p50`                    | `integer`                 | no   |
+| `timing.fetch_ms_p90`                    | `integer`                 | no   |
+| `timing.fetch_ms_max`                    | `integer`                 | no   |
+| `timing.fetch_ms_total`                  | `integer`                 | no   |
+| `timing.idle_ms_total`                   | `integer`                 | no   |
 | `kind`                                   | `"access"`                | no   |
 | `access_tests`                           | `object[]`                | no   |
 | `access_tests[].id`                      | `uuid`                    | no   |
