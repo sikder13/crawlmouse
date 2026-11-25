@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type CSSProperties } from 'react';
 import { ScrollRegion } from './ScrollRegion';
 import layout from './layout.module.css';
 import styles from './GradeHistory.module.css';
@@ -43,8 +43,13 @@ export interface GradeHistoryProps {
 
 const W = 640;
 const H = 186;
-/** The second axis line's offset, and the room the drawing grows by to hold it. */
-const TIME_LINE = 12;
+/**
+ * The second axis line's offset, and the room the drawing grows by to hold it: 1.2 times the
+ * phone's 15-unit lettering, so the day and its time do not touch (GradeHistory.module.css).
+ */
+const TIME_LINE = 18;
+/** The chart's top padding, in px (GradeHistory.module.css `.chart`): its box is this plus the drawing. */
+const PAD_TOP = 8;
 const X0 = 40;
 const X1 = 630;
 const TICKS = [100, 75, 50, 25];
@@ -109,6 +114,8 @@ export function GradeHistory({
           className={styles.chart}
           data-v2-chart=""
           viewBox={`0 0 ${W} ${height}`}
+          // The box grows with the drawing, so a desktop chart with times keeps its lettering's size.
+          style={{ '--v2-chart-h': `${height + PAD_TOP}px` } as CSSProperties}
           aria-hidden="true"
           focusable="false"
         >
