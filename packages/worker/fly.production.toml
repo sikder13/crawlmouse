@@ -1,6 +1,6 @@
-# The crawl worker in production. No addresses and no secrets here: the two secrets
-# (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set with `flyctl secrets set`;
-# see docs/ops/worker-runbook.md.
+# The crawl worker in production. No secrets here, and one address, the app's signal route
+# (APP_SIGNAL_URL below): the two secrets (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set
+# with `flyctl secrets set`; see docs/ops/worker-runbook.md.
 app = "crawlmouse-worker"
 primary_region = "iad"
 kill_signal = "SIGTERM"
@@ -24,6 +24,10 @@ kill_timeout = "5s"
   # and the result store full, and holds the peak resident memory to a fixed bound per level well
   # under the VM below (see PEAK_RSS_MIB there).
   NODE_OPTIONS = "--max-old-space-size=512 --max-semi-space-size=4"
+  # The app's route for "this batch has ended" (src/signal.ts), so a check reads a batch when it ends
+  # rather than at its next poll: an address, not a secret. A Fly secret of the same name would take
+  # its place. The apex, not www: the worker refuses a redirect, and www answers 308 (F-332).
+  APP_SIGNAL_URL = "https://crawlmouse.com/api/webhooks/worker"
 
 [http_service]
   internal_port = 8080

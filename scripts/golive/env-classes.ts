@@ -127,7 +127,8 @@ export const WORKER_FLY_ENV: Why = {
   WORKER_SIGNING_SECRET: 'Fly secret, the pair of the app variable of the same name',
   WORKER_JWT_PUBLIC_KEY:
     "Fly secret, the public half of the app's WORKER_JWT_PRIVATE_KEY_PKCS8_B64",
-  APP_SIGNAL_URL: "Fly secret, the app's route for a batch's end (PR 5a); unset means polling",
+  APP_SIGNAL_URL:
+    "fly.toml [env], the production app's route for a batch's end (PR 5a, F-332); the staging worker's Fly secret of the same name takes its place",
   APP_SIGNAL_PROTECTION_BYPASS:
     'Fly secret on the staging worker only, to reach a protected staging app; ignored on production',
   BATCH_CONCURRENCY: 'fly.toml [env]',
