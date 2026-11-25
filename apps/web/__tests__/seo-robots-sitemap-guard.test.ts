@@ -41,6 +41,8 @@ const SITEMAP_EXCLUDE = [
   // CC-29: the Agency trial form (noindex), and every v2 rewrite target, which has no address of its
   // own (lib/v2/rewrites.ts): /v2-home, /dashboard/v2, /v2-pricing, /v2-developers, /v2-report.
   '/agency-trial',
+  // Goal 1 row 25: share links and the pages they open, on crawlmouse.com and on an agency's host.
+  '/s/',
   ...V2_REWRITES.map((r) => r.to.split('/:')[0]!),
 ];
 
@@ -134,6 +136,18 @@ describe('sitemap.ts', () => {
         urls.some((u) => u.includes(bad)),
         `sitemap must NOT include ${bad}`,
       ).toBe(false);
+    }
+  });
+
+  it('lists crawlmouse.com addresses only: no agency’s portal host is in our sitemap (row 25 e)', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    try {
+      for (const u of [...urls, ...(await sitemap()).map((e) => e.url)]) {
+        expect(new URL(u).host, u).toBe('crawlmouse.com');
+      }
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 
