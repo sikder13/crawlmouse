@@ -139,3 +139,37 @@ describe('the chart’s box grows with its drawing (PR 2 re-review, item 2)', ()
     expect(b.height - PAD_TOP).toBe(b.viewBox);
   });
 });
+
+describe('a phone keeps every text of the chart (owner ruling 2026-11-08; CI layout.spec.ts:605)', () => {
+  /** The `.fit` rules inside the phone query. */
+  const phone = css.slice(css.indexOf('@media (max-width: 760px)'));
+  const fitRules = [...phone.matchAll(/(\.fit[^{]*)\{([^}]*)\}/g)].map((m): [string, string] => [
+    m[1]!.trim(),
+    m[2]!,
+  ]);
+
+  it('takes no text out of the page: no `.fit` rule sets display none or visibility hidden', () => {
+    expect(fitRules.length).toBeGreaterThan(0);
+    for (const [selector, body] of fitRules) {
+      if (selector.includes('phoneNotes')) continue; // the list it shows, not hides
+      expect(body, selector).not.toMatch(/display:\s*none|visibility:\s*hidden/);
+    }
+  });
+
+  it('draws all four tick labels, and the note and marker words both in the drawing and in the list', () => {
+    const d = new JSDOM(renderToStaticMarkup(<DashboardScreen data={sameDay()} />)).window.document;
+    const svg = d.querySelector('svg[data-v2-chart]')!;
+    const ticks = [...svg.querySelectorAll('g')][1]!;
+    expect(
+      [...ticks.querySelectorAll('text')].map((t) => [t.textContent, t.getAttribute('class')]),
+    ).toEqual([
+      ['100', null],
+      ['75', null],
+      ['50', null],
+      ['25', null],
+    ]);
+    const list = d.querySelector('ul[aria-hidden="true"]')!;
+    const inDrawing = [...svg.querySelectorAll('text')].map((t) => t.textContent);
+    for (const li of list.querySelectorAll('li')) expect(inDrawing).toContain(li.textContent);
+  });
+});

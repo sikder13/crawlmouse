@@ -35,8 +35,9 @@ export interface GradeHistoryProps {
    */
   marker?: { series: 0 | 1; index: number; text: string; verdicts?: readonly string[] } | null;
   /**
-   * On a phone the chart fits its card instead of scrolling: its lettering drawn larger, the 75 and
-   * 25 ticks left out, and the note and the marker's words written under it rather than on the lines.
+   * On a phone the chart fits its card instead of scrolling: its axis lettering drawn larger, and
+   * the note and the marker's words shown in a list under it; their copies on the lines are made
+   * transparent there, never removed (owner ruling 2026-11-08).
    */
   fitOnPhone?: boolean;
 }
@@ -126,12 +127,7 @@ export function GradeHistory({
           </g>
           <g className={styles.ticks}>
             {TICKS.map((t) => (
-              <text
-                key={t}
-                x={t === 100 ? 8 : 14}
-                y={y(t) + 4}
-                className={t === 75 || t === 25 ? styles.minorTick : undefined}
-              >
+              <text key={t} x={t === 100 ? 8 : 14} y={y(t) + 4}>
                 {t}
               </text>
             ))}

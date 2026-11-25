@@ -78,9 +78,11 @@
    8.5px. A check's time sits on a second line under its day, so the widest line is "24 Nov" (6
    characters, about 56 units at 0.62 em); between six checks there are 118 units, and the end
    labels are anchored inward; the time line sits 18 units under the day, 1.2 times the lettering.
-   GradeHistory.axis.test.tsx measures both. The 75 and 25 tick labels are left out, so "100" and "50" stand alone (their grid lines
-   stay); the note and the marker's words, which would sit on the lines at that size, are written
-   under the chart. */
+   GradeHistory.axis.test.tsx measures both. Every tick label stays: "100", the widest, spans 28
+   units from x 8, inside the 40 before the plot. The note and the marker's words, which would sit
+   on the lines at that size, are written in the list under the chart, where a phone shows them;
+   their copies in the drawing (aria-hidden, like all of it) are made transparent there, not taken
+   out of the page (owner ruling 2026-11-08: a phone keeps every text; layout.spec.ts). */
 @media (max-width: 760px) {
   .fit .chart {
     min-width: 0;
@@ -91,9 +93,8 @@
     font-size: 15px;
   }
 
-  .fit .ticks .minorTick,
   .fit .chart .note {
-    display: none;
+    opacity: 0;
   }
 
   .fit .phoneNotes {
