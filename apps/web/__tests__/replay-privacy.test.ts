@@ -22,7 +22,8 @@ const source = stripComments(readFileSync(FILE, 'utf8'));
 describe('instrumentation-client replay privacy', () => {
   it('keeps Sentry replay error-only (no session sampling)', () => {
     expect(source).toContain('replaysSessionSampleRate: 0,');
-    expect(source).toContain('replaysOnErrorSampleRate: 1.0,');
+    // On our hosts every error is replayed; on an agency's own host (row 25), none.
+    expect(source).toContain('replaysOnErrorSampleRate: onPortalHost ? 0 : 1.0,');
   });
 
   it('keeps PostHog recording off-by-default with input masking', () => {
