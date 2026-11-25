@@ -27,6 +27,7 @@ import {
   SITE_ORIGIN,
   type MailChange,
 } from './alert';
+import { listedChanges } from '../../view/listed-changes';
 
 /** The rows one site lists before it says how many more there are. */
 export const SUMMARY_SITE_ROWS = 10;
@@ -96,7 +97,10 @@ const siteOrder = (a: SummarySite, b: SummarySite) =>
   a.host.localeCompare(b.host);
 
 export const weeklySummaryTemplate: Template<WeeklySummaryInput> = (input): RenderedMail => {
-  const sites = input.sites.filter((s) => s.changes.length > 0);
+  // The changes a reader is shown and counted (F-302), whoever built the input.
+  const sites = input.sites
+    .map((s) => ({ ...s, changes: listedChanges(s.changes) }))
+    .filter((s) => s.changes.length > 0);
   if (sites.length === 0) throw new RangeError('a weekly summary with no change');
   const ordered = [...sites].sort(siteOrder);
   const total = sites.reduce((n, s) => n + s.changes.length, 0);

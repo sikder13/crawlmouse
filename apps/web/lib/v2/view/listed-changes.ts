@@ -6,13 +6,16 @@
  */
 import type { Change } from '@crawlmouse/types/v2';
 
+/** The fields the rule reads, so a mail's change row is read by it too. */
+type Listed = Pick<Change, 'subject' | 'kind' | 'grade_deltas'>;
+
 /** A grade row in which no letter moved. */
-export const lettersUnmoved = (c: Change): boolean =>
+export const lettersUnmoved = (c: Listed): boolean =>
   c.subject === 'grade' &&
   c.kind === 'changed' &&
   c.grade_deltas.length > 0 &&
   c.grade_deltas.every((g) => g.from_grade === g.to_grade);
 
 /** The rows of `changes` a reader is shown and counted. */
-export const listedChanges = <C extends Change>(changes: readonly C[]): C[] =>
+export const listedChanges = <C extends Listed>(changes: readonly C[]): C[] =>
   changes.filter((c) => !lettersUnmoved(c));

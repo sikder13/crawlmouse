@@ -210,6 +210,33 @@ describe('sendSummary (D6)', () => {
     expect(h.sent.map((m) => m.to)).not.toContain('three@agency.example');
   });
 
+  // F-302: a grade row in which no letter moved is not a change, here as on /changes.
+  const held: SummaryChange = {
+    ...change,
+    kind: 'changed',
+    subject: 'grade',
+    severity: null,
+    summary: 'Technical SEO A → A (90 → 91)',
+    where: 'all pages',
+    grade_deltas: [
+      { grade: 'technical_seo', from_score: 90, to_score: 91, from_grade: 'A', to_grade: 'A' },
+    ],
+  };
+
+  it('is not sent for a week whose only change is a letter-held grade row', async () => {
+    const h = harness({ sites: [{ siteId: SITE, host: 'shop.example', changes: [held] }] });
+    expect(await sendSummary(h.deps, DUE)).toEqual({ skip: 'empty' });
+    expect(h.sent).toEqual([]);
+  });
+
+  it('beside a real change, counts and lists only that one', async () => {
+    const h = harness({ sites: [{ siteId: SITE, host: 'shop.example', changes: [change, held] }] });
+    await sendSummary(h.deps, DUE);
+    const mail = h.sent[0]!;
+    expect(mail.subject).toBe('Your week on Crawlmouse: 1 change on 1 site, 1 problem');
+    expect(mail.text).not.toContain('A → A');
+  });
+
   it('is never sent empty', async () => {
     for (const sites of [[], [{ siteId: SITE, host: 'shop.example', changes: [] }]]) {
       const h = harness({ sites });

@@ -114,6 +114,23 @@ describe('the weekly summary (D6)', () => {
     ]);
   });
 
+  it('counts no letter-held grade row as a change, and renders none of only those (F-302)', () => {
+    const held = change({
+      subject: 'grade',
+      summary: 'Technical SEO A → A (90 → 91)',
+      where: 'all pages',
+      grade_deltas: seo(['A', 90], ['A', 91]),
+    });
+    expect(() =>
+      weeklySummaryTemplate(input([{ siteId: A, host: 'a.example', changes: [held] }])),
+    ).toThrow(RangeError);
+    const m = weeklySummaryTemplate(
+      input([{ siteId: A, host: 'a.example', changes: [change(), held] }]),
+    );
+    expect(m.subject).toBe('Your week on Crawlmouse: 1 change on 1 site');
+    expect(m.text).not.toContain('A → A');
+  });
+
   it('is never rendered empty', () => {
     expect(() => weeklySummaryTemplate(input([]))).toThrow(RangeError);
     expect(() =>
