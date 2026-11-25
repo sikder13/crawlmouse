@@ -21,10 +21,12 @@ import {
   PLAN_NAMES,
   primarySite,
   primarySites,
+  readerRole,
   readerSeat,
   resultChecks,
   type AccountView,
 } from './account';
+import { roleMay } from '../agency/guard';
 import type { SeatRole } from '../account/profile';
 import {
   ACCOUNT_NAV,
@@ -346,7 +348,12 @@ const SAME_PLACE: Partial<Record<RailLabel, RailLabel>> = { Sites: 'Clients', Cl
 function rail(v: AccountView, current: RailLabel | null): NavItemView[] {
   const fresh = newChanges(v).length;
   const agency = v.tier === 'agency';
-  const links: readonly { label: RailLabel; href: string }[] = agency ? AGENCY_NAV : ACCOUNT_NAV;
+  // Integrations answers a role that may not edit the account's alerts with a 404 (its page's gate),
+  // so that role's rail does not link it (QA's F5). A preview reads as the owner.
+  const integrations = roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts');
+  const links: readonly { label: RailLabel; href: string }[] = (
+    agency ? AGENCY_NAV : ACCOUNT_NAV
+  ).filter((n) => n.label !== 'Integrations' || integrations);
   const marked = links.some((n) => n.label === current) ? current : current && SAME_PLACE[current];
   return links.map((n) => ({
     ...n,
