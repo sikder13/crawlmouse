@@ -29,7 +29,7 @@ export function csvCell(value: Value): string {
 const record = (values: readonly Value[]): string => `${values.map(csvCell).join(',')}\r\n`;
 
 /** The pages file's columns, in order. Each is the contract's field of that name, or as noted. */
-const PAGE_CELLS = {
+export const PAGE_CELLS = {
   url: (p) => p.url,
   final_url: (p) => p.final_url,
   status_code: (p) => p.status_code,

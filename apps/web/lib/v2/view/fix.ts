@@ -35,6 +35,7 @@ import {
   NO_HREFS,
   SEGMENT_KEYS,
   SEGMENTS,
+  segmentTab,
   type SegmentHrefs,
   type SegmentKey,
   type SegmentLink,
@@ -72,7 +73,7 @@ export interface FixFrame {
   position: string;
   keptUntil: string | null;
   keepHref: string;
-  tabs: (SegmentLink & { current: boolean })[];
+  tabs: (SegmentLink & { current: boolean; added?: boolean })[];
   back: SegmentLink;
   /** The next live fix in order, with its effect; null on a resolved fix. */
   next: SegmentLink | null;
@@ -565,11 +566,7 @@ export function fixView(
     keepHref,
     tabs: [
       { label: 'Overview', href: hrefs.overview, current: false },
-      ...SEGMENT_KEYS.map((k) => ({
-        label: SEGMENTS[k].tab,
-        href: hrefs.segment(k),
-        current: k === segment,
-      })),
+      ...SEGMENT_KEYS.map((k) => segmentTab(k, hrefs.segment(k), k === segment)),
     ],
     back: { label: `Back: ${SEGMENTS[segment].backName}`, href: hrefs.segment(segment) },
     next:

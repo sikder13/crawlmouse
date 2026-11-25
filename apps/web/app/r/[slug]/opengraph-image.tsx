@@ -4,14 +4,17 @@ import { BRAND } from '@/lib/brand';
 import { siteHost } from '@/lib/site-url';
 import { buildOgReportModel } from '@/lib/og-report-model';
 import { reportCardOf, type PublicReportCard } from '@/lib/v2/view/public-report';
+import { OG_CARD_HEADERS } from '@/lib/og-card-cache';
 
 export const runtime = 'nodejs';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 export const alt = 'Crawlmouse audit report';
-// The card for a given report never changes; cache the render so a viral tweet
-// doesn't re-run satori for every unfurl.
-export const revalidate = 3600;
+// Rendered per request and held by the CDN for OG_CARD_EDGE_SECONDS only (F-241). A route cache
+// here, with ImageResponse's default `immutable, max-age=31536000`, kept a taken-down report's card
+// at the edge after `purgePublicReport` had run. The CDN copy still spares satori a render per
+// unfurl, and a takedown ends it within that window; see lib/og-card-cache.ts.
+export const dynamic = 'force-dynamic';
 
 // In Next 15 the params of a metadata image route is a Promise and MUST be awaited
 // — reading `params.slug` synchronously yields undefined, which silently fell back
@@ -23,19 +26,23 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   // CC-29 D6: a live v2 report, with V2_CHECKS_PUBLIC on, draws the v2 card from its snapshot.
   // Every other row is drawn below as before.
   const card = reportCardOf(report);
-  if (card) return new ImageResponse(<V2Card card={card} />, size);
+  if (card) return new ImageResponse(<V2Card card={card} />, { ...size, headers: OG_CARD_HEADERS });
 
   // Every decision about WHAT this card may show lives in buildOgReportModel, which is pure and
   // unit-tested (lib/og-report-model.test.ts) — the card is a PNG, so that model is the only place the
   // payload can actually be asserted on.
   //
   // A GONE report — missing, taken down, HIDDEN (§9) — or one with no verdict at all unfurls the bare
-  // placeholder, NOT its grade+domain. purgePublicReport purges this OG segment on hide/takedown, so
-  // the card flips to the placeholder immediately (deploy-order-safe: hidden_at is undefined on a
-  // pre-migration read → not gone). Mirrors the page's gate exactly.
+  // placeholder, NOT its grade+domain. purgePublicReport purges the by-slug read on hide/takedown, so
+  // the next render draws the placeholder; a CDN copy already held lasts at most
+  // OG_CARD_EDGE_SECONDS (deploy-order-safe: hidden_at is undefined on a pre-migration read → not
+  // gone). Mirrors the page's gate exactly.
   const model = buildOgReportModel(report);
   if (model.kind === 'placeholder') {
-    return new ImageResponse(<div style={{ fontSize: 48 }}>Crawlmouse</div>, size);
+    return new ImageResponse(<div style={{ fontSize: 48 }}>Crawlmouse</div>, {
+      ...size,
+      headers: OG_CARD_HEADERS,
+    });
   }
 
   const { grade, score, passing, brand } = model;
@@ -92,7 +99,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       </div>
       <div style={{ marginTop: 'auto', color: BRAND.inkMuted, fontSize: 24 }}>{siteHost()}</div>
     </div>,
-    size,
+    { ...size, headers: OG_CARD_HEADERS },
   );
 }
 
