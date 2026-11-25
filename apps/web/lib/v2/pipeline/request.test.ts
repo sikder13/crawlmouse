@@ -4,6 +4,7 @@ import { IdSchema, type Check } from '@crawlmouse/types/v2';
 import { bucketedKey, checkIdOfKey } from './ids';
 import { DEFAULT_PAGE_CAP } from './limits';
 import { requestCheck, type RequestDeps } from './request';
+import type { EntitlementClock } from '../../entitlement-v2';
 import type { QueuedCheck, RequestSite } from './store';
 
 const SITE: RequestSite = {
@@ -16,8 +17,18 @@ const SITE: RequestSite = {
 const NOON = Date.UTC(2026, 10, 8, 12, 0, 0);
 
 /** A store whose insert does nothing on an existing id, as `on conflict (id) do nothing` does. */
-function harness(site: RequestSite = SITE) {
+const FREE: EntitlementClock = {
+  state: 'free',
+  tier: 'free',
+  pastDueTier: null,
+  pastDueSince: null,
+  trialVariant: null,
+  trialEndsAt: null,
+};
+
+function harness(site: RequestSite = SITE, account: EntitlementClock = FREE) {
   const rows = new Map<string, QueuedCheck>();
+  const clocks: string[] = [];
   const sent: Parameters<RequestDeps['send']>[0][] = [];
   let clock = NOON;
   let ids = 0;
@@ -27,6 +38,7 @@ function harness(site: RequestSite = SITE) {
         expect(id).toBe(site.id);
         return site;
       },
+      accountClock: async (id) => (clocks.push(id), account),
       insertQueued: async (row) => {
         if (rows.has(row.id)) return false;
         rows.set(row.id, row);
@@ -39,7 +51,7 @@ function harness(site: RequestSite = SITE) {
     now: () => clock,
     newId: () => `44444444-4444-4444-8444-${String(++ids).padStart(12, '0')}`,
   };
-  return { deps, rows, sent, at: (ms: number) => (clock = ms) };
+  return { deps, rows, sent, clocks, at: (ms: number) => (clock = ms) };
 }
 
 describe('requestCheck (D13)', () => {
@@ -81,6 +93,32 @@ describe('requestCheck (D13)', () => {
       /no next_check_at/,
     );
     expect(h.sent).toEqual([]);
+  });
+
+  it("sends a Pro site's check its plan's page cap, and a Free or unkept site's the default (row 16)", async () => {
+    const pro: EntitlementClock = { ...FREE, state: 'pro', tier: 'pro' };
+    const capOf = async (site: RequestSite, account: EntitlementClock) => {
+      const h = harness(site, account);
+      await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
+      return { cap: h.sent[0]!.data.pageCap, read: h.clocks };
+    };
+    expect(await capOf(SITE, pro)).toEqual({ cap: 2000, read: [SITE.account_id] });
+    expect(await capOf(SITE, FREE)).toEqual({ cap: DEFAULT_PAGE_CAP, read: [SITE.account_id] });
+    expect(await capOf({ ...SITE, account_id: null, next_check_at: null }, pro)).toEqual({
+      cap: DEFAULT_PAGE_CAP,
+      read: [],
+    });
+  });
+
+  it('reads the plan before it inserts, so a read that fails leaves no queued check', async () => {
+    const h = harness();
+    h.deps.store.accountClock = async () => {
+      throw new Error('accounts unavailable');
+    };
+    await expect(requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' })).rejects.toThrow(
+      'accounts unavailable',
+    );
+    expect([h.rows.size, h.sent.length]).toEqual([0, 0]);
   });
 
   it('keys a sentinel request on its UTC day, apart from the scheduled check (row 23)', async () => {

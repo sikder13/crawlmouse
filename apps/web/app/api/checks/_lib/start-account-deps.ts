@@ -8,6 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { admitSiteHost } from '../../../../lib/auth/admit-site';
 import { scheduleFor } from '../../../../lib/auth/schedule';
 import { supabaseAdmin } from '../../../../lib/supabase/admin';
+import { accountPageCap } from '../../../../lib/v2/pipeline/page-cap';
 import { verifyTurnstileToken } from '../../../../lib/turnstile';
 import {
   supabaseAddSite,
@@ -28,7 +29,7 @@ export function accountStartDeps(session: SupabaseClient): AccountStartDeps {
     schedule: scheduleFor,
     addSite: supabaseAddSite(admin),
     recheck: supabaseRequestRecheck(admin),
-    resendQueued: supabaseResendQueued(),
+    resendQueued: supabaseResendQueued((accountId) => accountPageCap(admin, accountId)),
     now: () => new Date(),
   };
 }
