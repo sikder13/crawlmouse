@@ -453,6 +453,11 @@ describe('hostile pages cannot spend the worker', () => {
     expect(result.pages.at(-1)!.limitations.join(' ')).toContain(
       'were not recorded: the batch had used its 8 MiB',
     );
+    // B's question 025: the record holds none of that page's links, so it does not say all were read.
+    expect(result.pages.at(-1)!.links_read).toBe(false);
+    expect(result.pages.at(-1)!.links_out).toBe(1000);
+    // The first page fitted its room: its links are all in the record.
+    expect(result.pages[0]!.links_read).toBe(true);
     expect(JSON.stringify(result).length).toBeLessThan(10 * 1024 * 1024);
     // Five 2 MB pages: heavy, so given more than the default time when the suite runs in parallel.
   }, 20_000);
@@ -504,6 +509,20 @@ describe('crawl batch output', () => {
     expect(result.pages[0]!.limitations).toContain(
       '3 more same-host links were found on this page and not recorded; 1000 are kept per page.',
     );
+    // B's question 025: 3 of its links are not in the record, so it does not say all were read.
+    expect(result.pages[0]!.links_read).toBe(false);
+  });
+
+  it('says every link was read for a page of exactly MAX_EDGES_PER_PAGE links, all recorded', async () => {
+    const links = Array.from({ length: 1000 }, (_, i) => `<a href="/l${i}">l${i}</a>`).join('');
+    const s = await serve({
+      page: (_p, _u, res) =>
+        void (res.setHeader('content-type', 'text/html'), res.end(`<body>${links}</body>`)),
+    });
+    const { result } = await run(crawlReq(s.base, ['/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.link_edges).toHaveLength(1000);
+    expect(result.pages[0]).toMatchObject({ links_out: 1000, links_read: true });
   });
 
   it('records an off-site redirect without requesting the target', async () => {

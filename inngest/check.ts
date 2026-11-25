@@ -24,6 +24,7 @@ import {
   CheckFailure,
   checkFailedEventId,
   checkFinishedEventId,
+  checkRetryEventId,
   failureReasonOf,
   type CheckFailed,
   type CheckBatchEnded,
@@ -228,6 +229,12 @@ export interface CheckSteps {
   finalize(event: CheckRequested): Promise<Empty>;
   /** Marks the check failed unless it has ended; `failed` says whether it is failed with `reason`. */
   fail(event: CheckRequested, reason: FailureReason): Promise<FailOutput>;
+  /**
+   * F-260: the check back to queued, from running under `runId`, with its stored batch results and
+   * batch rows deleted; true when it is queued with no run after the call (a retried step finds it
+   * so), false when the check is another run's or has ended, and then nothing is changed.
+   */
+  requeue(event: CheckRequested, runId: string): Promise<{ requeued: boolean }>;
 }
 
 /** The part of Inngest's `step` the orchestration uses. */
@@ -244,7 +251,8 @@ export interface CheckStepTools {
     id: string,
     payload:
       | { id: string; name: 'check.finished'; data: CheckFinished }
-      | { id: string; name: 'check.failed'; data: CheckFailed },
+      | { id: string; name: 'check.failed'; data: CheckFailed }
+      | { id: string; name: 'check.requested'; data: CheckRequested },
   ): Promise<unknown>;
 }
 
@@ -252,7 +260,9 @@ export type CheckRunResult =
   | { status: 'finished' | 'partial' }
   | { status: 'failed'; reason: FailureReason }
   /** The claim found the check gone: cancelled, already ended, or another run's. */
-  | { status: 'gone' };
+  | { status: 'gone' }
+  /** F-260: a worker deploy met this run; the check is queued again and its retry run requested. */
+  | { status: 'retried' };
 
 /** Throws, naming the step, when its output is not under STEP_OUTPUT_BYTES as JSON. */
 export function sized<T>(id: string, output: T): T {
@@ -452,8 +462,26 @@ export async function runCheck(
     return true;
   };
 
+  /**
+   * F-260: a batch from another worker release than the first means a deploy met this run. The first
+   * run of a check is retried once, from the start: the check is queued again and the retry run
+   * requested, numbered past every batch this run posted. A retry that meets one fails as before.
+   */
+  const redeployed = async (): Promise<CheckRunResult> => {
+    if (event.retry !== undefined) return endFailed('worker_redeployed');
+    const { requeued } = await run('requeue', () => steps.requeue(event, runId));
+    // Another run's check, or one already ended: this run fails nothing (QA's gate on #190, F4).
+    if (!requeued) return { status: 'gone' };
+    await step.sendEvent('retry', {
+      id: checkRetryEventId(event.checkId),
+      name: 'check.requested',
+      data: { ...event, retry: { firstBatch: batch } },
+    });
+    return { status: 'retried' };
+  };
+
   // ── crawl ──
-  let batch = 1;
+  let batch = event.retry?.firstBatch ?? 1;
   let crawlRead = 0;
   for (let n = 1; n <= PACE.maxCrawlBatches; n++) {
     const end = await runBatch(`crawl-${n}`, { kind: 'crawl', batch, stage: null });
@@ -462,7 +490,7 @@ export async function runCheck(
     batch += 1;
     if (end.end === 'paused') return endFailed('paused');
     if (end.end === 'failed') break;
-    if (!take(end.out)) return endFailed('worker_redeployed');
+    if (!take(end.out)) return redeployed();
     crawlRead += 1;
   }
   if (crawlRead === 0) return endFailed('worker_unavailable');
@@ -475,7 +503,7 @@ export async function runCheck(
     batch += 1;
     if (end.end === 'paused') return endFailed('paused');
     if (end.end === 'failed') break;
-    if (!take(end.out)) return endFailed('worker_redeployed');
+    if (!take(end.out)) return redeployed();
   }
 
   // ── render, build, persist, finalize, emit ──
@@ -544,7 +572,6 @@ export function createCheckFn(
     {
       id: CHECK_FN_ID,
       concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: checkConcurrencyLimit(env) }],
-      idempotency: 'event.data.checkId',
       timeouts: { finish: `${PACE.finishS}s` },
       retries: 2,
       cancelOn: [{ event: 'check.cancel.requested', match: 'data.checkId' }],

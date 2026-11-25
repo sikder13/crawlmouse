@@ -171,6 +171,7 @@ J = {
  ('J2.4f','Every export (PDF, CSV, JSON, link-map CSV); open each file','Each file is made and opens','desktop','yes'),
  ('J2.4g','Staging audits','The staging URL is audited','desktop','yes'),
  ('J2.4h','Every page measured for Without JavaScript','Pages carry a measured figure','desktop','yes'),
+ ('J2.4i','Daily watch: a crawler newly blocked','One full check and one alert the same day','desktop','yes'),
  ('J2.5','Second check on one site; read Changes and any alert it should cause','Changes is right; a due alert is sent','desktop','yes'),
  ('J2.6','Reports: create, schedule, send; judge the report and its email','Each works or is clearly not on this plan','desktop','yes'),
  ('J2.7','Open the plan and billing screens with billing off','They say exactly what applies with billing off','desktop','no'),

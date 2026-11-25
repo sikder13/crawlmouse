@@ -7,6 +7,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 // the viewer is CC-26b's readViewer over the two.
 
 const h = vi.hoisted(() => ({
+  posted: [] as { url: string; text: string }[],
+  slackAnswer: { ok: true } as { ok: true } | { ok: false; code: string; retryable: boolean },
+  limited: false,
+  limitKeys: [] as string[],
+  limitArgs: [] as unknown[],
   db: null as unknown as PGlite,
   user: null as { id: string; email: string } | null,
   log: [] as string[],
@@ -45,6 +50,20 @@ vi.mock('@/lib/supabase/admin', async () => {
     },
   };
 });
+vi.mock('@/lib/v2/monitor/slack', async (original) => ({
+  ...(await original<typeof import('@/lib/v2/monitor/slack')>()),
+  slackPoster: () => async (url: string, text: string) => {
+    h.posted.push({ url, text });
+    return h.slackAnswer;
+  },
+}));
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async (key: string, limit: number, windowMs: number, opts: unknown) => {
+    h.limitKeys.push(key);
+    h.limitArgs.push([limit, windowMs, opts]);
+    return { allowed: !h.limited, remaining: 0, resetAt: new Date(Date.now() + 60_000) };
+  },
+}));
 vi.mock('@/lib/v2/account/viewer', async () => {
   const { postgrestOver } = await import('@/__tests__/helpers/postgrest-pglite');
   const { readViewer } = await import('@/lib/v2/account/viewer-read');
@@ -79,6 +98,11 @@ beforeAll(async () => {
 afterAll(async () => h.db.close());
 
 beforeEach(() => {
+  h.posted.length = 0;
+  h.slackAnswer = { ok: true };
+  h.limited = false;
+  h.limitKeys.length = 0;
+  h.limitArgs.length = 0;
   h.log.length = 0;
   h.user = null;
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
@@ -117,6 +141,17 @@ const form = (body: string) =>
   new Request(`${ORIGIN}/api/alert-rules`, {
     method: 'POST',
     headers: { origin: ORIGIN, 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+
+const formFrom = (body: string, referer: string) =>
+  new Request(`${ORIGIN}/api/alert-rules`, {
+    method: 'POST',
+    headers: {
+      origin: ORIGIN,
+      'content-type': 'application/x-www-form-urlencoded',
+      referer,
+    },
     body,
   });
 
@@ -187,13 +222,131 @@ describe('PUT /api/alert-rules', () => {
     expect(await secretsOf(m.accountId)).toEqual([URL_A]);
   });
 
+  describe('a test message', () => {
+    const PAGE = `${ORIGIN}/settings/integrations`;
+
+    it('posts one fixed message to the stored webhook, and goes back saying so', async () => {
+      const m = await member('test-ok', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?tested=1');
+      expect(h.posted).toEqual([{ url: URL_A, text: expect.stringContaining('test message') }]);
+      // Nothing of the account or its sites is in it.
+      expect(h.posted[0]!.text).not.toContain(m.user.email);
+      expect(h.limitKeys).toEqual([`slack-test:account:${m.accountId}`]);
+      // Ten a day per account, and closed if the limiter cannot be read.
+      expect(h.limitArgs).toEqual([[10, 24 * 60 * 60 * 1000, { failClosed: true }]]);
+    });
+
+    it('with nothing connected: refused, nothing posted', async () => {
+      const m = await member('test-none', 'pro');
+      h.user = m.user;
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=slack_not_connected');
+      expect(h.posted).toEqual([]);
+    });
+
+    it('a webhook Slack refuses: says so, and the URL stays stored', async () => {
+      const m = await member('test-refused', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      h.slackAnswer = { ok: false, code: 'slack_404', retryable: false };
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=slack_failed');
+      expect(await secretsOf(m.accountId)).toEqual([URL_A]);
+    });
+
+    it('Slack not reached at all: says so, rather than blame the webhook', async () => {
+      const m = await member('test-unreached', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      for (const code of ['slack_dns', 'network']) {
+        h.slackAnswer = { ok: false, code, retryable: true };
+        const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+        expect(res.headers.get('location'), code).toBe(
+          '/settings/integrations?error=slack_unreachable',
+        );
+      }
+    });
+
+    it('over the limit: refused before anything is posted', async () => {
+      const m = await member('test-limit', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      h.limited = true;
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=rate_limited');
+      expect(h.posted).toEqual([]);
+    });
+
+    it('on Free: refused with upgrade_required, nothing read or posted', async () => {
+      const m = await member('test-free', 'free');
+      h.user = m.user;
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=upgrade_required');
+      expect(h.posted).toEqual([]);
+      expect(h.limitKeys).toEqual([]);
+    });
+
+    it('cannot ride along with another change', async () => {
+      const m = await member('test-mixed', 'pro');
+      h.user = m.user;
+      const res = await PUT(put({ testSlack: true, clearSlack: true }));
+      expect(res.status).toBe(400);
+      expect(h.posted).toEqual([]);
+    });
+  });
+
+  describe('which alerts go to Slack', () => {
+    const channelsOf = async (accountId: string) =>
+      (
+        await h.db.query<{ channels: string[] }>(
+          `select channels from public.alert_rules where account_id = $1 order by kind`,
+          [accountId],
+        )
+      ).rows.map((r) => r.channels);
+
+    it('connecting adds Slack to each of the account’s rules, beside email', async () => {
+      const m = await member('rules-on', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      expect(await channelsOf(m.accountId)).toEqual([['email', 'slack']]);
+    });
+
+    it('replacing the URL adds nothing twice', async () => {
+      const m = await member('rules-again', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      await PUT(put({ slackWebhookUrl: URL_A.replace('abcd', 'efgh') }));
+      expect(await channelsOf(m.accountId)).toEqual([['email', 'slack']]);
+    });
+
+    it('disconnecting takes Slack off them and leaves email', async () => {
+      const m = await member('rules-off', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      expect(await channelsOf(m.accountId)).toEqual([['email', 'slack']]);
+      await PUT(put({ clearSlack: true }));
+      expect(await channelsOf(m.accountId)).toEqual([['email']]);
+    });
+
+    it('touches no other account’s rules', async () => {
+      const m = await member('rules-mine', 'pro');
+      const other = await member('rules-theirs', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      expect(await channelsOf(other.accountId)).toEqual([['email']]);
+    });
+  });
+
   it('stores a Slack URL on a paid account and answers its last four, never the URL', async () => {
     const m = await member('paid', 'pro');
     h.user = m.user;
     const res = await PUT(put({ slackWebhookUrl: URL_A }));
     expect(res.status).toBe(200);
     const text = await res.text();
-    expect(JSON.parse(text)).toEqual({ slack: { set: true, last4: 'WXYZ' } });
+    expect(JSON.parse(text)).toEqual({ slack: { set: true, last4: 'WXYZ' }, tested: false });
     expect(text).not.toContain('hooks.slack.com');
     expect(text).not.toContain(URL_A.split('/').slice(-3).join('/'));
     expect(await secretsOf(m.accountId)).toEqual([URL_A]);
@@ -279,6 +432,57 @@ describe('PUT /api/alert-rules', () => {
     expect(gone.headers.get('location')).toBe('/alerts?error=not_found');
     expect((await PUT(put({ slackWebhookUrl: URL_A }))).status).toBe(402);
     expect(await secretsOf(m.accountId)).toEqual([]);
+  });
+
+  describe('a form posted from Integrations', () => {
+    const PAGE = `${ORIGIN}/settings/integrations`;
+    const connect = `_method=PUT&slackWebhookUrl=${encodeURIComponent(URL_A)}`;
+
+    it('connecting goes back there saying it saved, and stores the URL', async () => {
+      const m = await member('int-set', 'pro');
+      h.user = m.user;
+      const res = await POST(formFrom(connect, PAGE));
+      expect(res.status).toBe(303);
+      expect(res.headers.get('location')).toBe('/settings/integrations?saved=1');
+      expect(await secretsOf(m.accountId)).toEqual([URL_A]);
+    });
+
+    it('the address never goes into the answer', async () => {
+      const m = await member('int-quiet', 'pro');
+      h.user = m.user;
+      const res = await POST(formFrom(connect, PAGE));
+      expect(res.headers.get('location')).not.toContain('hooks.slack.com');
+      expect(await res.text()).not.toContain('hooks.slack.com');
+    });
+
+    it('disconnecting goes back there and removes it', async () => {
+      const m = await member('int-clear', 'pro');
+      h.user = m.user;
+      await POST(formFrom(connect, PAGE));
+      const res = await POST(formFrom('_method=PUT&clearSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?saved=1');
+      expect(await secretsOf(m.accountId)).toEqual([]);
+    });
+
+    it('a refusal goes back there with its code', async () => {
+      const m = await member('int-free', 'free');
+      h.user = m.user;
+      const res = await POST(formFrom(connect, PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=upgrade_required');
+      expect(await secretsOf(m.accountId)).toEqual([]);
+    });
+
+    it.each([
+      ['Alerts', `${ORIGIN}/alerts`],
+      ['another site with the same path', 'https://evil.example/settings/integrations'],
+      ['a page below it', `${PAGE}/more`],
+      ['an address that is not one', 'not a url'],
+    ])('from %s: back to Alerts', async (_name, referer) => {
+      const m = await member('int-other', 'pro');
+      h.user = m.user;
+      const res = await POST(formFrom(connect, referer));
+      expect(res.headers.get('location')).toBe('/alerts');
+    });
   });
 
   it('a POST that does not name PUT is refused: 405 for JSON, back to Alerts for a form', async () => {

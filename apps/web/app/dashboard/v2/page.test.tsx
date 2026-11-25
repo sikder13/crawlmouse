@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   viewerRead: 0,
@@ -19,6 +19,8 @@ const h = vi.hoisted(() => ({
   earlierRead: [] as { userId: string; now: Date }[],
   earlier: [] as unknown[],
   earlierFails: false,
+  slackLast4: null as string | null,
+  slackFails: false,
   reported: [] as unknown[],
 }));
 
@@ -44,6 +46,14 @@ vi.mock('./earlier-audits', () => ({
     if (h.earlierFails) throw new Error('earlier audits: read failed: down');
     return h.earlier;
   },
+}));
+vi.mock('@/lib/v2/account/alert-rules', () => ({
+  supabaseAlertRulePorts: () => ({
+    slackLast4: async () => {
+      if (h.slackFails) throw new Error('account_slack_last4 failed: down');
+      return h.slackLast4;
+    },
+  }),
 }));
 vi.mock('@sentry/nextjs', () => ({
   captureException: (e: unknown) => void h.reported.push(e),
@@ -90,6 +100,8 @@ const MAIN_SHA256 = '3c564084adaf59952d38a962ecd91a3ac87f54c710f482d4b3c084e2df4
 beforeEach(() => {
   h.viewerRead = 0;
   h.earlierFails = false;
+  h.slackLast4 = null;
+  h.slackFails = false;
   h.reported = [];
   h.rewritten = true;
   h.viewer = { kind: 'signed_out' };
@@ -234,6 +246,32 @@ describe('/dashboard/v2', () => {
     type Earlier = { children: ReactElement<{ data: { earlier: unknown } }> };
     const el = (await render()).props as unknown as Earlier;
     expect(el.children.props.data.earlier).toBeNull();
+    expect(h.reported).toHaveLength(1);
+  });
+
+  it('reads whether Slack is set into the set-up list; a failed read is reported and taken as not set', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const bad = fixture('bad-site');
+    h.viewer = viewerOn(BAD, bad.seats[0]!.id);
+    // As a live account reads: no table records a connection.
+    h.dataset = { ...bad, accounts: bad.accounts.map((a) => ({ ...a, integrations: [] })) };
+    // The fixture's trial, which a Pro set-up list needs, is live at its own as_of.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(bad.as_of));
+    onTestFinished(() => void vi.useRealTimers());
+    type Setup = {
+      children: ReactElement<{ data: { setup: { items: { key: string; done: boolean }[] } } }>;
+    };
+    const slackDone = async () =>
+      ((await render()).props as unknown as Setup).children.props.data.setup.items.find(
+        (i) => i.key === 'slack',
+      )!.done;
+    h.slackLast4 = 'WXYZ';
+    expect(await slackDone()).toBe(true);
+    h.slackLast4 = null;
+    expect(await slackDone()).toBe(false);
+    h.slackFails = true;
+    expect(await slackDone()).toBe(false);
     expect(h.reported).toHaveLength(1);
   });
 

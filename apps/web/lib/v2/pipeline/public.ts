@@ -12,6 +12,7 @@ import { stableId, type MapDrawing } from '@crawlmouse/engine/v2/pipeline';
 import type { Check } from '@crawlmouse/types/v2';
 import { isFailureReason, type FailureReason } from '../../../../../inngest/check-events';
 import type { CheckDataset, CheckReader, EvidenceStore } from './types';
+import type { Tier } from '../../entitlement-v2';
 
 /** What a viewer's plan opens of a check's fixes: the Free three, or each of them. */
 export type FixPlan = 'free' | 'pro';
@@ -27,8 +28,11 @@ export interface PublicCheckDeps {
   evidence: Pick<EvidenceStore, 'get'>;
   /** Whether `userId` is a member of `siteId`'s account with that site in scope. */
   isMember(siteId: string, userId: string): Promise<boolean>;
-  /** What the account's tier opens of a check's fixes, at `now`. */
-  planOf(accountId: string): Promise<FixPlan>;
+  /**
+   * The account's effective tier at `now`: it decides what opens of a check's fixes (`free` the Free
+   * three, a paid tier each) and how many competitors its pages compare (F-256).
+   */
+  planOf(accountId: string): Promise<Tier>;
   /** Milliseconds since the epoch. */
   now(): number;
 }
@@ -71,6 +75,8 @@ export type CheckRead =
       kept: boolean;
       /** `free` for a check no account keeps; a kept check's is its account's (`planOf`). */
       plan: FixPlan;
+      /** How many competitors the reader's plan compares: `GATES[tier].competitorsPerSite`, 0 unkept. */
+      competitors: number;
       dataset: CheckDataset;
       /** The drawing stored when the check was built; null when there is none to read. */
       map: MapDrawing | null;

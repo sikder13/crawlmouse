@@ -65,7 +65,7 @@ describe('Reports, a share link just made', () => {
       ...data.made,
       rows: data.made.rows.map((r, i) =>
         i === 0
-          ? { ...r, madeLink: { label: 'The link, shown here for a short while:', url: URL } }
+          ? { ...r, madeLink: { label: 'The link, shown here for two minutes:', url: URL } }
           : r,
       ),
     },

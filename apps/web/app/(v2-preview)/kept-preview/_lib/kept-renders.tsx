@@ -14,15 +14,22 @@ const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
 export const KEPT_RENDERS: Record<string, () => Promise<ReactNode>> = {
   'ai-readiness-checker': async () => <KeptAiReadinessChecker />,
   author: async () =>
-    keptPage(await (await import('@/app/authors/[slug]/page')).default(params('udaay-sikder'))),
-  blog: async () => keptPage((await import('@/app/blog/page')).default()),
-  'blog-research': async () => keptPage((await import('@/app/blog/research/page')).default()),
+    keptPage(
+      await (await import('@/app/authors/[slug]/page')).default(params('udaay-sikder')),
+      [],
+      'v2',
+    ),
+  blog: async () => keptPage((await import('@/app/blog/page')).default(), [], 'v2'),
+  'blog-research': async () =>
+    keptPage((await import('@/app/blog/research/page')).default(), [], 'v2'),
   'blog-post': async () =>
-    keptPage(await (await import('@/app/blog/[slug]/page')).default(params('orphan-pages')), [
-      ArticleLayout,
-    ]),
+    keptPage(
+      await (await import('@/app/blog/[slug]/page')).default(params('orphan-pages')),
+      [ArticleLayout],
+      'v2',
+    ),
   bot: async () => keptPage((await import('@/app/bot/page')).default()),
-  guides: async () => keptPage((await import('@/app/guides/page')).default()),
+  guides: async () => keptPage((await import('@/app/guides/page')).default(), [], 'v2'),
   login: async () => keptPage((await import('@/app/login/page')).default()),
   status: async () => keptPage((await import('@/app/status/page')).default()),
   takedown: async () => legalPage((await import('@/app/takedown/page')).default()),

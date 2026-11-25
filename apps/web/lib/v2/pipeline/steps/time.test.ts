@@ -371,6 +371,7 @@ function simulate(opts: {
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
     fail: async () => ({ failed: true, siteId: 's' }),
+    requeue: async () => ({ requeued: false }),
   };
   const event = {
     ...SITE,

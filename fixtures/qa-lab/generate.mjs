@@ -1162,6 +1162,37 @@ function buildSites() {
     );
     sites.push(site);
   }
+
+  // sentinel — an ordinary small site whose robots.txt changes with the clock (api/sentinel.mjs): it
+  // disallows GPTBot during odd UTC hours and allows it during even ones, for the daily sentinel's
+  // journey step (J2.4i). Its pages are served as they are, at once.
+  {
+    const site = {
+      label: 'sentinel',
+      name: 'Harrowgate Lamps',
+      town: 'Harrowgate',
+      tagline: 'Lamps mended, rewired and made to last.',
+      homeTitle: 'Lamp repair in Harrowgate',
+      homeTopic: 'lamp repair',
+      palette: 'plum',
+      words: ['rewiring', 'brass', 'shade', 'switch', 'bulb holder', 'flex', 'base'],
+      sitemap: true,
+      llms: false,
+      schema: true,
+      robots: 'open',
+      nav: [{ href: '/repairs/', text: 'Repairs' }],
+    };
+    site.pages = hierarchy(
+      site,
+      [
+        { title: 'Repairs', leaves: ['Rewiring', 'New switches', 'Shade making'] },
+        { title: 'Lamps', leaves: ['Table lamps', 'Floor lamps', 'Desk lamps'] },
+        { title: 'Visit', leaves: ['Opening hours', 'Finding us'] },
+      ],
+      {},
+    );
+    sites.push(site);
+  }
   return sites;
 }
 
@@ -1418,8 +1449,9 @@ function vercelJson(sites) {
     routes.push({
       src: '/(.*)',
       has: [{ type: 'host', value: host }],
-      // The slow site is served by its function, which answers late; every other site is static files.
-      dest: s.label === 'slow' ? '/api/slow?path=/$1' : `/sites/${s.label}/$1`,
+      // The slow site is served by its function, which answers late, and the sentinel site by its
+      // own, whose robots.txt changes with the clock; every other site is static files.
+      dest: FUNCTION_SITES.has(s.label) ? `/api/${s.label}?path=/$1` : `/sites/${s.label}/$1`,
     });
   }
   // The large lab: one function renders the same ~2,500 pages on four hosts and answers each host its
@@ -1438,6 +1470,7 @@ function vercelJson(sites) {
       ignoreCommand: IGNORE_COMMAND,
       functions: {
         'api/slow.mjs': { includeFiles: 'sites/slow/**', maxDuration: 10 },
+        'api/sentinel.mjs': { includeFiles: 'sites/sentinel/**', maxDuration: 10 },
         'api/large.mjs': { maxDuration: 10 },
       },
       routes,
@@ -1446,6 +1479,9 @@ function vercelJson(sites) {
     2,
   )}\n`;
 }
+
+/** The sites served by a function of their own under `api/`, rather than as static files. */
+const FUNCTION_SITES = new Set(['slow', 'sentinel']);
 
 /**
  * A user agent that discloses Crawlmouse: the engine's and the worker's, except the worker's browser
@@ -1500,7 +1536,14 @@ function listed(dir) {
 
 const files = await output();
 /** What is here by hand rather than written by this file; anything else unlisted is stale output. */
-const SOURCES = ['generate.mjs', 'README.md', '.vercelignore', 'api/slow.mjs', 'api/large.mjs'];
+const SOURCES = [
+  'generate.mjs',
+  'README.md',
+  '.vercelignore',
+  'api/slow.mjs',
+  'api/sentinel.mjs',
+  'api/large.mjs',
+];
 // `vercel link` writes .vercel/ and .env.local; both are gitignored and never uploaded.
 const generated = listed(ROOT).filter(
   (p) => !SOURCES.includes(p) && !p.startsWith('.vercel/') && p !== '.env.local',

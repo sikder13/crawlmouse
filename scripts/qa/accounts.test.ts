@@ -156,7 +156,7 @@ const taggedUserAgents = (): string[] => [
 ];
 
 describe('QA_HOSTS', () => {
-  it('names the eighteen lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
+  it('names the nineteen lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
     expect(allHosts()).toEqual([
       'nahltech.com',
       'crawlmouse.com',
@@ -174,6 +174,7 @@ describe('QA_HOSTS', () => {
       'demo-2.lab.crawlmouse.com',
       'demo-3.lab.crawlmouse.com',
       'slow.lab.crawlmouse.com',
+      'sentinel.lab.crawlmouse.com',
       'large.lab.crawlmouse.com',
       'large-slow.lab.crawlmouse.com',
       'large-throttle.lab.crawlmouse.com',
@@ -209,11 +210,12 @@ describe('the lab serves every lab host', () => {
       for (const path of PATHS) {
         expect(routeFor(host, path, CONTROL.userAgent), `${host}${path}`).toEqual({
           status: undefined,
-          // The slow site is served by its function, which reads the same folder (api/slow.mjs); the
-          // large four by one function that renders them (api/large.mjs).
+          // The slow and sentinel sites are served by their functions, which read the same folders
+          // (api/slow.mjs, api/sentinel.mjs); the large four by one function that renders them
+          // (api/large.mjs).
           dest:
-            host === QA_HOSTS.slow
-              ? `/api/slow?path=${path}`
+            host === QA_HOSTS.slow || host === QA_HOSTS.sentinel
+              ? `/api/${label(host)}?path=${path}`
               : largeHosts().includes(host)
                 ? `/api/large?path=${path}`
                 : `/sites/${label(host)}${path}`,
