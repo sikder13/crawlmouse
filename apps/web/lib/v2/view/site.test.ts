@@ -35,7 +35,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
   });
 
   it('opens the newest crawler fix as its one orange action', () => {
-    // Fix 0 (Claude-SearchBot, +19 AI) is the highest-ranked of the three new fixes.
+    // Fix 16 (Claude-SearchBot, +19 AI) is the highest-ranked of the three new fixes.
     expect(v.header.actions.filter((a) => a.primary).map((a) => a.label)).toEqual([
       'Open the Claude-SearchBot packet · +19 AI',
     ]);

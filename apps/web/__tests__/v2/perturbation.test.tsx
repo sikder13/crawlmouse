@@ -556,7 +556,7 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
     ],
     'fixes[].first_seen_check_id': [
       {
-        // Fix 0 was first seen at a later check; seen at the first audit, it ranks third.
+        // Fix 16 was first seen at a later check; seen at the first audit, it ranks third.
         change: (_, d) => (fixRanked(d, 3).first_seen_check_id = CHECKS.badFirstAudit),
         expect: {
           Result: ['Remove the Claude-SearchBot block from robots.txt'],

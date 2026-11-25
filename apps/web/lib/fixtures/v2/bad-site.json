@@ -7361,7 +7361,7 @@
       "id": "f0000000-0000-4000-8000-000000000000",
       "site_id": "50000000-0000-4000-8000-000000000001",
       "fingerprint": "0f1e000000000000",
-      "number": 0,
+      "number": 16,
       "type": "robots_txt_blocks_crawler",
       "section": "crawler_access",
       "title": "Remove the Claude-SearchBot block from robots.txt",

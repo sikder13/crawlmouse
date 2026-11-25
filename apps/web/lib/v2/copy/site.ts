@@ -103,7 +103,7 @@ export const SITE_CHANGES: CopyChange[] = [
     rendered:
       "last check today 06:02 · next Fri 6 Nov around 06:00 · 214 pages · 16 fixes: the 13 from the audit plus 3 new at Friday's check",
     source:
-      'The fixture’s check finished 06:02 in the account’s zone, and fixesAsOf it holds 16 fixes: 13 first seen at the first audit, three (0, 14, 15) at Friday’s; "around" is FACTS H4',
+      'The fixture’s check finished 06:02 in the account’s zone, and fixesAsOf it holds 16 fixes: 13 first seen at the first audit, three (14, 15, 16) at Friday’s; "around" is FACTS H4',
   },
   {
     screen: 'site',
@@ -111,7 +111,7 @@ export const SITE_CHANGES: CopyChange[] = [
     locked: 'Open the ClaudeBot packet',
     rendered: 'Open the Claude-SearchBot packet',
     source:
-      'The fixture’s fix 0 removes the Claude-SearchBot block (its crawler_uas); the highest-ranked new fix',
+      'The fixture’s fix 16 removes the Claude-SearchBot block (its crawler_uas); the highest-ranked new fix',
   },
   {
     screen: 'site',
@@ -170,7 +170,7 @@ export const SITE_CHANGES: CopyChange[] = [
     kind: 'fixture',
     locked: 'Remove the ClaudeBot block from robots.txt',
     rendered: 'Remove the Claude-SearchBot block from robots.txt',
-    source: 'The fixture’s fix 0 title',
+    source: 'The fixture’s fix 16 title',
   },
   {
     screen: 'site',
@@ -252,6 +252,10 @@ export const SITE_CHANGES: CopyChange[] = [
  * F-099: the fixes table in the engine's order of impact, on the fixture's rows, last of the changes.
  * At both widths, since the locked page hides a fix's note on a phone.
  */
+/** F-276: the locked fixes table names the new robots.txt fix 0; the engine numbers fixes from 1. */
+const RENUMBER_SOURCE =
+  'V2R register, F-276 (CTO 085): the engine numbers fixes from 1; the fixture’s fix 0 is renumbered 16';
+
 const IMPACT_SOURCE =
   'V2R register, F-099 (CC-45 sweep): rows in impact order, the engine’s rank, as the dashboard and the main button read them; the folded row names the numbers it holds';
 
@@ -259,10 +263,17 @@ SITE_CHANGES.push(
   {
     screen: 'site',
     kind: 'ruling',
+    locked: '0 Remove the Claude-SearchBot block from robots.txt new Fri',
+    rendered: '16 Remove the Claude-SearchBot block from robots.txt new Fri',
+    source: RENUMBER_SOURCE,
+  },
+  {
+    screen: 'site',
+    kind: 'ruling',
     locked:
-      '0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template · marked done Wed; the re-check that day did not agree, so it stays open Without JavaScript +22 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 4 Open every product page with a two-sentence answer Content AI after fixes 1 and 2 open Packet 5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
+      '16 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template · marked done Wed; the re-check that day did not agree, so it stays open Without JavaScript +22 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 4 Open every product page with a two-sentence answer Content AI after fixes 1 and 2 open Packet 5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
     rendered:
-      '1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template · marked done Wed; the re-check that day did not agree, so it stays open Without JavaScript +22 AI open Packet 0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 4, 6–15 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
+      '1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template · marked done Wed; the re-check that day did not agree, so it stays open Without JavaScript +22 AI open Packet 16 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 4, 6–15 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
     hiddenOnPhone: true,
     source: IMPACT_SOURCE,
   },
@@ -270,9 +281,9 @@ SITE_CHANGES.push(
     screen: 'site',
     kind: 'ruling',
     locked:
-      '0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template Without JavaScript +22 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 4 Open every product page with a two-sentence answer Content AI after fixes 1 and 2 open Packet 5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
+      '16 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template Without JavaScript +22 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 4 Open every product page with a two-sentence answer Content AI after fixes 1 and 2 open Packet 5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
     rendered:
-      '1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template Without JavaScript +22 AI open Packet 0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 4, 6–15 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
+      '1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template Without JavaScript +22 AI open Packet 16 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 4, 6–15 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
     onlyOnPhone: true,
     source: IMPACT_SOURCE,
   },
