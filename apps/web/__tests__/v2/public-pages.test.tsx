@@ -20,6 +20,9 @@ import { join } from 'node:path';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// The page reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
 import { CHECK_COPY, CHECK_QUESTIONS } from '../../lib/v2/copy/check-pages';
 import { V2_REWRITES } from '../../lib/v2/rewrites';
 import { JSDOM } from 'jsdom';

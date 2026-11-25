@@ -6,6 +6,9 @@
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// The page reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
 import { V2_REWRITES } from '@/lib/v2/rewrites';
 
 vi.mock('@/components/analytics/TrackView', () => ({

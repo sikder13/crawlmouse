@@ -326,6 +326,22 @@ const INVENTORY: [entry: string, why: string][] = [
     'array slice (a batch of Storage object names) \u2014 cannot split a surrogate pair',
   ],
   [
+    'apps/web/lib/v2/competitors/compare.ts :: return hosts.slice(0, limit);',
+    'array slice (a site\u2019s competitor hosts, to its plan\u2019s limit) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/v2/monitor/sentinel-work.ts :: siteIds.slice(i, i + SENTINEL_SEND_CHUNK).map((siteId) => ({',
+    'array slice (a chunk of site ids to send) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/v2/monitor/sentinel.ts :: .slice(0, SENTINEL_MAX_TEMPLATES)',
+    'array slice (template keys, to the look\u2019s limit) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "inngest/sentinel.ts :: return sized('due', await work.dispatch(at.getUTCHours(), at.toISOString().slice(0, 10)));",
+    'the date part of an ISO timestamp the code made, ASCII only \u2014 cannot split a surrogate pair',
+  ],
+  [
     'apps/web/lib/audit-stream-projection.ts :: .slice(0, AI_CLIENT_MAX_FINDINGS),',
     'array slice \u2014 cannot split a surrogate pair',
   ],
@@ -453,6 +469,10 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'apps/web/lib/v2/view/free-fixes.ts :: return fixesAsOf(d, check).slice(0, FREE_FIXES);',
     'ARRAY slice over fix records in the v2 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The fixes the Free plan opens (FACTS: three per audit), the one rule the Result, the segments and the fix page share.',
+  ],
+  [
+    'apps/web/lib/v2/view/fix.ts :: if (!proven.slice(0, allowed).includes(f.id)) {',
+    'ARRAY slice over fix ids, never persisted: no string is indexed, so no surrogate pair can be split. The proven fixes Free sees a "Fixed, and proven" card for (GATES.free.fixProofs, one).',
   ],
   [
     'apps/web/lib/v2/view/result.ts :: const named = locked.slice(0, 2);',

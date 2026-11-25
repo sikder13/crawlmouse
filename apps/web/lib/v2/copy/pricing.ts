@@ -26,6 +26,7 @@ import {
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES, type Tier } from '../../entitlement-v2';
 import { AUDIT_TTL_DAYS } from '../../limits';
+import { ALL_SHOWN, type Features } from '../features';
 import type { Tagged } from './agencies';
 import { AGENCY_PLUS_INBOX_ADDRESS } from './contact-inbox';
 import { CANCEL_CLICKS } from './settings';
@@ -66,7 +67,7 @@ export function monthsFree(): number {
 
 const trialDays = `${TRIAL_DAYS} days`;
 
-/** What a paid plan says while V2_BILLING is off (RC-01). */
+/** What a paid plan says while it is not on sale: V2_BILLING off (RC-01), or Agency closed (F-251). */
 const OPENS_SHORTLY = 'opens shortly';
 
 /** How many fixes Free shows: a number on Free, or the page's sentences would not hold. */
@@ -75,7 +76,21 @@ function freeFixes(): number {
   if (n === 'all') throw new Error('the pricing copy assumes Free shows a number of fixes');
   return n;
 }
-const pages = (tier: Tier) => `${count(GATES[tier].pagesPerCheck)} pages`;
+/**
+ * A plan's page limit, "2,000 pages". Null when `pages2000` is false (the Goal 1 switch hides it) and
+ * the plan's limit is above Free's: no figure is stated then, since the hidden one is the plan's own
+ * and Free's would understate it. Home's plan cards and Sign-up's plan table read it too.
+ */
+export const planPages = (tier: Tier, pages2000: boolean): string | null =>
+  !pages2000 && GATES[tier].pagesPerCheck > GATES.free.pagesPerCheck
+    ? null
+    : `${count(GATES[tier].pagesPerCheck)} pages`;
+
+/** "Up to 500 pages per audit", or `without` when `pages` states no figure. */
+const pagesSentence = (tier: Tier, pages2000: boolean, without: string): string => {
+  const p = planPages(tier, pages2000);
+  return p === null ? without : `Up to ${p} per audit`;
+};
 
 export interface PlanRow extends Tagged {
   /** The short left-hand label: "5 sites", "weekly". */
@@ -89,14 +104,15 @@ export interface PlanCopy {
   rows: PlanRow[];
 }
 
-function seatAndSitePrices(interval: Interval): string {
+function seatAndSitePrices(interval: Interval, pages2000: boolean): string {
   const a = GATES.agency;
   const seat = interval === 'month' ? EXTRA_SEAT : EXTRA_SEAT_YEARLY;
   const site = interval === 'month' ? EXTRA_SITE : EXTRA_SITE_YEARLY;
+  const p = planPages('agency', pages2000);
   return (
     `${a.seats} seats, ${usd(seat)} a seat ${per(interval)} beyond; ` +
-    `${usd(site)} ${per(interval)} for each site from ${a.sites + 1} to ${a.maxSites}; ` +
-    `up to ${pages('agency')} per audit`
+    `${usd(site)} ${per(interval)} for each site from ${a.sites + 1} to ${a.maxSites}` +
+    (p === null ? '' : `; up to ${p} per audit`)
   );
 }
 
@@ -110,13 +126,21 @@ const renders = (tier: Tier): PlanRow => ({
  * The three plan columns (A2: Pro has two seats; K9: renders; K10: the seat and site prices).
  * `proTrial`: whether the page offers Pro's no-card trial (`pricingView` decides it from Pro's
  * button and the flags); without it, Pro's tag says the card is required (SEO R2-N1).
+ * `agencyOnSale`: billing is on and Agency sales are open (`agencyOnSale` in the view); without it,
+ * Agency's tag reads as with billing off.
+ * `features`: what the Goal 1 switch hides, which changes the page limits and Agency's description
+ * here; the view drops the rows it hides.
  */
 export function planCopy(
   interval: Interval,
   proTrial: boolean,
   billing: boolean,
+  agencyOnSale: boolean,
+  features: Features = ALL_SHOWN,
 ): Record<Tier, PlanCopy> {
   const { free, pro, agency } = GATES;
+  const p2k = features.pages_2000;
+  const branded = features.agency_white_label && features.agency_domain;
   return {
     free: {
       name: 'Free',
@@ -128,7 +152,8 @@ export function planCopy(
       rows: [
         {
           label: `${free.sites} ${plural(free.sites, 'site', 'sites')}`,
-          text: `Up to ${pages('free')} per audit`,
+          // Free's own limit, which the switch does not hide.
+          text: `Up to ${count(free.pagesPerCheck)} pages per audit`,
           capabilities: ['sites'],
         },
         {
@@ -158,7 +183,7 @@ export function planCopy(
       rows: [
         {
           label: `${pro.sites} sites`,
-          text: `Up to ${pages('pro')} per audit`,
+          text: pagesSentence('pro', p2k, 'Each with its own audits'),
           capabilities: ['sites'],
         },
         {
@@ -187,17 +212,23 @@ export function planCopy(
     },
     agency: {
       name: 'Agency',
-      tag: billing ? `${TRIAL_DAYS}-day trial, card required` : OPENS_SHORTLY,
-      description: {
-        text: 'Agencies reporting to clients under their own name.',
-        // A client report names the agency in its mail; the page it opens, the sender and the
-        // domain are ours (`client_report_page`), so the sentence is marked until that is built.
-        capabilities: ['client_reports', 'client_report_page'],
-      },
+      tag: agencyOnSale ? `${TRIAL_DAYS}-day trial, card required` : OPENS_SHORTLY,
+      description: branded
+        ? {
+            text: 'Agencies reporting to clients under their own name.',
+            // A client report names the agency in its mail; the page it opens, the sender and the
+            // domain are ours (`client_report_page`), so the sentence is marked until that is built.
+            capabilities: ['client_reports', 'client_report_page'],
+          }
+        : {
+            // The switch hides the client reports and the branding: a sentence naming neither.
+            text: 'Agencies watching their clients’ sites, with seats for the team.',
+            capabilities: ['sites', 'seats'],
+          },
       rows: [
         {
           label: `${agency.sites} sites`,
-          text: seatAndSitePrices(interval),
+          text: seatAndSitePrices(interval, p2k),
           capabilities: ['sites', 'seats'],
         },
         {
@@ -255,9 +286,12 @@ export const PRICING_COPY = {
   ],
   intervals: { month: 'Monthly', year: 'Yearly' } as Record<Interval, string>,
   /** FACTS B2 (the crawlers, rewritten to I6) and L6 (the annual reminders). */
-  crawlers: (): Tagged[] => [
+  /** `aiLetter` false (the Goal 1 switch hides the AI readability letter): no grade is named. */
+  crawlers: (aiLetter = true): Tagged[] => [
     {
-      text: 'Every plan tests the same AI crawlers on a sample of your pages: OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot count towards your grade; GPTBot and ClaudeBot are shown, and blocking them is your choice. Googlebot and Bingbot are shown by robots.txt.',
+      text: aiLetter
+        ? 'Every plan tests the same AI crawlers on a sample of your pages: OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot count towards your grade; GPTBot and ClaudeBot are shown, and blocking them is your choice. Googlebot and Bingbot are shown by robots.txt.'
+        : 'Every plan tests the same AI crawlers on a sample of your pages: OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-SearchBot, GPTBot and ClaudeBot. Googlebot and Bingbot are shown by robots.txt.',
       capabilities: ['free_audit'],
     },
     {
@@ -265,7 +299,8 @@ export const PRICING_COPY = {
       capabilities: ['observed_crawlers'],
     },
   ],
-  annual: (billing: boolean): Tagged[] => {
+  /** `agencyOnSale`: Agency yearly is offered from Settings only while Agency is on sale (F-251). */
+  annual: (billing: boolean, agencyOnSale: boolean): Tagged[] => {
     const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
     if (!billing) {
       return [
@@ -277,7 +312,9 @@ export const PRICING_COPY = {
     }
     return [
       {
-        text: `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, from Settings.`,
+        text: agencyOnSale
+          ? `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, from Settings.`
+          : `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free; Pro from Settings, Agency when the Agency plan opens.`,
         capabilities: [],
       },
       {
@@ -328,6 +365,8 @@ export const PRICING_COPY = {
     agencyUsed: { note: 'Your agency trial was used, on an agency account since deleted' },
     /** V2_BILLING off (RC-01): no route here takes a card. */
     opensShortly: { note: 'Paid plans open shortly' },
+    /** V2_BILLING on, V2_AGENCY_SALES off (F-251): Pro is on sale, Agency is not. */
+    agencyOpensShortly: { note: `The Agency plan ${OPENS_SHORTLY}` },
     agencyStartFree: { label: 'Start free', note: `The Agency plan ${OPENS_SHORTLY}` },
     proTrialBillingOff: {
       label: `Start with ${trialDays} of Pro`,
@@ -378,9 +417,12 @@ export const PRICING_COPY = {
     } as Record<string, string>,
   },
   after: {
-    /** Without Pro's trial on offer, the section is the Agency trial's (`proTrial`, SEO R2-N1). */
-    title: (proTrial: boolean, billing: boolean) =>
-      proTrial || !billing
+    /**
+     * Without Pro's trial on offer, the section is the Agency trial's (`proTrial`, SEO R2-N1), while
+     * Agency is on sale (`agencyOnSale`: billing on and V2_AGENCY_SALES, F-251).
+     */
+    title: (proTrial: boolean, agencyOnSale: boolean) =>
+      proTrial || !agencyOnSale
         ? `What happens when the ${trialDays} end`
         : `What happens when the Agency trial’s ${trialDays} end`,
     /**
@@ -400,7 +442,8 @@ export const PRICING_COPY = {
         : []),
     ],
     columns: ['What', 'What happens'] as const,
-    rows: (interval: Interval, billing: boolean): [string, Tagged][] => [
+    /** The Agency trial's row only while Agency is on sale (`agencyOnSale`, F-251). */
+    rows: (interval: Interval, billing: boolean, agencyOnSale: boolean): [string, Tagged][] => [
       [
         'Your first site',
         {
@@ -426,7 +469,7 @@ export const PRICING_COPY = {
           capabilities: ['fix_packets'],
         },
       ],
-      ...(billing
+      ...(agencyOnSale
         ? ([
             [
               'Agency trial',
@@ -454,8 +497,15 @@ export const PRICING_COPY = {
   },
   faq: {
     title: 'Questions people ask before paying',
-    /** `proTrial`: whether the page offers Pro's no-card trial (SEO R2-N1). */
-    items: (proTrial: boolean, billing: boolean): { q: string; a: Tagged }[] => {
+    /**
+     * `proTrial`: whether the page offers Pro's no-card trial (SEO R2-N1). `agencyOnSale`: whether
+     * Agency's trial and its trial page are on offer (F-251); without it, neither is named.
+     */
+    items: (
+      proTrial: boolean,
+      billing: boolean,
+      agencyOnSale: boolean,
+    ): { q: string; a: Tagged }[] => {
       const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
       if (!billing) {
         return [
@@ -484,16 +534,17 @@ export const PRICING_COPY = {
           },
         ];
       }
-      const agencyCard =
-        'Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.';
+      const agencyCard = agencyOnSale
+        ? ' Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.'
+        : '';
       return [
         {
           q: 'Do I need a card for Pro?',
           a: {
             text: proTrial
-              ? `No. The ${trialDays} start with your email. ${agencyCard}`
-              : `Yes: Pro starts when Stripe takes the card. ${agencyCard}`,
-            capabilities: ['agency_trial', 'cancel'],
+              ? `No. The ${trialDays} start with your email.${agencyCard}`
+              : `Yes: Pro starts when Stripe takes the card.${agencyCard}`,
+            capabilities: agencyOnSale ? ['agency_trial', 'cancel'] : [],
           },
         },
         {
@@ -507,7 +558,9 @@ export const PRICING_COPY = {
         {
           q: 'Can I cancel?',
           a: {
-            text: 'Any day, with no call: from Settings, or for an agency account from the Agency trial page. The account goes back to Free; nothing you can see is deleted.',
+            text: agencyOnSale
+              ? 'Any day, with no call: from Settings, or for an agency account from the Agency trial page. The account goes back to Free; nothing you can see is deleted.'
+              : 'Any day, with no call, from Settings. The account goes back to Free; nothing you can see is deleted.',
             capabilities: ['cancel'],
           },
         },

@@ -154,7 +154,7 @@ describe('the large lab site: its pages', () => {
     for (const host of ALL_HOSTS) {
       for (const path of [
         '/no-such-page/',
-        '/about',
+        '/no-such-page',
         '/index.html',
         '/../vercel.json',
         '/%2e%2e/',
@@ -169,6 +169,21 @@ describe('the large lab site: its pages', () => {
         const out = await l.answer({ host, path, client: 'c' });
         expect([host, String(path), out.status, l.waits]).toEqual([host, String(path), 404, []]);
       }
+    }
+  });
+
+  it('redirects a page asked for without its trailing slash to it (308), as most servers do', async () => {
+    for (const host of ALL_HOSTS) {
+      for (const [path, to] of [
+        ['/about', '/about/'],
+        ['/diary', '/diary/'],
+        ['/topics', '/topics/'],
+      ]) {
+        const out = await lab().answer({ host, path, client: 'c' });
+        expect([host, path, out.status, out.headers.location]).toEqual([host, path, 308, to]);
+      }
+      // The slashed address itself is the page, so the redirect leads somewhere real.
+      expect((await lab().answer({ host, path: '/about/', client: 'c' })).status, host).toBe(200);
     }
   });
 

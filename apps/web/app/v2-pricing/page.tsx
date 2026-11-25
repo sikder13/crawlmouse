@@ -5,8 +5,9 @@ import { notFound } from 'next/navigation';
 import { after } from 'next/server';
 import { PricingScreen } from '@/components/v2/screens/pricing/PricingScreen';
 import { accountDoorEnabled, checksPublicEnabled, v2PublicPagesEnabled } from '@/lib/auth/flags';
-import { billingPublic } from '@/lib/billing/flags';
+import { agencySalesOpen, billingPublic } from '@/lib/billing/flags';
 import { CONSENT_REQUIRED_COOKIE, isConsentRequiredCountry } from '@/lib/consent';
+import { shownFeatures } from '@/lib/feature-switch';
 import { PRICING_COPY } from '@/lib/v2/copy/pricing';
 import { pricingCapture } from '@/lib/v2/pricing/events';
 import { readPricingVisit } from '@/lib/v2/pricing/read';
@@ -72,6 +73,8 @@ export default async function V2PricingPage({
     accountDoor: accountDoorEnabled(),
     checksPublic: checksPublicEnabled(),
     billing: billingPublic(),
+    agencySales: agencySalesOpen(),
   };
-  return <PricingScreen view={pricingView(viewer, interval, now, flags)} />;
+  // The Goal 1 switch (V2_HIDE_FEATURES), read per request like the rest of this page.
+  return <PricingScreen view={pricingView(viewer, interval, now, flags, shownFeatures())} />;
 }

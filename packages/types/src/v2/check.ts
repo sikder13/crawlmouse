@@ -209,9 +209,12 @@ export const CompetitorSnapshotSchema = z.strictObject({
   host: HostSchema,
   crawlers_with_access: CountSchema,
   crawlers_tested: CountSchema,
-  text_share: ShareSchema,
-  product_schema: z.boolean(),
-  technical_seo: GradeSummarySchema,
+  /** Null when the competitor's pages were not rendered, so no share of their text was measured. */
+  text_share: ShareSchema.nullable(),
+  /** Null: a check stores no JSON-LD types, so whether it marks up products is not known. */
+  product_schema: z.boolean().nullable(),
+  /** Null when the competitor's Technical SEO grade was refused. */
+  technical_seo: GradeSummarySchema.nullable(),
   /** Null when the competitor's AI readability was withheld. Plan gating is applied where it is shown. */
   ai_readability: GradeSummarySchema.nullable(),
   /** Null when the competitor's signals could not be read. */
@@ -315,3 +318,4 @@ export const CheckSchema = z
 export type Coverage = z.infer<typeof CoverageSchema>;
 export type CrawlerResult = z.infer<typeof CrawlerResultSchema>;
 export type Check = z.infer<typeof CheckSchema>;
+export type CompetitorSnapshot = z.infer<typeof CompetitorSnapshotSchema>;

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sentinel.lab.crawlmouse.com/sitemap.xml

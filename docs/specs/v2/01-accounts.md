@@ -398,6 +398,7 @@ is Free from `trial_ends_at` whether or not `trial_expired` was applied.
 | Scheduled checks                                                   | monthly_first_site_only | weekly            | weekly               | ARCH-2 §3.1                           |
 | Fixes visible                                                      | 3                       | all               | all                  | ARCH-2 §3.1                           |
 | Fix packets                                                        | visible_fixes_only      | all               | all                  | ARCH-2 §3.1                           |
+| Verified fixes shown before and after                              | 1                       | all               | all                  | Goal 1 row 22 (CTO 062)               |
 | Competitors per site                                               | 0                       | 1                 | 3                    | ARCH-2 §3.1                           |
 | Exports (PDF, CSV, JSON)                                           | no                      | yes               | yes                  | ARCH-2 §3.1                           |
 | Slack                                                              | no                      | yes               | yes                  | ARCH-2 §3.1                           |

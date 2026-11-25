@@ -1,3 +1,4 @@
+import { RequestTiming } from './timing.js';
 import { canonicalizeUrl } from '@crawlmouse/engine/worker';
 import { BatchPartialSchema, type BatchResult, type RobotsEvidence } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
@@ -82,9 +83,10 @@ export async function runBatch(
 ): Promise<BatchResult> {
   const startedAt = deps.clock.now();
   const budget = new Budget(req.budget, deps.clock);
+  const timing = new RequestTiming(deps.clock);
   const ctx: FetchContext = {
     sites: deps.sites,
-    fetcher: deps.fetcher,
+    fetcher: timing.wrap(deps.fetcher),
     budget,
     asked: new Map(),
     abort: new AbortController(),
@@ -166,14 +168,16 @@ export async function runBatch(
     findings: findings.list(),
     robots: origins.map(robotsEvidence),
     declarations,
+    timing: timing.summary(),
   };
   if ('rows' in done) return { ...common, kind: 'access', access_tests: done.rows };
   // Compared in the canonical spelling the edges use, so a page already crawled is not rediscovered.
   // A chain's last Location counts only when it was requested: a stopped redirect's was not.
   const crawled = new Set([...requested, ...done.landed].map((u) => canonicalizeUrl(u)));
-  const discovered = [...new Set(done.link_edges.map((e) => e.to_url))].filter(
-    (u) => !crawled.has(u),
-  );
+  // Named as first linked (F-252), so the next batch asks the address the site wrote.
+  const discovered = [...new Set(done.link_edges.map((e) => e.to_url))]
+    .filter((u) => !crawled.has(u))
+    .map((u) => done.linked.get(u) ?? u);
   return {
     ...common,
     kind: 'crawl',
