@@ -4,6 +4,7 @@
  * stand-in as the service role, the report generator with a bucket in memory, and the mailer with
  * its ledger and transport in memory. The agency keeps the engine's recorded site, checked twice.
  */
+import { NO_BRAND } from '@/lib/v2/reports/brand-doc';
 import { createHash } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -74,6 +75,7 @@ const store = (linkSecret: string | null = SECRET) => {
           bucket: memory.bucket,
           read: pgliteCheckReader(db),
           home: 'https://crawlmouse.com/',
+          brand: NO_BRAND,
         },
         reportId,
       ),

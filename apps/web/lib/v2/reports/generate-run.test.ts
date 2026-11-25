@@ -15,6 +15,7 @@ import {
   secondInput,
 } from '../pipeline/test-support/public-checks';
 import type { CheckReader } from '../pipeline/types';
+import { NO_BRAND, type BrandReader, type DocBrand } from './brand-doc';
 import { REPORTS_BUCKET, reportPath, type ReportDoc, type ReportFile } from './generate';
 import { memoryReportBucket } from './generate-test-support';
 import {
@@ -94,7 +95,7 @@ async function make(over: Partial<NewReport>, deps: Partial<GenerateDeps> = {}) 
   const id = (await store.create(request(over)))!;
   const memory = memoryReportBucket();
   const made = await generateReport(
-    { store, bucket: memory.bucket, read, home: HOME, ...deps },
+    { store, bucket: memory.bucket, read, home: HOME, brand: NO_BRAND, ...deps },
     id,
   );
   return { id, made, objects: memory.objects, memory };
@@ -258,7 +259,10 @@ describe('generateReport', () => {
     const id = (await store.create(request()))!;
     const memory = memoryReportBucket();
     memory.state.refuse = true;
-    const made = await generateReport({ store, bucket: memory.bucket, read, home: HOME }, id);
+    const made = await generateReport(
+      { store, bucket: memory.bucket, read, home: HOME, brand: NO_BRAND },
+      id,
+    );
     expect(made).toEqual({ outcome: 'failed', reason: 'store_failed' });
     expect(memory.objects.size).toBe(0);
     expect(await row(id)).toMatchObject({
@@ -298,7 +302,7 @@ describe('generateReport', () => {
       },
     };
     const made = await generateReport(
-      { store: failing, bucket: memory.bucket, read, home: HOME },
+      { store: failing, bucket: memory.bucket, read, home: HOME, brand: NO_BRAND },
       id,
     );
     expect(made).toEqual({ outcome: 'failed', reason: 'object_left' });
@@ -323,14 +327,20 @@ describe('generateReport', () => {
       fail: down,
     };
     await expect(
-      generateReport({ store: stopping, bucket: memory.bucket, read, home: HOME }, id),
+      generateReport(
+        { store: stopping, bucket: memory.bucket, read, home: HOME, brand: NO_BRAND },
+        id,
+      ),
     ).rejects.toThrow(/did not answer/);
     expect([...memory.objects.keys()]).toEqual([path]);
     expect((await row(id)).file_state).toBe('pending');
     const left = memory.objects.get(path);
 
     memory.state.refuseRemoval = false;
-    const made = await generateReport({ store, bucket: memory.bucket, read, home: HOME }, id);
+    const made = await generateReport(
+      { store, bucket: memory.bucket, read, home: HOME, brand: NO_BRAND },
+      id,
+    );
     expect(made.outcome).toBe('stored');
     expect(memory.state.puts).toBe(2);
     expect([...memory.objects.keys()]).toEqual([path]);
@@ -364,7 +374,9 @@ describe('generateReport', () => {
       },
       remove: memory.bucket.remove,
     };
-    expect(await generateReport({ store, bucket: overtaken, read, home: HOME }, id)).toEqual({
+    expect(
+      await generateReport({ store, bucket: overtaken, read, home: HOME, brand: NO_BRAND }, id),
+    ).toEqual({
       outcome: 'not_pending',
     });
     expect([...memory.objects.keys()]).toEqual([path]);
@@ -376,7 +388,7 @@ describe('generateReport', () => {
     const before = await row(id);
     const file = memory.objects.get(reportPath(owner.accountId, id, 'pdf'));
     expect(memory.state.puts).toBe(1);
-    const deps = { store, bucket: memory.bucket, read, home: HOME };
+    const deps = { store, bucket: memory.bucket, read, home: HOME, brand: NO_BRAND };
     expect(await generateReport(deps, id)).toEqual({ outcome: 'not_pending' });
     expect(memory.state.puts).toBe(1);
     expect(memory.objects.get(reportPath(owner.accountId, id, 'pdf'))).toBe(file);
@@ -401,7 +413,9 @@ describe('generateReport', () => {
       },
       remove: memory.bucket.remove,
     };
-    expect(await generateReport({ store, bucket: racing, read, home: HOME }, id)).toEqual({
+    expect(
+      await generateReport({ store, bucket: racing, read, home: HOME, brand: NO_BRAND }, id),
+    ).toEqual({
       outcome: 'not_pending',
     });
     expect(memory.state.puts).toBe(1);
@@ -411,6 +425,80 @@ describe('generateReport', () => {
       failed_reason: 'abandoned',
       storage_path: expect.stringContaining(id),
     });
+  });
+});
+
+describe('generateReport: the agency’s brand on a client’s documents (white-label)', () => {
+  const PNG = Uint8Array.from(
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  );
+  /** A reader that answers one brand, and records whose brand and which logo it was asked for. */
+  function reader(brand: DocBrand | null) {
+    const asked: string[] = [];
+    const r: BrandReader = {
+      brandFor: async (accountId) => {
+        asked.push(`brand ${accountId}`);
+        return brand;
+      },
+      logo: async (accountId, path) => {
+        asked.push(`logo ${accountId} ${path}`);
+        return { bytes: PNG, format: 'png' };
+      },
+    };
+    return { r, asked };
+  }
+
+  it('stamps the brand, first, on a comparison’s stored document, asked for the report’s own account', async () => {
+    const { r, asked } = reader({ name: 'Northwind', logoPath: null });
+    const { id, objects } = await make({ kind: 'compare', format: 'html' }, { brand: r });
+    const doc = docIn(objects.get(reportPath(owner.accountId, id, 'html'))!);
+    expect(Object.keys(doc)[0]).toBe('brand');
+    expect(doc.brand).toEqual({ name: 'Northwind', logoPath: null });
+    expect(asked).toEqual([`brand ${owner.accountId}`]);
+  });
+
+  it('with no brand, stores the document and the PDF exactly as NO_BRAND does', async () => {
+    const none = reader(null);
+    for (const over of [{ kind: 'compare', format: 'html' }, {}] as Partial<NewReport>[]) {
+      const a = await make(over, { brand: none.r });
+      const b = await make(over, { brand: NO_BRAND });
+      const fileOf = (m: typeof a) => [...m.objects.values()][0]!.bytes;
+      expect(Buffer.from(fileOf(a)).equals(Buffer.from(fileOf(b)))).toBe(true);
+      if (over.kind === 'compare')
+        expect(Object.hasOwn(docIn([...a.objects.values()][0]!), 'brand')).toBe(false);
+    }
+  });
+
+  it('draws the brand and its logo in the audit PDF, the logo read for the report’s own account', async () => {
+    const path = `agency/${owner.accountId}/0123456789abcdef.png`;
+    const { r, asked } = reader({ name: 'Northwind', logoPath: path });
+    const branded = await make({}, { brand: r });
+    const plain = await make({});
+    const bytesOf = (m: typeof plain) => [...m.objects.values()][0]!.bytes;
+    expect(Buffer.from(bytesOf(branded)).equals(Buffer.from(bytesOf(plain)))).toBe(false);
+    expect(asked).toEqual([`brand ${owner.accountId}`, `logo ${owner.accountId} ${path}`]);
+  });
+
+  it('never asks for a brand for a raw export', async () => {
+    const { r, asked } = reader({ name: 'Northwind', logoPath: null });
+    await make({ kind: 'raw_export', format: 'csv' }, { brand: r });
+    await make({ kind: 'raw_export', format: 'json' }, { brand: r });
+    expect(asked).toEqual([]);
+  });
+
+  it('fails the report, rather than sending it unbranded, when the brand cannot be read', async () => {
+    const failing: BrandReader = {
+      brandFor: async () => {
+        throw new Error('agency_brands read failed');
+      },
+      logo: async () => null,
+    };
+    const { id, made } = await make({ kind: 'compare', format: 'html' }, { brand: failing });
+    expect(made).toEqual({ outcome: 'failed', reason: 'build_failed' });
+    expect((await row(id)).file_state).toBe('failed');
   });
 });
 
