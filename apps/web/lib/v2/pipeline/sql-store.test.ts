@@ -139,7 +139,7 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
   });
 
   // F-260: a check a worker deploy met is queued again for its one retry run.
-  it('requeues a check running under its run: queued as the constraints ask, its batch rows deleted, then claimable', async () => {
+  it('requeues a check running under its run: queued as the constraints ask, its rows kept for the step, then deleted, then claimable', async () => {
     const { db, store } = await fresh();
     const s = await site(db);
     const id = await check(db, s, { status: 'running', heartbeat: ago(10 * MIN), run: 'run-1' });
@@ -167,6 +167,9 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       inngest_run_id: null,
     });
     expect(new Date(row.heartbeat_at as string).toISOString()).toBe(at);
+    // The rows stay until the step has removed their stored results, so they can still be named.
+    expect((await store.batches(id)).map((b) => b.batch)).toEqual([1, 2]);
+    await store.deleteBatches(id);
     const left = await db.query(`select 1 from public.crawl_batches where check_id = $1`, [id]);
     expect(left.rows).toEqual([]);
     // A retried step finds it queued with no run, and answers true again.

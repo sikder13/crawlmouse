@@ -13,6 +13,7 @@ import {
   seedsOf,
 } from '../../../../../../packages/engine/fixtures/v2/build/recorded';
 import { getJson, putJson } from '../evidence';
+import { objectNames } from '../keep';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
@@ -318,7 +319,8 @@ async function runAcrossADeploy(honourFirstBatch = true) {
   const retry = sent.find((e) => e.name === 'check.requested');
   const rowAfterFirst = { ...rows.get(CHECK)! };
   const batchesAfterFirst = batches.size;
-  if (!retry) return { first, retry, rowAfterFirst, batchesAfterFirst };
+  const objectsAfterFirst = [...evidence.objects.keys()].sort();
+  if (!retry) return { first, retry, rowAfterFirst, batchesAfterFirst, objectsAfterFirst };
   const firstBatch = honourFirstBatch ? retry.data.retry!.firstBatch : 1;
   // The worker's new release answers the recording, numbered from the retry's first batch.
   for (const [n, b] of recorded) {
@@ -334,7 +336,19 @@ async function runAcrossADeploy(honourFirstBatch = true) {
     },
     steps,
   );
-  return { first, retry, rowAfterFirst, batchesAfterFirst, second, posted, held, rows };
+  return {
+    first,
+    retry,
+    rowAfterFirst,
+    batchesAfterFirst,
+    objectsAfterFirst,
+    second,
+    posted,
+    held,
+    rows,
+    batches,
+    evidence,
+  };
 }
 
 describe('F-260: a worker deploy in the middle of a check', () => {
@@ -353,6 +367,30 @@ describe('F-260: a worker deploy in the middle of a check', () => {
       inngest_run_id: null,
     });
     expect(batchesAfterFirst).toBe(0);
+  });
+
+  // QA's gate on #190, F1: expiry and the purge name a check's objects from its batch rows, so the
+  // first run's stored results go with its rows, and no object is left that nothing would remove.
+  it('removes the first run’s stored batches with its rows, so every object left is one expiry names', async () => {
+    const { objectsAfterFirst, evidence, batches } = await runAcrossADeploy();
+    const base = `anon/${SITE_ID}/${CHECK}`;
+    expect(objectsAfterFirst).toEqual([`${base}/seeds.json.gz`]);
+    const named = new Set(
+      objectNames([...batches!.values()].map((b) => b.batch)).map((n) => `${base}/${n}.json.gz`),
+    );
+    const left = [...evidence!.objects.keys()];
+    expect(left.filter((k) => !named.has(k))).toEqual([]);
+    expect(left.sort()).toEqual(
+      [
+        `${base}/batch-3.json.gz`,
+        `${base}/batch-4.json.gz`,
+        `${base}/batch-5.json.gz`,
+        `${base}/batch-6.json.gz`,
+        `${base}/map.json.gz`,
+        `${base}/render.json.gz`,
+        `${base}/seeds.json.gz`,
+      ].sort(),
+    );
   });
 
   it('builds on the retry what an undisturbed run builds, from batches the worker did not hold', async () => {

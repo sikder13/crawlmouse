@@ -122,8 +122,10 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
           heartbeat_at: at,
         });
       } else if (r?.status !== 'queued' || r.inngest_run_id !== null) return false;
-      for (const [k, b] of batches) if (b.check_id === checkId) batches.delete(k);
       return true;
+    },
+    async deleteBatches(checkId) {
+      for (const [k, b] of batches) if (b.check_id === checkId) batches.delete(k);
     },
     async reap() {
       throw new Error('memoryStore: reap is tested on PGlite');

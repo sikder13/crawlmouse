@@ -66,12 +66,13 @@ export interface PipelineStore {
   fail(checkId: string | null, reason: FailureReason, runId: string | null): Promise<boolean>;
   /**
    * F-260: a check running under `runId` back to queued, as `checks`' constraints require of a queued
-   * check (no start, no progress, no run), with its heartbeat at `at` so the reaper counts from now;
-   * then its batch rows deleted. It runs while the check fetches, before persist stages any chunk. True
-   * when the check is queued with no run after the
-   * call: a retried call finds it so and deletes again. False when it is another run's or has ended.
+   * check (no start, no progress, no run), with its heartbeat at `at` so the reaper counts from now.
+   * True when the check is queued with no run after the call: a retried call finds it so. False when
+   * it is another run's or has ended, and then nothing is changed.
    */
   requeue(checkId: string, runId: string, at: string): Promise<boolean>;
+  /** F-260: a requeued check's batch rows, deleted once their stored results are removed. */
+  deleteBatches(checkId: string): Promise<void>;
   /** `reap_stalled_checks`: checks whose heartbeat (or queue time) is before `cutoff`. */
   reap(cutoff: string): Promise<ReapedCheck[]>;
   /** The check a run claimed, if any. */
@@ -226,8 +227,11 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
         const r = (now ?? [])[0];
         if (r?.status !== 'queued' || r.inngest_run_id !== null) return false;
       }
-      must('requeue batches', await sb.from('crawl_batches').delete().eq('check_id', checkId));
       return true;
+    },
+
+    async deleteBatches(checkId) {
+      must('delete batches', await sb.from('crawl_batches').delete().eq('check_id', checkId));
     },
 
     async progress(checkId, progress, at) {

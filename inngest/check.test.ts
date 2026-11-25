@@ -622,15 +622,38 @@ describe('runCheck: polling (D1)', () => {
     expect(requeues).toEqual([]);
   });
 
-  it('fails the check worker_redeployed when the requeue finds it no longer this run’s', async () => {
+  // QA's gate on #190, F4: a requeue that finds the check another run's, or ended, fails nothing.
+  it('ends gone, failing nothing and sending no retry, when the requeue finds the check no longer this run’s', async () => {
     const { result, ids, events } = await drive({
       read: (at) => (at.batch === 2 ? fromOtherRelease : undefined),
       requeued: false,
     });
-    expect(result).toEqual({ status: 'failed', reason: 'worker_redeployed' });
-    expect(ids.slice(-4)).toEqual(['crawl-2-read', 'requeue', 'fail', 'emit-failed']);
+    expect(result).toEqual({ status: 'gone' });
+    expect(ids.slice(-2)).toEqual(['crawl-2-read', 'requeue']);
+    expect(ids).not.toContain('fail');
     expect(events.map((e) => e.id)).not.toContain('retry');
   });
+
+  // QA's gate on #190, F5: only a batch from another release retries; every other end fails as before.
+  it.each([
+    [
+      'paused',
+      { post: (at: BatchAt) => (at.batch === 2 ? ({ status: 'paused' } as const) : undefined) },
+    ],
+    ['worker_unavailable', { crawlBatches: 1, poll: () => 'failed' as const }],
+    [
+      'capacity_wait_exceeded',
+      { post: () => ({ status: 'busy', at: T0 + 10 * 3600 * 1000 }) as const },
+    ],
+  ] as const)(
+    'ends %s failed with no requeue: only worker_redeployed is retried',
+    async (reason, script) => {
+      const { result, ids, requeues } = await drive(script as Script);
+      expect(result).toEqual({ status: 'failed', reason });
+      expect(ids).not.toContain('requeue');
+      expect(requeues).toEqual([]);
+    },
+  );
 
   it('numbers a retried run’s batches from firstBatch, crawl then access', async () => {
     const { result, posts } = await drive({ crawlBatches: 2 }, T0, {

@@ -201,9 +201,9 @@ export interface CheckSteps {
   /** Marks the check failed unless it has ended; `failed` says whether it is failed with `reason`. */
   fail(event: CheckRequested, reason: FailureReason): Promise<FailOutput>;
   /**
-   * F-260: the check back to queued, from running under `runId`, with its batch rows deleted; true
-   * when it is queued with no run after the call (a retried step finds it so), false when the check
-   * is no longer this run's.
+   * F-260: the check back to queued, from running under `runId`, with its stored batch results and
+   * batch rows deleted; true when it is queued with no run after the call (a retried step finds it
+   * so), false when the check is another run's or has ended, and then nothing is changed.
    */
   requeue(event: CheckRequested, runId: string): Promise<{ requeued: boolean }>;
 }
@@ -439,7 +439,8 @@ export async function runCheck(
   const redeployed = async (): Promise<CheckRunResult> => {
     if (event.retry !== undefined) return endFailed('worker_redeployed');
     const { requeued } = await run('requeue', () => steps.requeue(event, runId));
-    if (!requeued) return endFailed('worker_redeployed');
+    // Another run's check, or one already ended: this run fails nothing (QA's gate on #190, F4).
+    if (!requeued) return { status: 'gone' };
     await step.sendEvent('retry', {
       id: checkRetryEventId(event.checkId),
       name: 'check.requested',

@@ -65,8 +65,11 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
         );
         if (now[0]?.status !== 'queued' || now[0].inngest_run_id !== null) return false;
       }
-      await db.query(`delete from public.crawl_batches where check_id = $1::uuid`, [checkId]);
       return true;
+    },
+
+    async deleteBatches(checkId) {
+      await db.query(`delete from public.crawl_batches where check_id = $1::uuid`, [checkId]);
     },
 
     async reap(cutoff) {
