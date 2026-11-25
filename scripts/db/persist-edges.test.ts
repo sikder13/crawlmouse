@@ -84,11 +84,19 @@ async function migrated(admin: Sql, name: string): Promise<Sql> {
   return sql;
 }
 
-/** The PGlite port's shape over postgres.js: `query(text, params)` answering `{ rows }`. */
+/**
+ * The PGlite port's shape over postgres.js: `query(text, params)` answering `{ rows }`. The port
+ * passes jsonb as a JSON string (`$n::jsonb`, which PGlite reads as text). postgres.js serializes a
+ * parameter Postgres types as jsonb with JSON.stringify, so that string would arrive as a JSON
+ * string, not the array or object it holds; the cast is moved past a text parameter instead.
+ */
 const asDb = (sql: Sql) =>
   ({
     query: async (text: string, params: unknown[] = []) => ({
-      rows: await sql.unsafe(text, params as never[]),
+      rows: await sql.unsafe(
+        text.replace(/\$(\d+)::jsonb\b/g, '($$$1::text)::jsonb'),
+        params as never[],
+      ),
     }),
   }) as never;
 
