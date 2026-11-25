@@ -58,6 +58,12 @@ const UNUSED_DB = {
   stageCheckRows: async (): Promise<unknown> => {
     throw new Error('persistDb is not called in this test');
   },
+  edgeTarget: async (): Promise<{ lineageId: string; checkMonth: string }> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  insertEdges: async (): Promise<void> => {
+    throw new Error('persistDb is not called in this test');
+  },
 };
 const EVENT: CheckRequested = {
   checkId: CHECK,

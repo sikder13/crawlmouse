@@ -41,6 +41,7 @@ import {
   type CrawlPage,
   type Fix,
   type FixEvent,
+  type LinkEdge,
 } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import {
@@ -60,11 +61,24 @@ import type {
   StagedCollection,
 } from './types';
 
+/** The function that makes a month's partitions (migration 003), called before the edges (F-330). */
+export const PARTITIONS_RPC = 'v2_premake_month_partitions';
 /** The function that stages one chunk (migration 008). */
 export const STAGE_RPC = 'stage_check_rows';
 /** The most JSON one staged chunk carries: half the 2 MB request bound (Q11). */
 export const CHUNK_BYTES = 1024 * 1024;
-const STAGED: readonly StagedCollection[] = ['page_results', 'link_edges', 'access_tests'];
+/**
+ * The collections staged for persist_built_check. Link edges are not (F-330): a 2,000-page check
+ * holds tens of thousands, and their insert inside persist_built_check, one PostgREST statement,
+ * passed production's 8 s `statement_timeout`. They are written first, in pieces (`EDGE_PIECE_ROWS`).
+ */
+const STAGED: readonly StagedCollection[] = ['page_results', 'access_tests'];
+/**
+ * The most link edges one request writes (F-330), each request its own statement under PostgREST's
+ * 8 s timeout. A piece is also bounded by CHUNK_BYTES of JSON. Measured in
+ * scripts/db/persist-edges.test.ts against a real Postgres with an 8 s `statement_timeout`.
+ */
+export const EDGE_PIECE_ROWS = 2_000;
 
 /** page_results' vantage columns, in the crawl row's own shapes. */
 const VantageSchema = z.strictObject({
@@ -118,10 +132,17 @@ export interface StageCall {
   rows: unknown[];
 }
 
-/** The calls that persist a built check: its staged chunks, in order, then the finishing payload. */
+/**
+ * The calls that persist a built check: its staged chunks, in order; its link edges, in pieces,
+ * written before the finishing payload; then the finishing payload.
+ */
 export interface PersistCalls {
   checkId: string;
   stages: StageCall[];
+  /** The edges, cut into pieces of at most EDGE_PIECE_ROWS rows and CHUNK_BYTES of JSON. */
+  edges: LinkEdge[][];
+  /** The lineage every edge names (persist_built_check's `fetching`). */
+  fetching: unknown;
   payload: Record<string, unknown>;
 }
 
@@ -149,6 +170,17 @@ export function chunked(rows: readonly unknown[], maxBytes = CHUNK_BYTES): unkno
   return out;
 }
 
+/** `edges` cut into pieces of at most `maxRows` rows and CHUNK_BYTES of JSON, in order. */
+export function edgePieces(edges: readonly LinkEdge[], maxRows = EDGE_PIECE_ROWS): LinkEdge[][] {
+  return chunked(edges).flatMap((chunk) => {
+    const out: LinkEdge[][] = [];
+    for (let i = 0; i < chunk.length; i += maxRows) {
+      out.push(chunk.slice(i, i + maxRows) as LinkEdge[]);
+    }
+    return out;
+  });
+}
+
 /**
  * The built check's rows, each parsed with its contract schema and every page with its vantage, as
  * the calls that persist it. Throws on a row the contract refuses and on a page with no vantage.
@@ -163,9 +195,10 @@ export function persistCalls(input: PersistInput): PersistCalls {
       if (!vantage) throw new Error(`persistBuiltCheck: no vantage for page ${page.url}`);
       return { ...page, ...VantageSchema.parse(vantage) };
     });
+  const link_edges = z.array(LinkEdgeSchema).parse(built.link_edges);
   const bulk: Record<StagedCollection, unknown[]> = {
     page_results,
-    link_edges: z.array(LinkEdgeSchema).parse(built.link_edges),
+    link_edges,
     access_tests: z.array(AccessTestSchema).parse(built.access_tests),
   };
   // A check built before `coverage.stopped` was kept, and persisted after the deploy, has none.
@@ -176,9 +209,18 @@ export function persistCalls(input: PersistInput): PersistCalls {
   const stages = STAGED.flatMap((collection) =>
     chunked(bulk[collection]).map((rows, chunk) => ({ collection, chunk, rows })),
   );
+  const fetching = MeasurementLineageSchema.parse(built.lineages.fetching);
+  // The edges are written by row, before persist_built_check reads anything (F-330): one naming
+  // another check is refused here, as persist_built_check refused a staged row naming another.
+  const other = link_edges.find((e) => e.check_id !== check.id);
+  if (other) {
+    throw new Error(`persistBuiltCheck: an edge names check ${other.check_id}, not ${check.id}`);
+  }
   return {
     checkId: check.id,
     stages,
+    edges: edgePieces(link_edges),
+    fetching,
     payload: {
       check,
       fixes: z.array(FixSchema).parse(built.fixes),
@@ -186,21 +228,25 @@ export function persistCalls(input: PersistInput): PersistCalls {
       changes: z.array(ChangeSchema).parse(built.changes),
       lineages: {
         grading: MeasurementLineageSchema.parse(built.lineages.grading),
-        fetching: MeasurementLineageSchema.parse(built.lineages.fetching),
+        fetching,
       },
       usage_event: built.usage_event === null ? null : UsageEventSchema.parse(built.usage_event),
       diff_inputs: DiffInputsSchema.parse(built.diff_inputs),
       map_path: z.string().min(1).nullable().parse(input.map_path),
       read: ReadSchema.parse(input.read),
-      staged: Object.fromEntries(
-        STAGED.map((collection) => [
-          collection,
-          {
-            chunks: stages.filter((s) => s.collection === collection).length,
-            rows: bulk[collection].length,
-          },
-        ]),
-      ),
+      // Link edges are written before this call (F-330), so none is staged for it to move.
+      staged: {
+        ...Object.fromEntries(
+          STAGED.map((collection) => [
+            collection,
+            {
+              chunks: stages.filter((s) => s.collection === collection).length,
+              rows: bulk[collection].length,
+            },
+          ]),
+        ),
+        link_edges: { chunks: 0, rows: 0 },
+      },
     },
   };
 }
@@ -220,14 +266,35 @@ export async function persistBuiltCheck(
   send: Sender = sendWithoutRequest,
 ): Promise<PersistOutcome> {
   const calls = persistCalls(input);
+  let written = false;
   for (const s of calls.stages) {
     const staged = z
       .boolean()
       .parse(await db.stageCheckRows(calls.checkId, s.collection, s.chunk, s.rows));
     // False: the check is written already, and persist_built_check will say so.
-    if (!staged) break;
+    if (!staged) {
+      written = true;
+      break;
+    }
   }
-  const outcome = OutcomeSchema.parse(await db.persistBuiltCheck(calls.payload));
+  // F-330: the edges, a piece a request, each its own statement and well inside PostgREST's 8 s;
+  // each skips a row already written, so a retried step repeats them safely. Only then does
+  // persist_built_check write the rest and mark the check finished, so a check is never finished
+  // with part of its edges. Until it is, the read-back refuses it (load.ts: finished or partial).
+  if (!written && calls.edges.length > 0) {
+    const { lineageId, checkMonth } = await db.edgeTarget(calls.checkId, calls.fetching);
+    for (const piece of calls.edges) {
+      await db.insertEdges(
+        piece.map((e) => ({ ...e, check_month: checkMonth, lineage_id: lineageId })),
+      );
+    }
+  }
+  const answered = OutcomeSchema.parse(await db.persistBuiltCheck(calls.payload));
+  // persist_built_check moved no edge (none was staged), so its count is the edges written here.
+  const edges = calls.edges.reduce((n, piece) => n + piece.length, 0);
+  const outcome = answered.written
+    ? { ...answered, counts: { ...answered.counts, link_edges: edges } }
+    : answered;
   const accountId = input.built.usage_event?.account_id ?? null;
   if (accountId !== null) {
     for (const v of outcome.verified) {
@@ -280,5 +347,63 @@ export function supabasePersistDb(sb: SupabaseClient): PersistDb {
       ),
     persistBuiltCheck: async (payload) =>
       answer(PERSIST_RPC, await sb.rpc(PERSIST_RPC, { p: payload })),
+    async edgeTarget(checkId, fetching) {
+      const l = MeasurementLineageSchema.parse(fetching);
+      const month = z
+        .array(z.object({ check_month: z.string() }))
+        .length(1)
+        .parse(answer('checks', await sb.from('checks').select('check_month').eq('id', checkId)));
+      const checkMonth = month[0]!.check_month;
+      // The month's partitions, as persist_built_check makes them before its first row.
+      answer(
+        PARTITIONS_RPC,
+        await sb.rpc(PARTITIONS_RPC, { p_from: checkMonth, p_through: checkMonth }),
+      );
+      const key = {
+        engine_sha: l.engine_sha,
+        detector_ruleset_version: l.detector_ruleset_version,
+        crawler_registry_version: l.crawler_registry_version,
+        worker_release: l.worker_release,
+        population_version: l.population_version,
+      };
+      // As persist_built_check writes it: its natural key decides, and an existing row is kept.
+      answer(
+        'measurement_lineages',
+        await sb
+          .from('measurement_lineages')
+          .upsert(
+            { id: l.id, ...key, created_at: l.created_at },
+            { onConflict: Object.keys(key).join(','), ignoreDuplicates: true },
+          ),
+      );
+      let q = sb
+        .from('measurement_lineages')
+        .select('id')
+        .eq('engine_sha', key.engine_sha)
+        .eq('detector_ruleset_version', key.detector_ruleset_version)
+        .eq('crawler_registry_version', key.crawler_registry_version);
+      q =
+        key.worker_release === null
+          ? q.is('worker_release', null)
+          : q.eq('worker_release', key.worker_release);
+      q =
+        key.population_version === null
+          ? q.is('population_version', null)
+          : q.eq('population_version', key.population_version);
+      const lineage = z
+        .array(z.object({ id: z.uuid() }))
+        .length(1)
+        .parse(answer('measurement_lineages', await q));
+      return { lineageId: lineage[0]!.id, checkMonth };
+    },
+    async insertEdges(rows) {
+      answer(
+        'link_edges',
+        await sb.from('link_edges').upsert([...rows], {
+          onConflict: 'check_id,from_hash,to_hash,check_month',
+          ignoreDuplicates: true,
+        }),
+      );
+    },
   };
 }
