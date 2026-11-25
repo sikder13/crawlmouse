@@ -259,18 +259,22 @@ function BlockedElsewhere({ data }: Props) {
           label={data.blockedTitle}
           headersHidden
           rowHeader={1}
-          columns={[{ header: 'Site', mono: true }, { header: 'Crawler' }, { header: 'Access' }]}
+          // Two columns, so the card fits a phone: the crawler and its verdict share a cell and
+          // wrap onto two lines when the width runs out, and a long host breaks inside itself.
+          columns={[{ header: 'Site', mono: true }, { header: 'Crawler and access' }]}
           rows={data.blockedElsewhere.map((b) => ({
             key: b.key,
             cells: [
-              <a key="h" href={b.href}>
+              <a key="h" href={b.href} className={styles.blockedHost}>
                 {b.host}
               </a>,
-              b.ua,
-              <span key="v" data-v2-verdict={b.verdict}>
-                <StatusPill state={VERDICTS[b.verdict].state}>
-                  {VERDICTS[b.verdict].label}
-                </StatusPill>
+              <span key="v" className={styles.blockedAccess}>
+                <span>{b.ua}</span>
+                <span data-v2-verdict={b.verdict}>
+                  <StatusPill state={VERDICTS[b.verdict].state}>
+                    {VERDICTS[b.verdict].label}
+                  </StatusPill>
+                </span>
               </span>,
             ],
           }))}

@@ -82,7 +82,23 @@ describe('crawlers blocked on any site (D-09)', () => {
       [...blocked.querySelectorAll('tbody tr')].map((r) =>
         [...r.children].map((c) => c.textContent),
       ),
-    ).toEqual([['nahltech.com', 'GPTBot', expect.stringContaining('blocked by robots.txt')]]);
+    ).toEqual([['nahltech.com', 'GPTBotProblem: blocked by robots.txt']]);
+  });
+
+  it('fits a phone: two columns, the crawler and its verdict in one cell that wraps (parity at 390)', () => {
+    const blocked = card(dom(dashboardPreview('day0')), 'AI crawlers blocked on your sites')!;
+    const row = blocked.querySelector('tbody tr')!;
+    expect([...row.children].map((c) => c.textContent)).toEqual([
+      'example-outfitter.com',
+      'GPTBotProblem: blocked by a rule',
+    ]);
+    const access = row.querySelector('[data-v2-verdict]')!.parentElement!;
+    expect([...access.children].map((c) => c.textContent)).toEqual([
+      'GPTBot',
+      'Problem: blocked by a rule',
+    ]);
+    expect(access.className).toMatch(/blockedAccess/);
+    expect(row.querySelector('a')!.className).toMatch(/blockedHost/);
   });
 });
 
