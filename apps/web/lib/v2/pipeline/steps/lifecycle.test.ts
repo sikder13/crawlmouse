@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { FULL_RENDER_STEP_S } from '../../../../../../inngest/full-render';
 import type { CheckRequested } from '../../../../../../inngest/check-events';
 import { getJson } from '../evidence';
 import {
@@ -242,9 +243,9 @@ describe('failCancelled (finding 4, correctness 2)', () => {
 });
 
 describe('the reaper’s cutoff (D13)', () => {
-  it('is ninety-five minutes before now', () => {
-    expect(REAP_AFTER_S).toBe(95 * 60);
-    expect(reapCutoff(T0)).toBe('2026-11-08T10:25:00.000Z');
+  it('is a hundred and thirty minutes before now', () => {
+    expect(REAP_AFTER_S).toBe(130 * 60);
+    expect(reapCutoff(T0)).toBe('2026-11-08T09:50:00.000Z');
   });
 
   it('fails no check whose run may still be alive: REAP_AFTER_S is above the finish timeout plus the longest wait between heartbeats (correctness 10)', () => {
@@ -259,6 +260,8 @@ describe('the reaper’s cutoff (D13)', () => {
       'a post answered busy, to the next post': cadenceFor(MAX_PAGE_CAP).busyWaitS,
       'a post, or a poll, to the next poll': cadenceFor(MAX_PAGE_CAP).pollMaxS,
       'the last batch to the end of the run': reserveS(MAX_PAGE_CAP),
+      // Row 17: a full render's chunk writes the check's heartbeat, each at most a step apart.
+      'a full render chunk, to the next': FULL_RENDER_STEP_S,
     };
     expect(cadenceFor(MAX_PAGE_CAP).busyWaitS).toBeGreaterThanOrEqual(PACE.busyWaitS);
     expect(reserveS(MAX_PAGE_CAP)).toBeGreaterThanOrEqual(RESERVE_S);
@@ -272,6 +275,6 @@ describe('the reaper’s cutoff (D13)', () => {
   it('is what reapStalled asks the store for', async () => {
     const reap = vi.fn(async () => []);
     await reapStalled({ reap }, () => T0);
-    expect(reap).toHaveBeenCalledWith('2026-11-08T10:25:00.000Z');
+    expect(reap).toHaveBeenCalledWith('2026-11-08T09:50:00.000Z');
   });
 });

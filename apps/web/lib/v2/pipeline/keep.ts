@@ -71,7 +71,15 @@ export interface KeptCheck {
  * names come from the path scheme and the batch numbers, not from `result_path` or `map_path`.
  */
 export function objectNames(batches: readonly number[]): EvidenceName[] {
-  return ['seeds', 'render', 'built', 'map', ...batches.map((n): EvidenceName => `batch-${n}`)];
+  return [
+    'seeds',
+    'render',
+    'render-full',
+    'render-full-progress',
+    'built',
+    'map',
+    ...batches.map((n): EvidenceName => `batch-${n}`),
+  ];
 }
 
 const ENDED: readonly string[] = ['finished', 'partial', 'failed'];

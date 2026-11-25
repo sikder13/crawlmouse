@@ -101,10 +101,10 @@ export const DEFAULT_PAGE_CAP = 500;
 /**
  * The reaper fails a queued or running check whose heartbeat is older than this (D13): above the
  * finish timeout plus the longest wait between two heartbeats (steps/lifecycle.test.ts), so no check
- * whose run may still be alive is reaped. 95 minutes since the finish timeout became 88 for 2,000
- * pages (inbox 079); 45 before that.
+ * whose run may still be alive is reaped. 130 minutes since the finish timeout became about 124 with
+ * row 17's full-render wait; 95 for 2,000 pages (inbox 079); 45 before that.
  */
-export const REAP_AFTER_S = 95 * 60;
+export const REAP_AFTER_S = 130 * 60;
 /** An audit nobody keeps stays readable this long after it was requested (CC-22b D8). */
 export const ANONYMOUS_EXPIRY_HOURS = 24;
 /** Manual and fix re-check requests in one 2-minute bucket are one check (ARCH-2 §4.1). */

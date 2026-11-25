@@ -146,7 +146,16 @@ function failing(
 
 describe('objectNames', () => {
   it('names a check’s objects from its batch numbers, whatever its rows store', () => {
-    expect(objectNames([0, 3])).toEqual(['seeds', 'render', 'built', 'map', 'batch-0', 'batch-3']);
+    expect(objectNames([0, 3])).toEqual([
+      'seeds',
+      'render',
+      'render-full',
+      'render-full-progress',
+      'built',
+      'map',
+      'batch-0',
+      'batch-3',
+    ]);
   });
 });
 

@@ -10,6 +10,7 @@ import { lifecycleSteps } from './lifecycle';
 
 export { NO_DAILY_BUDGET, type StepDeps } from './deps';
 export { failCancelled, failCheck, reapCutoff, reapStalled } from './lifecycle';
+export { fullRenderSteps } from './full-render';
 
 export function checkSteps(deps: StepDeps): CheckSteps {
   return { ...lifecycleSteps(deps), ...batchSteps(deps), ...finishSteps(deps) };
