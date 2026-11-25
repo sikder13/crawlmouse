@@ -238,6 +238,8 @@ describe('the finders see what they claim to see', () => {
       'app/api/account/route.ts',
       'app/api/agency-trial/route.ts',
       'app/api/agency/brand/route.ts',
+      'app/api/agency/domain/check/route.ts',
+      'app/api/agency/domain/route.ts',
       'app/api/alert-rules/route.ts',
       'app/api/billing/cancel/route.ts',
       'app/api/billing/pro-trial/start/route.ts',

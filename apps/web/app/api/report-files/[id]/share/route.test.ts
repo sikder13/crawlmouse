@@ -578,6 +578,65 @@ describe('GET /s/[token]', () => {
   });
 });
 
+describe('GET /s/[token] on an agency’s own host (Goal 1 row 25)', () => {
+  const PORTAL = 'x-crawlmouse-portal-host';
+  const openOn = (host: string, token: string) =>
+    OPEN(
+      new Request(`https://${host}/s/${token}`, {
+        method: 'GET',
+        headers: { 'x-forwarded-for': IP, [PORTAL]: host },
+      }),
+      { params: Promise.resolve({ token }) },
+    );
+  async function brand(accountId: string, host: string, status = 'verified') {
+    await h.db.query(
+      `insert into public.agency_brands (account_id, agency_name, portal_domain, portal_domain_status, portal_cname_found)
+       values ($1, 'Agency', $2, $3, true)`,
+      [accountId, host, status],
+    );
+  }
+
+  it('opens the agency’s own link on its host, to the page on that same host', async () => {
+    const w = await world();
+    await brand(w.owner.accountId, 'reports.own-example.com');
+    const token = await shared(w, w.proof);
+    as(null);
+    const res = await openOn('reports.own-example.com', token);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe(`https://reports.own-example.com/s/view/${w.proof}`);
+    expect((await links(w.proof))[0]!.view_count).toBe(1);
+  });
+
+  it('is a 404 for another agency’s link on this host, and counts no view of it', async () => {
+    const [mine, theirs] = [await world(), await world()];
+    await brand(mine.owner.accountId, 'reports.mine2-example.com');
+    const token = await shared(theirs, theirs.proof);
+    as(null);
+    const res = await openOn('reports.mine2-example.com', token);
+    expect(res.status).toBe(404);
+    expect(res.headers.get('location')).toBeNull();
+    expect((await links(theirs.proof))[0]!.view_count).toBe(0);
+    expect(h.capture).not.toHaveBeenCalled();
+  });
+
+  it('is a 404 on a host that is not verified, on one no row holds, and with agency_domain hidden', async () => {
+    const w = await world();
+    await brand(w.owner.accountId, 'pending.own3-example.com', 'pending');
+    const token = await shared(w, w.proof);
+    as(null);
+    expect((await openOn('pending.own3-example.com', token)).status).toBe(404);
+    expect((await openOn('nobody.own3-example.com', token)).status).toBe(404);
+    const v = await world();
+    await brand(v.owner.accountId, 'reports.own4-example.com');
+    const t2 = await shared(v, v.proof);
+    as(null);
+    vi.stubEnv('V2_HIDE_FEATURES', 'agency_domain');
+    expect((await openOn('reports.own4-example.com', t2)).status).toBe(404);
+    expect((await links(w.proof))[0]!.view_count).toBe(0);
+    expect((await links(v.proof))[0]!.view_count).toBe(0);
+  });
+});
+
 describe('the gone page', () => {
   it('holds no script, and no link but the home page and the support address', () => {
     expect(GONE_PAGE).not.toMatch(/<script|javascript:|\son\w+=/i);

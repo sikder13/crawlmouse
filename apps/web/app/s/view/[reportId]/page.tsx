@@ -15,6 +15,7 @@ import { parseStoredDoc } from '@/lib/v2/reports/share-doc';
 import { pageCapture } from '@/lib/v2/reports/share-proof';
 import { supabaseShareFiles, supabaseShareStore } from '@/lib/v2/reports/share-store';
 import { proofView } from '@/lib/v2/view/proof';
+import { portalScope, type PortalReader } from '@/lib/v2/agency/portal';
 
 /** Views of shared pages one address may ask for in an hour: the link's own bound (`/s/[token]`). */
 const PER_IP_HOUR = 60;
@@ -56,8 +57,16 @@ export default async function SharedProofPage({
   );
   if (!limit.allowed) return notFound();
   const admin = supabaseAdmin();
+  // On an agency's own host (row 25), only that agency's reports are drawn.
+  const scope = await portalScope(await headers(), () => admin as unknown as PortalReader);
+  if (scope.kind === 'refused') return notFound();
   const shared = await sharedProof(
-    { store: supabaseShareStore(admin), files: supabaseShareFiles(admin), now: () => new Date() },
+    {
+      store: supabaseShareStore(admin),
+      files: supabaseShareFiles(admin),
+      now: () => new Date(),
+      ...(scope.kind === 'portal' ? { onlyAccount: scope.accountId } : {}),
+    },
     reportId,
     raw,
   );

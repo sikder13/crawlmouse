@@ -87,6 +87,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'strict',
     bodyAfterMembership: true,
   },
+  {
+    route: 'api/agency/domain',
+    methods: ['DELETE', 'POST'],
+    class: 'member',
+    origin: 'strict',
+    bodyAfterMembership: true,
+  },
+  { route: 'api/agency/domain/check', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/alert-rules', methods: ['POST', 'PUT'], class: 'member', origin: 'strict' },
   {
     route: 'api/audits/[id]/cancel',

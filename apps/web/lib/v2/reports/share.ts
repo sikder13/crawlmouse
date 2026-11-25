@@ -245,6 +245,12 @@ export interface OpenDeps {
   files: ShareFiles;
   capture: AgencyCapture;
   now(): Date;
+  /**
+   * On an agency's own host (Goal 1 row 25), the account whose reports alone open there. A link of
+   * any other account, and a link that no longer opens, is a 404 like an unknown one, read without
+   * the count, so the host says nothing about another agency's links and counts no view of them.
+   */
+  onlyAccount?: string;
 }
 
 /**
@@ -260,6 +266,10 @@ export async function openShareLink(
   token: string,
 ): Promise<Response> {
   if (!isShareToken(token)) return shareNotFound();
+  if (deps.onlyAccount !== undefined) {
+    const seen = await deps.store.read(token, deps.now());
+    if (seen.outcome !== 'open' || seen.accountId !== deps.onlyAccount) return shareNotFound();
+  }
   const link = await deps.store.open(token, deps.now());
   if (link.outcome === 'unknown') return shareNotFound();
   if (link.outcome === 'gone') return gone();
@@ -301,12 +311,13 @@ export async function openShareLink(
  * that is not a proof page.
  */
 export async function sharedProof(
-  deps: Pick<OpenDeps, 'store' | 'files' | 'now'>,
+  deps: Pick<OpenDeps, 'store' | 'files' | 'now' | 'onlyAccount'>,
   reportId: string,
   token: string | null,
 ): Promise<{ report: SharedReport; bytes: Uint8Array } | null> {
   if (token === null) return null;
   const link = await deps.store.read(token, deps.now());
   if (link.outcome !== 'open' || link.reportId !== reportId || link.format !== 'html') return null;
+  if (deps.onlyAccount !== undefined && link.accountId !== deps.onlyAccount) return null;
   return { report: link, bytes: await deps.files.read(link.storagePath) };
 }

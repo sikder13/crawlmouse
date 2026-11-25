@@ -30,6 +30,8 @@ const h = vi.hoisted(() => ({
   /** Each rate-limit call's key and bound, and whether the address is past its bound. */
   limits: [] as { key: string; limit: number; windowMs: number }[],
   overLimit: false,
+  /** The request's headers, as the middleware leaves them (row 25 sets the portal host here). */
+  headers: new Headers(),
 }));
 
 class Redirect extends Error {
@@ -45,7 +47,7 @@ vi.mock('next/headers', () => ({
     get: (name: string) =>
       h.cookies.has(name) ? { name, value: h.cookies.get(name)! } : undefined,
   }),
-  headers: async () => new Headers(),
+  headers: async () => h.headers,
 }));
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: async (key: string, limit: number, windowMs: number) => {
@@ -119,6 +121,7 @@ beforeEach(() => {
   h.downloads.length = 0;
   h.capture.mockClear();
   h.user = null;
+  h.headers = new Headers();
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -331,6 +334,62 @@ describe('/s/view/[reportId]', () => {
       referrer: 'no-referrer',
     });
     expect(dynamic).toBe('force-dynamic');
+  });
+});
+
+describe('/s/view/[reportId] on an agency’s own host (Goal 1 row 25)', () => {
+  const HOST = 'reports.agency-example.com';
+  const onHost = (host: string) => {
+    h.headers = new Headers({ 'x-crawlmouse-portal-host': host });
+  };
+  async function brand(accountId: string, host: string, status: string) {
+    await h.db.query(
+      `insert into public.agency_brands (account_id, agency_name, portal_domain, portal_domain_status, portal_cname_found)
+       values ($1, 'Agency', $2, $3, true)
+       on conflict (account_id) do update set portal_domain = $2, portal_domain_status = $3`,
+      [accountId, host, status],
+    );
+  }
+
+  it('draws the agency’s own report on its verified host', async () => {
+    const w = await world();
+    await brand(w.owner.accountId, HOST, 'verified');
+    h.cookies.set('cm_share', await link(w, w.proof));
+    onHost(HOST);
+    expect(await sharedPage(w.proof)).toContain('Before and after');
+  });
+
+  it('is a 404 for another agency’s report on this host, though the link opens on crawlmouse.com', async () => {
+    const [mine, theirs] = [await world(), await world()];
+    await brand(mine.owner.accountId, 'reports.mine-example.com', 'verified');
+    const token = await link(theirs, theirs.proof);
+    h.cookies.set('cm_share', token);
+    onHost('reports.mine-example.com');
+    await expect(sharedPage(theirs.proof)).rejects.toBeInstanceOf(NotFound);
+    expect(h.downloads).toEqual([]);
+    h.headers = new Headers();
+    expect(await sharedPage(theirs.proof)).toContain('Before and after');
+  });
+
+  it('is a 404 on a host whose row is not verified, on a host no row holds, and with agency_domain hidden', async () => {
+    for (const status of ['unverified', 'txt_verified', 'pending', 'error']) {
+      const w = await world();
+      const host = `${status.replace('_', '-')}.agency-example.com`;
+      await brand(w.owner.accountId, host, status);
+      h.cookies.set('cm_share', await link(w, w.proof));
+      onHost(host);
+      await expect(sharedPage(w.proof), status).rejects.toBeInstanceOf(NotFound);
+    }
+    const w = await world();
+    h.cookies.set('cm_share', await link(w, w.proof));
+    onHost('nobody.agency-example.com');
+    await expect(sharedPage(w.proof)).rejects.toBeInstanceOf(NotFound);
+
+    await brand(w.owner.accountId, 'hidden.agency-example.com', 'verified');
+    vi.stubEnv('V2_HIDE_FEATURES', 'agency_domain');
+    onHost('hidden.agency-example.com');
+    await expect(sharedPage(w.proof)).rejects.toBeInstanceOf(NotFound);
+    expect(h.downloads).toEqual([]);
   });
 });
 

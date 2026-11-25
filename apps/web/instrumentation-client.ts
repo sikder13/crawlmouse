@@ -22,6 +22,11 @@ import {
   surveysOffAtStart,
 } from '@/lib/consent';
 import { hasSessionCookie } from '@/lib/v2/session-header';
+import { isOwnHost } from '@/lib/v2/agency/own-host';
+
+// An agency's own host (Goal 1 row 25) serves its client's report and nothing else: no analytics
+// and no session replay there.
+const onPortalHost = typeof window !== 'undefined' && !isOwnHost(window.location.host);
 
 // Sentry (client) — configured here, fetched when the browser is idle or on the first error, so it
 // is not part of a page's first load (F-045, lib/sentry-lazy.ts). With no DSN set (local/build)
@@ -30,7 +35,7 @@ configureSentry({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   tracesSampleRate: 0.1,
   replaysSessionSampleRate: 0,
-  replaysOnErrorSampleRate: 1.0,
+  replaysOnErrorSampleRate: onPortalHost ? 0 : 1.0,
   // The id in an `/audit/<id>` or `/checks/<id>` address is written out of each event and
   // transaction before it is sent (lib/auth/sentry-scrub.ts).
   ...sentryBrowserOptions(),
@@ -44,6 +49,7 @@ export const onRouterTransitionStart = routerTransitionStart;
 if (
   typeof window !== 'undefined' &&
   process.env.NEXT_PUBLIC_POSTHOG_KEY &&
+  !onPortalHost &&
   !/^\/internal(\/|$)/.test(window.location.pathname)
 ) {
   const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;

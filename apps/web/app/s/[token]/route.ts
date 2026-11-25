@@ -8,6 +8,7 @@ import { notFound } from '@/lib/v2/account/route';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
 import { isShareToken, openShareLink, shareNotFound, shareTooMany } from '@/lib/v2/reports/share';
 import { supabaseShareFiles, supabaseShareStore } from '@/lib/v2/reports/share-store';
+import { portalScope, type PortalReader } from '@/lib/v2/agency/portal';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,14 +40,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     return shareTooMany(Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000));
   }
   const admin = supabaseAdmin();
+  // On an agency's own host (row 25), only that agency's links open, and the page a link opens is
+  // on the same host; a host that may serve nothing answers as for an unknown link.
+  const scope = await portalScope(req.headers, () => admin as unknown as PortalReader);
+  if (scope.kind === 'refused') return shareNotFound();
   return openShareLink(
     {
       store: supabaseShareStore(admin),
       files: supabaseShareFiles(admin),
       capture: agencyCaptureFor(req),
       now: () => new Date(),
+      ...(scope.kind === 'portal' ? { onlyAccount: scope.accountId } : {}),
     },
-    resolveOrigin(req),
+    scope.kind === 'portal' ? scope.origin : resolveOrigin(req),
     token,
   );
 }

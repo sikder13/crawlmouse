@@ -77,6 +77,18 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
+    'apps/web/lib/v2/agency/own-host.ts :: return end === -1 ? h : h.slice(1, end);',
+    "STRING slice of a request `Host` header between an IPv6 literal's ASCII `[` and `]` (Goal 1 row 25): both cuts sit at ASCII characters, so neither can split a surrogate pair. Not crawled text, never persisted or rendered.",
+  ],
+  [
+    "apps/web/lib/v2/agency/own-host.ts :: return host.endsWith('.') ? host.slice(0, -1) : host;",
+    "STRING slice dropping one trailing ASCII `.` from a host, only when `endsWith('.')` has just said it is there (Goal 1 row 25), so it cannot split a surrogate pair. Not crawled text.",
+  ],
+  [
+    'apps/web/lib/v2/agency/own-host.ts :: return normalizeHost(colon === -1 ? h : h.slice(0, colon));',
+    'STRING slice of a request `Host` header before its ASCII `:` port separator (Goal 1 row 25): the cut sits at an ASCII character, so it cannot split a surrogate pair. Not crawled text, never persisted or rendered.',
+  ],
+  [
     'apps/web/lib/v2/reports/file-name.ts :: .slice(0, 100);',
     'Not crawled text: a site host we stored, already reduced to ASCII letters, digits, dots and hyphens on the line above, so the cut cannot split a character; it bounds a download file name (F-125).',
   ],

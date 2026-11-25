@@ -14,6 +14,12 @@ import {
   type CutoverMatch,
 } from '@/lib/v2/cutover';
 import { isRewriteTarget, REWRITE_HEADER, rewriteOf, type RewriteFlag } from '@/lib/v2/rewrites';
+import {
+  hostnameOf,
+  isOwnHost,
+  PORTAL_HOST_HEADER,
+  portalPathAllowed,
+} from '@/lib/v2/agency/portal-host';
 
 /**
  * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
@@ -67,6 +73,14 @@ export async function handleEdge(
   refresh: (req: NextRequest) => Promise<NextResponse> = updateSession,
   report: (r: Refusal) => void = (r) => void reportRefusal(r),
 ): Promise<NextResponse> {
+  // A request on a host that is not ours is an agency's client portal (Goal 1 row 25), answered
+  // here before anything else reads it: it never reaches the cutover table, the API guard, the
+  // session refresh or the consent cookie (portalAnswer). On our hosts, a portal header a client
+  // sent is deleted, so only portalAnswer can set it.
+  const host = req.headers.get('host');
+  if (!isOwnHost(host)) return portalAnswer(req, hostnameOf(host ?? ''));
+  req.headers.delete(PORTAL_HOST_HEADER);
+
   // A retired v1 address whose flags are all on is answered here, page or API, before anything else
   // reads the request (lib/v2/cutover.ts): its v1 page or route is not reached.
   const retired = cutoverOf(req.nextUrl.pathname);
@@ -102,6 +116,37 @@ export async function handleEdge(
     maxAge: 60 * 60 * 24,
   });
 
+  return res;
+}
+
+/** The one cookie a portal page reads: the share token `/s/<token>` sets for the page it opens. */
+const PORTAL_COOKIE = 'cm_share';
+const PORTAL_ROBOTS = 'noindex, nofollow, noarchive';
+
+/**
+ * A request on an agency's own host (row 25). Only `portalPathAllowed` paths pass (a share link, the
+ * page it opens, Next's static files); every other path and method is a 404 here, `/api` included.
+ * What passes carries the host in `PORTAL_HOST_HEADER`, which the two share routes read to find the
+ * agency and refuse another agency's report. No session is refreshed and no cookie is set: the
+ * request reaches the app with a `Cookie` header holding the share cookie alone, so a cookie set by
+ * the agency's parent domain, a session cookie included, is never read on this host. Every answer is
+ * `noindex`. Whether `agency_domain` is shown, and whether the host is verified, the routes decide.
+ */
+function portalAnswer(req: NextRequest, host: string): NextResponse {
+  if (!portalPathAllowed(req.method, req.nextUrl.pathname)) {
+    return new NextResponse(null, {
+      status: 404,
+      headers: { 'X-Robots-Tag': PORTAL_ROBOTS, ...NO_STORE },
+    });
+  }
+  const headers = new Headers(req.headers);
+  headers.set(PORTAL_HOST_HEADER, host);
+  headers.delete(REWRITE_HEADER);
+  headers.delete('cookie');
+  const share = req.cookies.get(PORTAL_COOKIE)?.value;
+  if (share !== undefined) headers.set('cookie', `${PORTAL_COOKIE}=${share}`);
+  const res = NextResponse.next({ request: { headers } });
+  res.headers.set('X-Robots-Tag', PORTAL_ROBOTS);
   return res;
 }
 
@@ -178,6 +223,23 @@ export function middleware(req: NextRequest, event: NextFetchEvent): Promise<Nex
 // favicon: pages for the session refresh and the consent cookie, the other API routes for guardApi,
 // which /ingest and the webhooks do not need. The X-Robots rule above applies to /embed/ and to the
 // report image path.
+//
+// The second entry sends those skipped paths to the middleware too, but only on a host that is not
+// ours, so on an agency's host they are 404s like every other path (portalAnswer). Its host pattern
+// is `OWN_HOST_MATCHER` (lib/v2/agency/portal-host.ts), written out because a route-segment export
+// must be a static literal; middleware.test.ts holds the two equal.
 export const config = {
-  matcher: ['/((?!ingest|api/webhooks/|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!ingest|api/webhooks/|_next/static|_next/image|favicon.ico).*)',
+    {
+      source: '/:path*',
+      missing: [
+        {
+          type: 'host',
+          value:
+            '(?:localhost|127\\.0\\.0\\.1|crawlmouse\\.com|.+\\.crawlmouse\\.com|.+\\.vercel\\.app)',
+        },
+      ],
+    },
+  ],
 };

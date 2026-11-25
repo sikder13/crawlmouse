@@ -87,6 +87,8 @@ export const OPTIONAL_ENV: Why = {
   RENDER_MAX_IN_FLIGHT: 'rendering stays off until the owner sets the caps (spec 14)',
   CLOUDFLARE_ACCOUNT_ID: 'Browser Rendering; rendering stays off without it (spec 14)',
   CLOUDFLARE_BROWSER_RENDERING_TOKEN: 'Browser Rendering; rendering stays off without it (spec 14)',
+  VERCEL_DOMAINS_TOKEN:
+    "the owner's Vercel token for an agency's portal host (Goal 1 row 25); unset, the domain check answers 503 and writes nothing (lib/v2/agency/vercel-domains.ts)",
 };
 
 /** The switch-on flags: setting one is a step, not a precondition. */
