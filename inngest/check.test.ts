@@ -840,10 +840,10 @@ describe('createCheckFn (D3)', () => {
       id: `${inngest.id}-${CHECK_FN_ID}`,
       triggers: [{ event: 'check.requested' }],
       concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: 16 }],
-      timeouts: { finish: '37m' },
+      timeouts: { finish: '5260s' },
       cancel: [{ event: 'check.cancel.requested', if: 'event.data.checkId == async.data.checkId' }],
     });
-    expect(PACE.finishS).toBe(37 * 60);
+    expect(PACE.finishS).toBe(5260);
     // F-260: no function idempotency, so a check's retry run can start (one event id a retry).
     expect(main!.idempotency).toBeUndefined();
     expect(main!.rateLimit).toBeUndefined();

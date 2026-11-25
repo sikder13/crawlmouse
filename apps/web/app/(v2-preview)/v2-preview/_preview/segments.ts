@@ -14,6 +14,7 @@ import type {
   SegmentKey,
   SegmentOptions,
 } from '../../../../lib/v2/view/segment/frame';
+import { linksView } from '../../../../lib/v2/view/segment/links';
 import { nojsView } from '../../../../lib/v2/view/segment/nojs';
 import { signalsView } from '../../../../lib/v2/view/segment/signals';
 import { structureView } from '../../../../lib/v2/view/segment/structure';
@@ -67,6 +68,12 @@ export const HISTORY_SOURCES: Record<ChangesHistory, { fixture: FixtureName; che
   },
 };
 
+/** Previews on a fixture of their own, not a variant's: the path's last part, and what it shows. */
+export const OWN_SOURCES: Record<'built', { fixture: FixtureName; check: string }> = {
+  /** The check builder's one check (CC-20a), read from the fixture rather than repeated here. */
+  built: { fixture: 'built-site', check: fixture('built-site').checks[0]!.id },
+};
+
 export const segmentPath = (key: SegmentKey, suffix = '') =>
   `/v2-preview/screens/segment/${key}${suffix}`;
 
@@ -104,10 +111,21 @@ export const SEGMENT_PREVIEWS = {
   access: (v: SegmentVariant) => accessView(...source(v), options(v)),
   nojs: (v: SegmentVariant) => nojsView(...source(v), options(v)),
   structure: (v: SegmentVariant) => structureView(...source(v), options(v)),
+  links: (v: SegmentVariant) => linksView(...source(v), options(v)),
   content: (v: SegmentVariant) => contentView(...source(v), options(v)),
   signals: (v: SegmentVariant) => signalsView(...source(v), options(v)),
   changes: (v: SegmentVariant) => changesView(...source(v), options(v)),
 } satisfies Record<SegmentKey, (v: SegmentVariant) => unknown>;
+
+/**
+ * Links and pages on the check builder's site (CC-20a), which has a page answering 404, titles
+ * and a description shared by several pages, and pages with no description. Its site has no other
+ * preview, so its tabs link nowhere.
+ */
+export function linksBuiltPreview() {
+  const { fixture: name, check } = OWN_SOURCES.built;
+  return linksView(fixture(name), check);
+}
 
 /** Changes for a later check: its site's own pages are not previewed, so the links go to "#". */
 export function changesHistoryPreview(name: ChangesHistory) {

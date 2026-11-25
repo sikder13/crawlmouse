@@ -71,7 +71,7 @@ const ROUTES: readonly Spec[] = [
     gate: 'seat_may',
     action: 'add_site',
     detail:
-      'Adds a client site through `add_site` with the service role, after `seat_may(add_site)` and an unscoped seat.',
+      'Adds a client site through `add_site` with the service role, after `seat_may(add_site)` and an unscoped seat; a repeat add’s re-send reads the account’s plan for the check’s page cap with the same client.',
     check: at('app/api/sites/route.ts', 'seat_may'),
     proof: by(
       'app/api/sites/route.test.ts',
@@ -1663,6 +1663,7 @@ const ENTRIES: readonly Spec[] = [
       'changes',
       'content',
       'fix/[fixId]',
+      'links',
       'map',
       'nojs',
       'overview',

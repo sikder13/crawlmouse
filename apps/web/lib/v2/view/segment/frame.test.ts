@@ -9,7 +9,7 @@ const hrefs = {
 };
 
 describe('segmentFrame', () => {
-  it('lists the overview and the six sections as tabs, in the locked order, marking the current one', () => {
+  it('lists the overview and the seven sections as tabs, in the locked order, marking the current one', () => {
     const { d, id } = edited('bad-site');
     const f = segmentFrame(d, id, 'structure', { asFirstSeen: true, hrefs });
     expect(f.tabs.map((t) => t.label)).toEqual([
@@ -17,6 +17,7 @@ describe('segmentFrame', () => {
       'Crawler access',
       'Without JavaScript',
       'Structure',
+      'Links and pages',
       'Content',
       'Signals',
       'Changes',
@@ -38,10 +39,14 @@ describe('segmentFrame', () => {
     expect(links('nojs')).toEqual(['Back: Crawler access', 'Next: Site structure · 74']);
     expect(links('structure')).toEqual([
       'Back: Without JavaScript',
+      'Next: Links and pages · no 404 or 410',
+    ]);
+    expect(links('links')).toEqual([
+      'Back: Site structure',
       'Next: Content an answer engine can quote · 58',
     ]);
     expect(links('content')).toEqual([
-      'Back: Site structure',
+      'Back: Links and pages',
       'Next: Agent-readiness signals · 2 of 7',
     ]);
     expect(links('signals')).toEqual(['Back: Content', 'Next: Changes']);
@@ -56,7 +61,7 @@ describe('segmentFrame', () => {
     expect(segmentFrame(d, id, 'access', { asFirstSeen: true, hrefs }).next.label).toBe(
       'Next: Readable without JavaScript · 42%',
     );
-    expect(segmentFrame(d, id, 'structure', { asFirstSeen: true, hrefs }).next.label).toBe(
+    expect(segmentFrame(d, id, 'links', { asFirstSeen: true, hrefs }).next.label).toBe(
       'Next: Content an answer engine can quote · 61',
     );
   });
@@ -65,14 +70,14 @@ describe('segmentFrame', () => {
     const { d, id } = edited('bad-site', (c) => {
       c.content = { ...c.content!, score: null, score_withheld: 'no_check_counted' };
     });
-    expect(segmentFrame(d, id, 'structure', { asFirstSeen: true, hrefs }).next.label).toBe(
+    expect(segmentFrame(d, id, 'links', { asFirstSeen: true, hrefs }).next.label).toBe(
       'Next: Content an answer engine can quote · not scored yet',
     );
   });
 
   it('drops the figure when the next section was not measured, rather than inventing one', () => {
     const { d, id } = edited('challenged-site');
-    expect(segmentFrame(d, id, 'structure', { hrefs }).next.label).toBe(
+    expect(segmentFrame(d, id, 'links', { hrefs }).next.label).toBe(
       'Next: Content an answer engine can quote · not measured',
     );
   });
@@ -87,6 +92,26 @@ describe('segmentFrame', () => {
     const { d, id } = edited('bad-site');
     expect(segmentFrame(d, id, 'access', { asFirstSeen: true, hrefs }).keptUntil).toBe(
       '26 Oct, 02:34 UTC',
+    );
+  });
+
+  it('gives the Links and pages tab its figure: the pill of its door, scoped to the pages checked', () => {
+    const { d, id } = edited('built-site');
+    // Counted here from the fixture's rows, apart from the code under test.
+    const gone = d.page_results.filter(
+      (p) => p.check_id === id && (p.status_code === 404 || p.status_code === 410),
+    ).length;
+    expect(gone).toBe(1);
+    expect(segmentFrame(d, id, 'structure', { hrefs }).next.label).toBe(
+      'Next: Links and pages · 1 missing page',
+    );
+    const clean = edited('clean-site');
+    expect(segmentFrame(clean.d, clean.id, 'structure', { hrefs }).next.label).toBe(
+      'Next: Links and pages · no 404 or 410',
+    );
+    const challenged = edited('challenged-site');
+    expect(segmentFrame(challenged.d, challenged.id, 'structure', { hrefs }).next.label).toBe(
+      'Next: Links and pages · not measured',
     );
   });
 
