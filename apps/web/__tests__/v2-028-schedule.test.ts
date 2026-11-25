@@ -274,10 +274,11 @@ describe('the triggers that keep next_check_at', () => {
     // whatever today is (in UTC, the accounts' zone here).
     const now = Date.now();
     const nextWeekly = (wd: number) => {
-      for (let i = 0; i < 8; i++) {
+      // The first time a day or more after the site is added (D-18).
+      for (let i = 0; i < 10; i++) {
         const d = new Date(now + i * 86_400_000);
         d.setUTCHours(6, 0, 0, 0);
-        if ((d.getUTCDay() || 7) === wd && d.getTime() > now + 60_000) return d;
+        if ((d.getUTCDay() || 7) === wd && d.getTime() > now + 86_400_000 + 60_000) return d;
       }
       throw new Error('no weekday');
     };
@@ -286,10 +287,11 @@ describe('the triggers that keep next_check_at', () => {
     const acc = await account('free');
     const id = await site(acc, { weekday: wd, hour: 6, offset: 0 });
     const { rows } = await db.query<{ ok: boolean; weekly: boolean }>(
+      // From a day after the site was added (migration 20261125000001, D-18).
       `select s.next_check_at = public.next_check_after('monthly', $2::smallint, 6::smallint, 0::smallint,
-                                                         'UTC', s.created_at) as ok,
+                                                         'UTC', s.created_at + interval '1 day') as ok,
               s.next_check_at = public.next_check_after('weekly', $2::smallint, 6::smallint, 0::smallint,
-                                                         'UTC', s.created_at) as weekly
+                                                         'UTC', s.created_at + interval '1 day') as weekly
          from public.sites s where s.id = $1`,
       [id, wd],
     );
