@@ -62,6 +62,7 @@ import { nextCheckLine, type NextChecks } from './site';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
 import { action, emailDeveloperAction, type ActionView } from './account-actions';
+import { roleMay } from '../agency/guard';
 import {
   FREE_SCHEDULE,
   accountShellView,
@@ -652,7 +653,7 @@ function setup(
     subject: string,
     todo: string,
     doneLabel: string,
-    act: ActionView,
+    act: ActionView | null,
   ) => {
     if (!todo.includes(subject)) {
       throw new Error(`set-up item ${key}: its row does not name its subject "${subject}"`);
@@ -661,7 +662,7 @@ function setup(
       key,
       label: done ? doneLabel : todo,
       done,
-      action: done ? null : { ...act, context: `for ${subject}` },
+      action: done || act === null ? null : { ...act, context: `for ${subject}` },
     });
   };
   const settings = (label: string) =>
@@ -673,7 +674,10 @@ function setup(
       SETUP_COPY.slack.subject,
       SETUP_COPY.slack.todo,
       SETUP_COPY.slack.done,
-      action('integrations', 'Connect'),
+      // Integrations is a 404 for a role that may not edit the account's alerts.
+      roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts')
+        ? action('integrations', 'Connect')
+        : null,
     );
   }
   if (g.competitorsPerSite > 0) {
@@ -687,16 +691,6 @@ function setup(
       settings('Add'),
     );
   }
-  if (g.searchConsole) {
-    item(
-      'search_console',
-      connected('search_console'),
-      SETUP_COPY.searchConsole.subject,
-      SETUP_COPY.searchConsole.todo,
-      SETUP_COPY.searchConsole.done,
-      action('integrations', 'Connect'),
-    );
-  }
   if (g.stagingAndDeployHooks) {
     const done = v.d.sites.some((s) => s.staging_of_site_id === site.id);
     item(
@@ -706,16 +700,6 @@ function setup(
       SETUP_COPY.staging.todo,
       SETUP_COPY.staging.done,
       settings('Add'),
-    );
-  }
-  if (g.observedCrawlerActivity) {
-    item(
-      'observed',
-      connected('cloudflare_analytics', 'vercel_drain'),
-      SETUP_COPY.observed.subject,
-      SETUP_COPY.observed.todo,
-      SETUP_COPY.observed.done,
-      action('integrations', 'Connect'),
     );
   }
   const left = items.filter((i) => !i.done).length;

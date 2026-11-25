@@ -72,6 +72,55 @@ function bodyReads(sf: ts.SourceFile, methods = ['json', 'formData']): number[] 
   return out;
 }
 
+/** The request methods that read its body. */
+const BODY_METHODS = new Set(['json', 'formData', 'arrayBuffer', 'text', 'blob']);
+
+/**
+ * Every place an exported handler may read its request body, by offset: a body method called on the
+ * request parameter (`req.json()`, `req.formData()`, `req.arrayBuffer()`, `req.text()`,
+ * `req.blob()`), the parameter's `.body` stream, any `.getReader()` call, and any call the parameter
+ * itself is passed to (`readCapped(req)`, `readBody(req)`), since the callee may read it. Wider than
+ * `bodyReads`, which a webhook's signature check relies on staying narrow (it must read `text()`).
+ * Only code inside an exported handler counts: a helper declared above the handler is read where the
+ * handler calls it, not where it is written.
+ */
+function bodyTouches(sf: ts.SourceFile): number[] {
+  const out: number[] = [];
+  const isExported = (n: ts.Node) =>
+    ts.canHaveModifiers(n) &&
+    (ts.getModifiers(n) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+  for (const stmt of sf.statements) {
+    if (!ts.isFunctionDeclaration(stmt) || !isExported(stmt) || !stmt.body) continue;
+    const first = stmt.parameters[0];
+    if (!first || !ts.isIdentifier(first.name)) continue;
+    const param = first.name.text;
+    const isParam = (e: ts.Node) => ts.isIdentifier(e) && e.text === param;
+    const visit = (node: ts.Node) => {
+      if (ts.isCallExpression(node)) {
+        const callee = node.expression;
+        if (
+          ts.isPropertyAccessExpression(callee) &&
+          ((BODY_METHODS.has(callee.name.text) && isParam(callee.expression)) ||
+            callee.name.text === 'getReader')
+        ) {
+          out.push(node.getStart(sf));
+        } else if (node.arguments.some(isParam)) {
+          out.push(node.getStart(sf));
+        }
+      } else if (
+        ts.isPropertyAccessExpression(node) &&
+        node.name.text === 'body' &&
+        isParam(node.expression)
+      ) {
+        out.push(node.getStart(sf));
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(stmt.body);
+  }
+  return out;
+}
+
 /** True when an exported handler parses its request body with `.json()`. */
 export function readsJsonBody(sf: ts.SourceFile): boolean {
   return bodyReads(sf, ['json']).length > 0;
@@ -251,6 +300,7 @@ export function mechanismProblems(
   sf: ts.SourceFile,
   routeClass: RouteClass,
   verifier?: string,
+  options: { bodyAfterMembership?: boolean } = {},
 ): string[] {
   switch (routeClass) {
     case 'user':
@@ -259,8 +309,18 @@ export function mechanismProblems(
       const problems = sessionFirst(sf);
       const check = first(membershipChecks(sf));
       if (check === Infinity) problems.push('never checks membership through rpc()');
-      else if (callPositions(sf, 'supabaseAdmin').some((p) => p < check)) {
-        problems.push('calls supabaseAdmin() before the membership check');
+      else {
+        if (callPositions(sf, 'supabaseAdmin').some((p) => p < check)) {
+          problems.push('calls supabaseAdmin() before the membership check');
+        }
+        // Opt-in by the route's row: most member routes read the account they name from the body,
+        // so they cannot ask about membership before it.
+        const early = options.bodyAfterMembership ? bodyTouches(sf).filter((p) => p < check) : [];
+        if (early.length) {
+          problems.push(
+            `reads the request body before the membership check (${early.length} read${early.length === 1 ? '' : 's'})`,
+          );
+        }
       }
       return problems;
     }

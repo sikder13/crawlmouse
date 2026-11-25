@@ -1,7 +1,7 @@
 /**
- * What /settings, /settings/delete and /alerts say when a form sends the reader back (CC-27b review,
- * item 6; CC-28 D8): `?saved=1` or `?email=sent` on Settings, `?sent=1` on the delete step, and
- * `?error=<code>` on all three, with a sentence for each code the routes behind them answer
+ * What /settings, /settings/delete, /settings/integrations and /alerts say when a form sends the
+ * reader back (CC-27b review, item 6; CC-28 D8): `?saved=1` or `?email=sent` on Settings, `?saved=1`
+ * on Integrations, `?sent=1` on the delete step, and `?error=<code>` on all four, with a sentence for each code the routes behind them answer
  * (settings-notices.test.ts reads the codes from the routes' sources). A code with no sentence here
  * gets the generic one. Alerts has no success line: its route sends a form back with none.
  */
@@ -10,6 +10,8 @@ import { numberWord } from '../words';
 
 export const SETTINGS_NOTICES = {
   saved: 'Saved.',
+  slackTested:
+    'A test message was sent. If it is not in the channel within a minute, check the webhook in Slack.',
   emailSent:
     'We sent a confirmation link to the new address. The change takes effect when you open it, and the old address gets a notice with a link to undo it.',
   deleteSent:
@@ -53,6 +55,11 @@ export const REFUSAL_SENTENCES: Readonly<Record<string, string>> = {
   personal_account_only:
     'Your sign-in address and deleting your account belong to your own account. Switch to it, then try again.',
   upgrade_required: 'Slack alerts need Pro or Agency.',
+  slack_not_connected: 'Slack is not connected, so there is nowhere to send a test.',
+  slack_unreachable:
+    'Slack could not be reached just now, so no test message was sent. Try again in a minute.',
+  slack_failed:
+    'Slack did not take the test message. Check that the webhook is still active in Slack, or replace it.',
   // What was sent
   invalid: 'Something in the form was not accepted. Check it and save again.',
   method_not_allowed: 'That form could not be sent that way. Reload the page and try again.',
@@ -97,7 +104,7 @@ type Query = Readonly<Record<string, string | string[] | undefined>>;
 /** The line a page shows for its query, or null. An error code is read ahead of a success line. */
 export function settingsNotice(
   query: Query,
-  page: 'settings' | 'delete' | 'alerts',
+  page: 'settings' | 'delete' | 'alerts' | 'integrations',
 ): Notice | null {
   const error = query.error;
   if (error !== undefined) {
@@ -110,5 +117,9 @@ export function settingsNotice(
     return null;
   }
   if (page === 'alerts') return null;
+  if (page === 'integrations') {
+    if (query.tested === '1') return { tone: 'ok', text: SETTINGS_NOTICES.slackTested };
+    return query.saved === '1' ? { tone: 'ok', text: SETTINGS_NOTICES.saved } : null;
+  }
   return query.sent === '1' ? { tone: 'ok', text: SETTINGS_NOTICES.deleteSent } : null;
 }

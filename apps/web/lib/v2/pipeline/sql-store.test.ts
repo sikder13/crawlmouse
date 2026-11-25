@@ -138,6 +138,49 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     expect(await statusOf(db, b)).toEqual({ status: 'failed', failure_reason: 'canceled' });
   });
 
+  // F-260: a check a worker deploy met is queued again for its one retry run.
+  it('requeues a check running under its run: queued as the constraints ask, its rows kept for the step, then deleted, then claimable', async () => {
+    const { db, store } = await fresh();
+    const s = await site(db);
+    const id = await check(db, s, { status: 'running', heartbeat: ago(10 * MIN), run: 'run-1' });
+    for (const batch of [1, 2]) {
+      await db.query(
+        `insert into public.crawl_batches (check_id, batch, kind, nonce, status, posted_at)
+         values ($1, $2, 'crawl', $3, 'posted', now())`,
+        [id, batch, `nonce-requeue-${batch}-0000`],
+      );
+    }
+    const at = new Date(NOW).toISOString();
+    expect(await store.requeue(id, 'run-2', at)).toBe(false);
+    expect((await statusOf(db, id)).status).toBe('running');
+    expect(await store.requeue(id, 'run-1', at)).toBe(true);
+    const row = (
+      await db.query<Record<string, unknown>>(
+        `select status, started_at, progress, inngest_run_id, heartbeat_at from public.checks where id = $1`,
+        [id],
+      )
+    ).rows[0]!;
+    expect(row).toMatchObject({
+      status: 'queued',
+      started_at: null,
+      progress: null,
+      inngest_run_id: null,
+    });
+    expect(new Date(row.heartbeat_at as string).toISOString()).toBe(at);
+    // The rows stay until the step has removed their stored results, so they can still be named.
+    expect((await store.batches(id)).map((b) => b.batch)).toEqual([1, 2]);
+    await store.deleteBatches(id);
+    const left = await db.query(`select 1 from public.crawl_batches where check_id = $1`, [id]);
+    expect(left.rows).toEqual([]);
+    // A retried step finds it queued with no run, and answers true again.
+    expect(await store.requeue(id, 'run-1', at)).toBe(true);
+    // The retry run claims it as any queued check.
+    expect(await store.claim(id, 'run-retry', PROGRESS as never)).toBe('claimed');
+    // A check that has ended is not requeued.
+    expect(await store.fail(id, 'internal', null)).toBe(true);
+    expect(await store.requeue(id, 'run-retry', at)).toBe(false);
+  });
+
   it('reaps a heartbeat older than REAP_AFTER_S, not one exactly that old or a second younger (D13)', async () => {
     const { db, store } = await fresh();
     const R = REAP_AFTER_S * 1000;

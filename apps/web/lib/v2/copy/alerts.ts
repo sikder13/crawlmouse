@@ -69,8 +69,12 @@ export const ALERTS_COPY = {
   slackNotConnected: 'not connected',
   on: 'on',
   off: 'off',
-  slackPerSite: 'Slack channel per site',
-  slackPerSiteValue: 'set on each site page',
+  slackSettings: 'Slack settings',
+  slackSettingsValue: 'in Integrations',
+  slackSettingsOwner: 'with the owner or an account manager',
+  openIntegrations: 'Open',
+  alertsPerSite: 'Alerts per site',
+  alertsPerSiteValue: 'set on each site page',
   openSite: 'Open a site',
   slackIsPro: 'Slack is Pro.',
   trialFoot: (days: number) =>
@@ -188,6 +192,14 @@ export const ALERTS_CHANGES: CopyChange[] = [
     locked: 'Tue 27 Oct 14:12',
     rendered: 'Tue 27 Oct 14:13',
     source: 'The fixture’s staging notification was sent at 18:13:20Z, 14:13 in the account’s zone',
+  },
+  {
+    screen: 'alerts',
+    kind: 'ruling',
+    locked: 'Slack channel per site set on each site page',
+    rendered: 'Slack settings in Integrations Open Alerts per site set on each site page',
+    source:
+      'V2R register (F-016; TARGET.md, owner, 23 Nov): Slack is built. The webhook is the account’s and is set on Integrations; a site page has no Slack field (F-016), and what it does set is that site’s alert rules.',
   },
   {
     screen: 'alerts',

@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import { NOTICE_LINES } from '../copy/notices';
+import { REPORTS_COPY } from '../copy/reports';
 import {
   hashShareToken,
   isShareToken,
@@ -7,6 +9,7 @@ import {
   newShareToken,
   openShareLink,
   SHARE_COOKIE,
+  SHARE_FLASH_SECONDS,
   sharedProof,
   shareReport,
   shareTokenIn,
@@ -24,6 +27,7 @@ const ORIGIN = 'https://crawlmouse.com';
 const REPORT = '6f1c2a8e-0000-4000-8000-000000000001';
 const ACCOUNT = '6f1c2a8e-0000-4000-8000-000000000002';
 const NOW = new Date('2026-11-12T12:00:00.000Z');
+const MADE = '2026-11-09T08:00:00.000Z';
 
 const opened = (format: 'pdf' | 'html' | 'csv' = 'html', reportId = REPORT): LinkAnswer => ({
   outcome: 'open',
@@ -44,6 +48,8 @@ function fakes(answer: LinkAnswer) {
     open: vi.fn(async () => answer),
     read: vi.fn(async () => answer),
     revoke: vi.fn(async () => undefined),
+    // The report was made days before the link is opened, so a name dated by the clock is caught.
+    fileFacts: vi.fn(async () => ({ host: 'shop.example.com', createdAt: MADE })),
   };
   const files: ShareFiles = {
     signedUrl: vi.fn(async (path: string) => `https://files.example/${path}`),
@@ -183,8 +189,25 @@ describe('openShareLink', () => {
     const f = fakes(opened(fmt));
     const res = await openShareLink(f, ORIGIN, newShareToken());
     expect(res.status).toBe(302);
-    expect(f.files.signedUrl).toHaveBeenCalledWith(`${ACCOUNT}/${REPORT}.x`, 60);
+    expect(f.files.signedUrl).toHaveBeenCalledWith(
+      `${ACCOUNT}/${REPORT}.x`,
+      60,
+      `crawlmouse-shop.example.com-2026-11-09-audit.${fmt}`,
+    );
     expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('downloads under the stored name when the site or the report is gone (F-125)', async () => {
+    const f = fakes(opened('pdf'));
+    vi.mocked(f.store.fileFacts).mockResolvedValueOnce(null);
+    expect((await openShareLink(f, ORIGIN, newShareToken())).status).toBe(302);
+    expect(f.files.signedUrl).toHaveBeenCalledWith(`${ACCOUNT}/${REPORT}.x`, 60, undefined);
+  });
+
+  it('reads no names for a proof page', async () => {
+    const f = fakes(opened('html'));
+    await openShareLink(f, ORIGIN, newShareToken());
+    expect(f.store.fileFacts).not.toHaveBeenCalled();
   });
 
   it('a proof page’s redirect holds the report’s id, and the token only in the cookie', async () => {
@@ -227,5 +250,13 @@ describe('sharedProof', () => {
       expect(await sharedProof(f, REPORT, 'tok')).toBeNull();
       expect(f.files.read).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('what the page says of a made link', () => {
+  it('names the time the flash cookie keeps it: two minutes', () => {
+    expect(SHARE_FLASH_SECONDS).toBe(120);
+    expect(REPORTS_COPY.madeLink).toContain('two minutes');
+    expect(NOTICE_LINES.share_made(null)).toContain('two minutes');
   });
 });

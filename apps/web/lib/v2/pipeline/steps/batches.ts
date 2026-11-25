@@ -142,7 +142,11 @@ export function batchSteps(
   }
 
   const progress = (event: CheckRequested, at: BatchAt, so: RunSoFar, now: number) =>
-    deps.store.progress(event.checkId, progressOf(phaseOf(at), so, now - so.startedAt), iso(now));
+    deps.store.progress(
+      event.checkId,
+      progressOf(phaseOf(at, event.retry?.firstBatch), so, now - so.startedAt),
+      iso(now),
+    );
 
   /** One post attempt: the batch the worker holds already, or one planned and posted now. */
   async function attempt(event: CheckRequested, at: BatchAt, so: RunSoFar): Promise<PostOutput> {
