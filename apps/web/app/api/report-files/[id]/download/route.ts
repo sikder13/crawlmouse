@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId, notFound, refuse } from '@/lib/v2/account/route';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
-import { reportFileName, type ReportKindName } from '@/lib/v2/reports/file-name';
+import { isNamedKind, reportFileName } from '@/lib/v2/reports/file-name';
 import type { ReportFormat } from '@/lib/v2/reports/generate';
 import { supabaseReportBucket } from '@/lib/v2/reports/generate-run';
 
@@ -69,15 +69,17 @@ export async function GET(req: Request, { params }: Context) {
     .eq('id', report.site_id)
     .maybeSingle();
   if (siteError) throw new Error(`sites read failed: ${siteError.message}`);
+  const kind = report.kind as string;
   const url = await supabaseReportBucket(admin).signedUrl(
     file.storage_path as string,
     SIGNED_SECONDS,
-    site === null
+    // A kind with no name of its own here, or a site row gone, keeps the stored object's name.
+    site === null || !isNamedKind(kind)
       ? undefined
       : reportFileName({
           host: site.host as string,
           createdAt: report.created_at as string,
-          kind: report.kind as ReportKindName,
+          kind,
           format: report.format as ReportFormat,
         }),
   );

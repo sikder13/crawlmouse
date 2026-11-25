@@ -152,7 +152,20 @@ describe('GET /api/report-files/[id]/download', () => {
         `select host from public.sites where id = $1`,
         [w.site.id],
       );
-      // F-125: the file downloads under the site and the day, not the report's id.
+      // F-125: the file downloads under the site and the day the report was made, not the
+      // report's id. The row is dated far from today, so a name dated by the clock fails.
+      await h.db.query(
+        `update public.reports set created_at = '2025-03-07T12:00:00Z' where id = $1`,
+        [onSite],
+      );
+      const named = await get(onSite);
+      expect(named.status).toBe(302);
+      expect(h.bucket.signed.at(-1)).toEqual([
+        path,
+        600,
+        `crawlmouse-${rows[0]!.host}-2025-03-07-audit.pdf`,
+      ]);
+      h.bucket.signed.pop();
       expect(h.bucket.signed).toEqual([
         [
           path,

@@ -27,6 +27,7 @@ const ORIGIN = 'https://crawlmouse.com';
 const REPORT = '6f1c2a8e-0000-4000-8000-000000000001';
 const ACCOUNT = '6f1c2a8e-0000-4000-8000-000000000002';
 const NOW = new Date('2026-11-12T12:00:00.000Z');
+const MADE = '2026-11-09T08:00:00.000Z';
 
 const opened = (format: 'pdf' | 'html' | 'csv' = 'html', reportId = REPORT): LinkAnswer => ({
   outcome: 'open',
@@ -47,7 +48,8 @@ function fakes(answer: LinkAnswer) {
     open: vi.fn(async () => answer),
     read: vi.fn(async () => answer),
     revoke: vi.fn(async () => undefined),
-    fileFacts: vi.fn(async () => ({ host: 'shop.example.com', createdAt: NOW.toISOString() })),
+    // The report was made days before the link is opened, so a name dated by the clock is caught.
+    fileFacts: vi.fn(async () => ({ host: 'shop.example.com', createdAt: MADE })),
   };
   const files: ShareFiles = {
     signedUrl: vi.fn(async (path: string) => `https://files.example/${path}`),
@@ -190,7 +192,7 @@ describe('openShareLink', () => {
     expect(f.files.signedUrl).toHaveBeenCalledWith(
       `${ACCOUNT}/${REPORT}.x`,
       60,
-      `crawlmouse-shop.example.com-2026-11-12-audit.${fmt}`,
+      `crawlmouse-shop.example.com-2026-11-09-audit.${fmt}`,
     );
     expect(res.headers.get('set-cookie')).toBeNull();
   });
