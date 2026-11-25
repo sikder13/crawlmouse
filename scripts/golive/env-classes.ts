@@ -78,6 +78,8 @@ export const OPTIONAL_ENV: Why = {
   INNGEST_COMPETITOR_CONCURRENCY: "unset uses inngest/competitors.ts's default",
   INNGEST_SENTINEL_CONCURRENCY: "unset uses inngest/sentinel.ts's default",
   NEXT_PUBLIC_POSTHOG_HOST: 'unset uses the /ingest proxy default',
+  INNGEST_ENV:
+    "the Inngest environment events are sent to and functions served in; set on staging and Preview, unset on production, which uses Inngest's default (settings-parity, c/036)",
   SENTRY_AUTH_TOKEN: 'build-time source-map upload; unset ships without source maps',
   SIGNIN_CANARY_TO:
     'unset, the sign-in canary is not registered; set, it runs every 10 minutes (CC-33 D6, docs/ops/uptime.md)',
@@ -145,6 +147,7 @@ export const READ_BY_LIBRARIES: Why = {
   INNGEST_SIGNING_KEY: 'the inngest SDK',
   INNGEST_EVENT_KEY: 'the inngest SDK',
   INNGEST_DEV: 'the inngest SDK',
+  INNGEST_ENV: 'the inngest SDK',
 };
 
 /** Must NOT be set for Production: the Vercel probe fails step 1 when one is. */
