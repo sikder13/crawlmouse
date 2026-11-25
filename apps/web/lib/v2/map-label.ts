@@ -3,7 +3,7 @@ import type { LayoutNode } from './map-layout';
 /**
  * What the map shows, counted from its nodes so the description cannot disagree with the picture.
  */
-export function mapLabel(nodes: readonly LayoutNode[], building: boolean): string {
+export function mapLabel(nodes: readonly LayoutNode[], building: boolean, notDrawn = 0): string {
   const count = (k: LayoutNode['kind']) => nodes.filter((n) => n.kind === k).length;
   const pages = nodes.length;
   const head = building
@@ -15,5 +15,11 @@ export function mapLabel(nodes: readonly LayoutNode[], building: boolean): strin
     orphans ? `${orphans} orphan ${orphans === 1 ? 'page' : 'pages'} with no links in` : null,
     js ? `${js} ${js === 1 ? 'page' : 'pages'} reachable only through JavaScript` : null,
   ].filter(Boolean);
-  return tail.length ? `${head}; ${tail.join(', ')}` : head;
+  const label = tail.length ? `${head}; ${tail.join(', ')}` : head;
+  return notDrawn > 0 ? `${label}; ${notDrawnText(notDrawn)}` : label;
+}
+
+/** The pages reached that the map leaves out (map-cap.ts), said where the map is described. */
+export function notDrawnText(n: number): string {
+  return `${n.toLocaleString('en-US')} more ${n === 1 ? 'page' : 'pages'} reached, not drawn`;
 }
