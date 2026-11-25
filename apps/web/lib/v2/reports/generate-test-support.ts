@@ -108,7 +108,10 @@ export async function reportWorld(db: PGlite): Promise<ReportWorld> {
 /** A bucket in memory: what was put and how many times, and each address it was asked to sign. */
 export function memoryReportBucket() {
   const objects = new Map<string, ReportFile>();
-  const signed: [path: string, seconds: number][] = [];
+  const signed: (
+    | [path: string, seconds: number]
+    | [path: string, seconds: number, filename: string]
+  )[] = [];
   const state = { refuse: false, refuseRemoval: false, puts: 0 };
   const bucket: ReportBucket = {
     async put(path, file) {
@@ -120,8 +123,8 @@ export function memoryReportBucket() {
       if (state.refuseRemoval) throw new Error('the bucket refused the removal');
       objects.delete(path);
     },
-    async signedUrl(path, seconds) {
-      signed.push([path, seconds]);
+    async signedUrl(path, seconds, filename) {
+      signed.push(filename === undefined ? [path, seconds] : [path, seconds, filename]);
       return `https://storage.test/reports/${path}?token=signed`;
     },
   };
