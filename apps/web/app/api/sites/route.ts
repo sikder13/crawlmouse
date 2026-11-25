@@ -42,8 +42,8 @@ export const dynamic = 'force-dynamic';
  * The add that made this site may have failed at its send, leaving its check queued with nothing to
  * run it. A repeat add recovers it. The reads run here, through the caller's own session; what they
  * answer is the work to do after the response, so a slow or failing send cannot hold back the 409.
- * It re-sends under `queuedEventId`'s id, and a check already sent runs once (`inngest/check.ts` is
- * idempotent on `checkId`). A paused site is left alone, as the other starts refuse one, and so is a
+ * It re-sends under `queuedEventId`'s id, and a check already sent runs once: Inngest drops an event
+ * whose id it has had within 24 hours, and `claim_check` lets one run claim a queued check. A paused site is left alone, as the other starts refuse one, and so is a
  * site whose row this session cannot read. A repeat is counted as the public start counts one, and
  * over that limit it sends nothing.
  */

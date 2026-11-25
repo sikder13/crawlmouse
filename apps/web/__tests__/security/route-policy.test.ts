@@ -93,7 +93,11 @@ describe('the export reader sees each spelling a route uses', () => {
 
 describe('each route source shows the mechanism its class requires', () => {
   it.each(ROUTE_POLICIES.map((p) => [`${p.route} (${p.class})`, p] as const))('%s', (_, policy) => {
-    expect(mechanismProblems(readRoute(policy.route), policy.class, policy.verifier)).toEqual([]);
+    expect(
+      mechanismProblems(readRoute(policy.route), policy.class, policy.verifier, {
+        bodyAfterMembership: policy.bodyAfterMembership === true,
+      }),
+    ).toEqual([]);
   });
 
   it('a route that answers 401 after asking for the session is registered as user or member', () => {
@@ -120,8 +124,12 @@ describe('each route source shows the mechanism its class requires', () => {
 });
 
 describe('the mechanism checks fail on the code they guard against', () => {
-  const check = (src: string, cls: Parameters<typeof mechanismProblems>[1], verifier?: string) =>
-    mechanismProblems(parseSource(src), cls, verifier);
+  const check = (
+    src: string,
+    cls: Parameters<typeof mechanismProblems>[1],
+    verifier?: string,
+    options?: Parameters<typeof mechanismProblems>[3],
+  ) => mechanismProblems(parseSource(src), cls, verifier, options);
 
   it('user: the session is read before any service-role call', () => {
     const ok = `export async function POST() { const { data: { user } } = await sb.auth.getUser(); const a = supabaseAdmin(); }`;
@@ -175,6 +183,44 @@ describe('the mechanism checks fail on the code they guard against', () => {
     expect(check(ok, 'webhook', 'serve')).toEqual([]);
     expect(check(extra, 'webhook', 'serve')).toEqual(['exports POST that serve() does not handle']);
     expect(check(other, 'webhook', 'serve')).toEqual(['does not import serve from inngest/next']);
+  });
+
+  it('member, body after membership: a body read before member_role is a problem, in each form', () => {
+    const route = (before: string, after = '') =>
+      `async function readCapped(r) { const x = r.body.getReader(); return x; }\nexport async function POST(req) { const sb = await supabaseServer(); await sb.auth.getUser(); ${before} const { data } = await sb.rpc('member_role', { p_account: a }); ${after} }`;
+    const strict = (src: string) => check(src, 'member', undefined, { bodyAfterMembership: true });
+    expect(strict(route('', 'const raw = await readCapped(req);'))).toEqual([]);
+    expect(
+      strict(route('', 'const f = await req.formData(); const t = await req.text();')),
+    ).toEqual([]);
+    const forms: Record<string, string> = {
+      'a helper given the request': 'const raw = await readCapped(req);',
+      'req.json()': 'const b = await req.json();',
+      'req.formData()': 'const f = await req.formData();',
+      'req.arrayBuffer()': 'const b = await req.arrayBuffer();',
+      'req.text()': 'const t = await req.text();',
+      'req.blob()': 'const b = await req.blob();',
+      'req.body': 'const s = req.body;',
+    };
+    for (const [name, read] of Object.entries(forms)) {
+      expect(strict(route(read)), name).toEqual([
+        'reads the request body before the membership check (1 read)',
+      ]);
+    }
+    // A getReader() call on the stream: `req.body` and `.getReader()` are both reads.
+    expect(strict(route('const r = req.body.getReader();'))).toEqual([
+      'reads the request body before the membership check (2 reads)',
+    ]);
+    // A route whose row does not opt in reads the account it names from its body, as most do.
+    expect(check(route('const raw = await readCapped(req);'), 'member')).toEqual([]);
+  });
+
+  it('only member rows say the body follows membership', () => {
+    const wrong = ROUTE_POLICIES.filter((p) => p.bodyAfterMembership && p.class !== 'member');
+    expect(wrong.map((p) => p.route)).toEqual([]);
+    expect(ROUTE_POLICIES.filter((p) => p.bodyAfterMembership).map((p) => p.route)).toContain(
+      'api/agency/brand',
+    );
   });
 
   it('operator: requireOperator runs before any service-role client or body read', () => {
@@ -398,6 +444,7 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/account/email/undo',
       'api/account/restore',
       'api/agency-trial',
+      'api/agency/brand',
       'api/alert-rules',
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
