@@ -372,19 +372,29 @@ export function aiWithheldSummary(check: Check, measured: number): string {
     ? `This audit did not measure ${orList(missing)}, which the AI readability grade needs.`
     : '';
   const { access: accessPart, quotable, signals } = ai.components;
-  // The grade stores how many crawlers Access rests on only when it is one. Otherwise it is at least
-  // I4's two, and a stored check cannot say more: a crawler with a verdict may not have counted.
+  // Tested is the contract's count: a scored crawler with a verdict (D-10, F-273: "at least two of
+  // the four" was said when all four were tested). What Access rests on is said apart, because a
+  // crawler with a verdict may not have counted: the grade stores that number only when it is one;
+  // otherwise it is at least I4's two, and a stored check cannot say more.
   const from = ai.scored_from_fewer_crawlers;
-  const accessFrom =
-    from === null ? `at least ${numberWord(I4_MEASURED_CRAWLERS)}` : numberWord(from);
+  const testedOf =
+    measured >= scored
+      ? `all ${numberWord(scored)}`
+      : `${numberWord(measured)} of the ${numberWord(scored)}`;
+  const restsOn = from === null ? `at least ${numberWord(I4_MEASURED_CRAWLERS)}` : numberWord(from);
   const tested = [
-    accessPart.score === null
-      ? null
-      : `crawler access for ${accessFrom} of the ${numberWord(scored)} scored crawlers`,
+    accessPart.score === null ? null : `crawler access for ${testedOf} scored crawlers`,
     quotable.score === null ? null : 'content',
     signals.score === null ? null : 'AI signals',
   ].filter((x): x is string => x !== null);
-  const testedSentence = missing.length && tested.length ? `It tested ${listOf(tested)}.` : '';
+  const testedSentence =
+    missing.length && tested.length
+      ? `It tested ${listOf(tested)}.${
+          accessPart.score === null || (from === null && measured <= I4_MEASURED_CRAWLERS)
+            ? ''
+            : ` Its access score rests on ${restsOn} of them.`
+        }`
+      : '';
   const range = ai.access_range;
   const access = range ? `Access is somewhere between ${range.min} and ${range.max} of 40.` : '';
   return [why, unmeasured, testedSentence, access].filter(Boolean).join(' ');
