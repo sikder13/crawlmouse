@@ -179,6 +179,20 @@ describe('Reports made', () => {
   });
 });
 
+describe('Reports made, a compare of two checks on one day (QA dashboard walk D-28)', () => {
+  it('names each check with its time, so the two do not read alike', () => {
+    const copy = structuredClone(bad);
+    // The compare's second check moved to 25 Oct 03:30Z, Sat 24 Oct 23:30 in Indiana: the day of
+    // its first (25 Oct 02:34Z, Sat 24 Oct 22:34).
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000005')!.finished_at =
+      '2026-10-25T03:30:00Z';
+    const v = reportsView(copy, ACCOUNT_VIEWERS.home(), {}, BASE);
+    expect(v.made.rows.find((r) => r.type === 'Compare')!.covers).toBe(
+      'Sat 24 Oct 22:34 vs Sat 24 Oct 23:30',
+    );
+  });
+});
+
 describe('how long a share link works', () => {
   it('is the interval create_share_link adds to the moment it is made, in days', () => {
     const sql = readFileSync(
