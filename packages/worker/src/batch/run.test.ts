@@ -1976,6 +1976,33 @@ describe('round 5: a robots.txt redirect the batch could not follow', () => {
   });
 });
 
+describe('the batch result carries its request timing (F-247)', () => {
+  it('times every request the batch made, for crawl and access batches alike', async () => {
+    const served = () => ({
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+      body: '<p>a</p>',
+    });
+    for (const req of [
+      crawlReq('https://example.com', ['/a', '/b']),
+      accessReq('https://example.com', ['/a']),
+    ]) {
+      const { result, calls } = await runFake(req, served);
+      expect(result.timing?.requests).toBe(calls.length);
+      expect(calls.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('times a redirect hop as a request of its own', async () => {
+    const { result, calls } = await runFake(
+      crawlReq('https://example.com', ['/a']),
+      toWww(() => ({ status: 200, headers: { 'content-type': 'text/html' }, body: '<p>w</p>' })),
+    );
+    expect(calls.some((c) => c.url === 'https://www.example.com/t')).toBe(true);
+    expect(result.timing?.requests).toBe(calls.length);
+  });
+});
+
 describe('the access batch’s control request on a 429 (review of the back-off, B2)', () => {
   const served = { status: 200, headers: { 'content-type': 'text/html' }, body: '<p>served</p>' };
 

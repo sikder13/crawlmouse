@@ -9,6 +9,9 @@ import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// The page reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
+
 vi.mock('@/components/analytics/TrackView', () => ({
   TrackView: ({ event }: { event: string }) => <i data-event={event} />,
 }));

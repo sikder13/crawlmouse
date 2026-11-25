@@ -8,6 +8,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { agenciesView } from '../v2/view/agencies';
 
+// /agencies and /llms.txt read the Goal 1 switch (`lib/feature-switch.ts`, 'server-only').
+vi.mock('server-only', () => ({}));
 vi.mock('../fonts', () => ({
   fraunces: { variable: '' },
   geist: { variable: '' },

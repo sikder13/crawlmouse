@@ -24,7 +24,8 @@ import { usd } from '../../billing/prices';
 import { trialRefusal, type EntitlementSnapshot } from '../../billing/state-machine';
 import type { PaidTier, Tier } from '../../entitlement-v2';
 import { AGENCIES_COPY } from '../copy/agencies';
-import { footerComing, tagged, type TaggedView } from './agencies';
+import { ALL_SHOWN, type Features } from '../features';
+import { footerComing, shown, taggedWith, type TaggedView } from './agencies';
 import { agencyTrialPath } from './agency-trial';
 import { PRICING_COPY as COPY, per, planCopy, priceOf, type PlanRow } from '../copy/pricing';
 
@@ -319,10 +320,13 @@ export function pricingView(
   interval: Interval,
   now: Date,
   flags: PricingFlags,
+  /** What the Goal 1 switch hides, read by the page (`shownFeatures()`); nothing by default. */
+  features: Features = ALL_SHOWN,
 ): PricingView {
+  const tagged = taggedWith(features);
   const pro = proAction(viewer, interval, now, flags);
   const agency = agencyOnSale(flags);
-  const copy = planCopy(interval, pro.trial, flags.billing, agency);
+  const copy = planCopy(interval, pro.trial, flags.billing, agency, features);
   const actions = ranked({
     free: freeAction(viewer, flags),
     pro: pro.action,
@@ -333,7 +337,7 @@ export function pricingView(
     signedIn: viewer.kind === 'signed_in',
     h1: COPY.h1,
     title: tagged(COPY.title),
-    lead: COPY.lead().map(tagged),
+    lead: shown(COPY.lead().map(tagged)),
     interval,
     intervals: (['month', 'year'] as const).map((i) => ({
       interval: i,
@@ -346,16 +350,13 @@ export function pricingView(
       name: copy[tier].name,
       tag: copy[tier].tag,
       description: tagged(copy[tier].description),
-      rows: builtFirst(
-        tier,
-        copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })),
-      ),
+      rows: builtFirst(tier, shown(copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })))),
       price: usd(priceOf(tier, interval)),
       per: per(interval),
       action: actions[tier],
     })),
-    crawlers: COPY.crawlers().map(tagged),
-    annual: COPY.annual(flags.billing, agency).map(tagged),
+    crawlers: shown(COPY.crawlers(features.ai_letter).map(tagged)),
+    annual: shown(COPY.annual(flags.billing, agency).map(tagged)),
     agencyPlus: {
       name: COPY.agencyPlus.name,
       limits: tagged({ text: COPY.agencyPlus.limits(), capabilities: ['sites', 'seats'] }),
@@ -372,18 +373,20 @@ export function pricingView(
     },
     after: {
       title: COPY.after.title(pro.trial, agency),
-      lead: COPY.after.lead(flags.billing).map(tagged),
+      lead: shown(COPY.after.lead(flags.billing).map(tagged)),
       columns: COPY.after.columns,
       rows: COPY.after
         .rows(interval, flags.billing, agency)
-        .map(([what, happens]) => [what, tagged(happens)]),
+        .map(([what, happens]) => [what, tagged(happens)] as [string, TaggedView])
+        .filter(([, happens]) => !happens.hidden),
     },
-    why: { title: COPY.why.title, text: COPY.why.text().map(tagged) },
+    why: { title: COPY.why.title, text: shown(COPY.why.text().map(tagged)) },
     faq: {
       title: COPY.faq.title,
       items: COPY.faq
         .items(pro.trial, flags.billing, agency)
-        .map(({ q, a }) => ({ q, a: tagged(a) })),
+        .map(({ q, a }) => ({ q, a: tagged(a) }))
+        .filter(({ a }) => !a.hidden),
     },
     comingLabel: AGENCIES_COPY.coming,
     footerComing: footerComing(),

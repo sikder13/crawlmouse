@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { PublicReportSnapshot } from '@crawlmouse/types';
@@ -64,14 +65,26 @@ async function insertReportWithRetry(
 
 /**
  * A v2 mint (CC-29 D7): only with V2_CHECKS_PUBLIC on, where a body naming `checkId` is otherwise the
- * 400 any unknown body is. The work is `mintV2`'s.
+ * 400 any unknown body is. The work is `mintV2`'s. A throw from it is reported to Sentry and answered
+ * 500 `could not mint`.
  */
 async function mintCheck(req: Request, body: unknown): Promise<Response> {
   const parsed = checksPublicEnabled() ? v2Schema.safeParse(body) : null;
   if (!parsed?.success) return NextResponse.json({ error: 'invalid request' }, { status: 400 });
-  const deps = supabaseMintDeps(await supabaseServer(), supabaseAdmin(), req.headers.get('cookie'));
-  const { status, body: answer } = await mintV2(deps, parsed.data, getClientIp(req));
-  return NextResponse.json(answer, { status });
+  try {
+    const deps = supabaseMintDeps(
+      await supabaseServer(),
+      supabaseAdmin(),
+      req.headers.get('cookie'),
+    );
+    const { status, body: answer } = await mintV2(deps, parsed.data, getClientIp(req));
+    return NextResponse.json(answer, { status });
+  } catch (err) {
+    // A throw (F-261 was one) is reported and answered with mintV2's own 500, which the site's
+    // control words as "The link could not be made", rather than an empty 500.
+    Sentry.captureException(err, { tags: { route: 'api/reports/mint', mint: 'v2' } });
+    return NextResponse.json({ error: 'could not mint' }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {

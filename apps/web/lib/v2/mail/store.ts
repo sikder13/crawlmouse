@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { supabaseFixesStore } from '../account/fixes-store';
 import { INVITED_ROLES, type InvitedRole } from '../agency/seats';
 import type { TrialSite } from './after-trial';
+import { competitorSiteId } from '../competitors/compare';
 
 export interface AccountLinkRow {
   kind: string;
@@ -59,6 +60,11 @@ export interface FinishedCheck {
   trigger: string;
   status: string;
   accountId: string | null;
+  /**
+   * A competitor's check (row 18): its site is kept by no account and is the competitor site of its
+   * own host, `competitorSiteId(host)`. It is no customer's audit, so it is not captured as one.
+   */
+  competitor: boolean;
 }
 
 /** One invitation of an invited seat, read before its mail is claimed. */
@@ -395,7 +401,12 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
       const c = await check(checkId);
       if (c === null) return null;
       const s = await site(c.site_id);
-      return { trigger: c.trigger, status: c.status, accountId: s?.account_id ?? null };
+      return {
+        trigger: c.trigger,
+        status: c.status,
+        accountId: s?.account_id ?? null,
+        competitor: s !== null && s.account_id === null && competitorSiteId(s.host) === c.site_id,
+      };
     },
 
     async seatInvitation(seatId, seq) {

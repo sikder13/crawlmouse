@@ -29,6 +29,14 @@
     }
   ],
   "declarations": [],
+  "timing": {
+    "requests": 308,
+    "fetch_ms_p50": 0,
+    "fetch_ms_p90": 0,
+    "fetch_ms_max": 0,
+    "fetch_ms_total": 0,
+    "idle_ms_total": 153500
+  },
   "kind": "access",
   "access_tests": [
     {

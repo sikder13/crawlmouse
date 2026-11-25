@@ -2,16 +2,18 @@ import type { Metadata } from 'next';
 import { AgenciesScreen } from '@/components/v2/screens/agencies/AgenciesScreen';
 import { accountDoorEnabled, checksPublicEnabled } from '@/lib/auth/flags';
 import { agencySalesOpen, billingPublic } from '@/lib/billing/flags';
+import { shownFeatures } from '@/lib/feature-switch';
 import { socialCardPath } from '@/lib/v2/social-card';
 import { socialMetadata } from '@/lib/v2/social-metadata';
 import { agenciesView } from '@/lib/v2/view/agencies';
 import '@/styles/v2/tokens.css';
 
-const view = agenciesView({
-  billing: billingPublic(),
-  agencySales: agencySalesOpen(),
-  accountDoor: accountDoorEnabled(),
-});
+// The Goal 1 switch (V2_HIDE_FEATURES) is read here, at build time like the flags: the page and its
+// metadata are static, so a change to the switch takes a redeploy.
+const view = agenciesView(
+  { billing: billingPublic(), agencySales: agencySalesOpen(), accountDoor: accountDoorEnabled() },
+  shownFeatures(),
+);
 
 /** Indexable (the root layout's robots apply); canonical to its own address, and shared as itself. */
 export const metadata: Metadata = {

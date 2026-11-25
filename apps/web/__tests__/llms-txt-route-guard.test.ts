@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { GET } from '../app/llms.txt/route';
 import { allPostSlugs, postsNewestFirst } from '../lib/blog/posts';
+
+// The route reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
 
 const body = await GET().text();
 const lines = body.split('\n');
@@ -75,9 +78,13 @@ describe('/llms.txt — Guides stay generated', () => {
     // The whole point of generating from POSTS: a new guide appears here the day it ships. A
     // hardcoded list passes a "contains six posts" check forever and goes stale silently.
     for (const slug of allPostSlugs()) {
-      expect(guides, `guide list must include /blog/${slug}`).toContain(`https://crawlmouse.com/blog/${slug}`);
+      expect(guides, `guide list must include /blog/${slug}`).toContain(
+        `https://crawlmouse.com/blog/${slug}`,
+      );
     }
-    expect(guides.split('\n').filter((l) => l.startsWith('- [')).length).toBe(allPostSlugs().length);
+    expect(guides.split('\n').filter((l) => l.startsWith('- [')).length).toBe(
+      allPostSlugs().length,
+    );
   });
 
   it('is ordered newest-first, like the blog index', () => {

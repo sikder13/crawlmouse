@@ -114,6 +114,9 @@ export interface DoorView {
   added?: boolean;
 }
 
+/** The AI readability grade's label: what the views and a snapshot's grades call it. */
+export const AI_READABILITY_LABEL = 'AI readability';
+
 export interface FixRowView {
   key: string;
   title: string;
@@ -233,7 +236,7 @@ function grade(
     },
     ai.withheld
       ? {
-          label: 'AI readability',
+          label: AI_READABILITY_LABEL,
           letter: null,
           score: null,
           tone: 'default',
@@ -241,7 +244,7 @@ function grade(
           summary: aiWithheldSummary(check, scoredCrawlersMeasured(check.crawlers)),
         }
       : {
-          label: 'AI readability',
+          label: AI_READABILITY_LABEL,
           letter: ai.grade,
           score: ai.total,
           tone: toneOf(ai.grade),

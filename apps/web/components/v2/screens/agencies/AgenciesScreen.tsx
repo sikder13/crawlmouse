@@ -100,71 +100,75 @@ export function AgenciesScreen({
           </Card>
         </section>
 
-        <section
-          className={`${layout.wrap} ${styles.sec}`}
-          data-capability={op.capabilities.join(' ')}
-        >
-          <Card className={styles.flush}>
-            <div className={`${layout.row} ${styles.cardHead}`}>
-              <div>
-                <Heading level={2} size="s">
-                  <Capability item={op.title} comingLabel={c} />
-                </Heading>
-                <Capability
-                  as="div"
-                  item={op.sub}
-                  comingLabel={c}
-                  className={`${layout.mut} ${styles.small}`}
-                />
+        {/* The one-pager names `agency_white_label` and `agency_domain`: with either hidden
+            (`op.hidden`), the section is not rendered. */}
+        {op.hidden ? null : (
+          <section
+            className={`${layout.wrap} ${styles.sec}`}
+            data-capability={op.capabilities.join(' ')}
+          >
+            <Card className={styles.flush}>
+              <div className={`${layout.row} ${styles.cardHead}`}>
+                <div>
+                  <Heading level={2} size="s">
+                    <Capability item={op.title} comingLabel={c} />
+                  </Heading>
+                  <Capability
+                    as="div"
+                    item={op.sub}
+                    comingLabel={c}
+                    className={`${layout.mut} ${styles.small}`}
+                  />
+                </div>
+                <span className={`${layout.mut} ${styles.micro}`}>{op.label}</span>
               </div>
-              <span className={`${layout.mut} ${styles.micro}`}>{op.label}</span>
-            </div>
-            <div className={styles.paper}>
-              <Card className={styles.onePager}>
-                <div className={`${layout.row} ${styles.between}`}>
-                  <span className={`${layout.row} ${styles.agency}`}>
-                    <span className={styles.logo} aria-hidden="true" />
-                    {op.agency}
-                  </span>
-                  <span className={`${layout.mut} ${styles.micro}`}>{op.meta}</span>
-                </div>
-                <Heading level={3} size="m" className={styles.opHeading}>
-                  {op.heading}
-                </Heading>
-                <div className={`${layout.row} ${styles.grades}`}>
-                  {op.grades.map((g) =>
-                    g.withheld ? (
-                      <Grade key={g.label} label={g.label} withheld />
-                    ) : (
-                      <Grade
-                        key={g.label}
-                        label={g.label}
-                        letter={g.letter ?? undefined}
-                        score={g.score ?? undefined}
-                        tone={g.tone}
-                      />
-                    ),
-                  )}
-                </div>
-                <Table
-                  label={op.fixesCaption}
-                  className={styles.fixes}
-                  headersHidden
-                  columns={[
-                    { header: 'Number', mono: true, muted: true },
-                    { header: 'Fix' },
-                    { header: 'Estimated effect', numeric: true, mono: true },
-                  ]}
-                  rows={op.fixes.map((f) => ({ key: f.key, cells: [f.n, f.title, f.points] }))}
-                />
-                <div className={`${layout.mut} ${styles.micro} ${styles.opFoot}`}>
-                  <div>{op.estimates}</div>
-                  <div>{op.footer}</div>
-                </div>
-              </Card>
-            </div>
-          </Card>
-        </section>
+              <div className={styles.paper}>
+                <Card className={styles.onePager}>
+                  <div className={`${layout.row} ${styles.between}`}>
+                    <span className={`${layout.row} ${styles.agency}`}>
+                      <span className={styles.logo} aria-hidden="true" />
+                      {op.agency}
+                    </span>
+                    <span className={`${layout.mut} ${styles.micro}`}>{op.meta}</span>
+                  </div>
+                  <Heading level={3} size="m" className={styles.opHeading}>
+                    {op.heading}
+                  </Heading>
+                  <div className={`${layout.row} ${styles.grades}`}>
+                    {op.grades.map((g) =>
+                      g.withheld ? (
+                        <Grade key={g.label} label={g.label} withheld />
+                      ) : (
+                        <Grade
+                          key={g.label}
+                          label={g.label}
+                          letter={g.letter ?? undefined}
+                          score={g.score ?? undefined}
+                          tone={g.tone}
+                        />
+                      ),
+                    )}
+                  </div>
+                  <Table
+                    label={op.fixesCaption}
+                    className={styles.fixes}
+                    headersHidden
+                    columns={[
+                      { header: 'Number', mono: true, muted: true },
+                      { header: 'Fix' },
+                      { header: 'Estimated effect', numeric: true, mono: true },
+                    ]}
+                    rows={op.fixes.map((f) => ({ key: f.key, cells: [f.n, f.title, f.points] }))}
+                  />
+                  <div className={`${layout.mut} ${styles.micro} ${styles.opFoot}`}>
+                    <div>{op.estimates}</div>
+                    <div>{op.footer}</div>
+                  </div>
+                </Card>
+              </div>
+            </Card>
+          </section>
+        )}
 
         <section className={`${layout.wrap} ${styles.sec} ${styles.g2}`}>
           <Card className={styles.flush}>
