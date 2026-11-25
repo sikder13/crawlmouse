@@ -289,7 +289,8 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          pnpm build
+          # The build's memory, measured (CTO 094): the peak of its whole process tree.
+          ../../.github/workflows/scripts/build-peak.sh pnpm build --experimental-debug-memory-usage
       # Named by the run, not the attempt: "Re-run failed jobs" re-runs the two jobs that download it
       # without re-running a build that passed, so they must find the earlier attempt's upload. A
       # full re-run builds again under the same name, hence overwrite.
