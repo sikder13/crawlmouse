@@ -156,6 +156,17 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
     async requestSite(): Promise<RequestSite> {
       return { id: site.id, account_id: site.account_id, host: site.host, next_check_at: null };
     },
+    // A Free account: the step tests do not read the page cap.
+    async accountClock() {
+      return {
+        state: 'free' as const,
+        tier: 'free' as const,
+        pastDueTier: null,
+        pastDueSince: null,
+        trialVariant: null,
+        trialEndsAt: null,
+      };
+    },
     async previousGraded() {
       return null;
     },
