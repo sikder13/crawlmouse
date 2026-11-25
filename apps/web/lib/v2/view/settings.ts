@@ -306,6 +306,26 @@ export interface Undeliverable {
   reason: 'hard_bounce' | 'complaint';
 }
 
+/** Settings for a seat that may not change them (D-03): its rail, and who does change them. */
+export interface SettingsNotYoursView {
+  shell: ShellView;
+  header: { title: string; line: string };
+  text: string;
+}
+
+export function settingsNotYoursView(
+  d: FixtureDataset,
+  viewer: Viewer,
+  role: SeatRole,
+): SettingsNotYoursView {
+  const v = viewAt(d, viewer);
+  return {
+    shell: accountShellView(v, 'Settings', { plan: 'page', role }),
+    header: { title: COPY.title, line: COPY.notYoursLine },
+    text: COPY.notYours,
+  };
+}
+
 export function settingsView(
   d: FixtureDataset,
   viewer: Viewer,
