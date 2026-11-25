@@ -28,7 +28,7 @@
   width: 100%;
   min-width: 520px;
   /* The drawing's height plus the top padding, set on the element (GradeHistory.tsx). */
-  height: var(--v2-chart-h, 194px);
+  height: var(--v2-chart-h);
   padding: 8px 8px 0;
   box-sizing: border-box;
 }

@@ -12,13 +12,11 @@
    none. The covers are the surface the table sits on, --v2-table-surface, the card's (s1) unless a
    sunken card sets its own; the shade is the text colour thinned, so it reads on light and dark. */
 .shade {
-  --v2-table-shade: color-mix(in srgb, var(--v2-fg) 22%, transparent);
-
   background:
-    linear-gradient(to right, var(--v2-table-surface, var(--v2-s1)) 30%, transparent) left center /
-      40px 100% no-repeat local,
-    linear-gradient(to left, var(--v2-table-surface, var(--v2-s1)) 30%, transparent) right center /
-      40px 100% no-repeat local,
+    linear-gradient(to right, var(--v2-table-surface) 30%, transparent) left center / 40px 100%
+      no-repeat local,
+    linear-gradient(to left, var(--v2-table-surface) 30%, transparent) right center / 40px 100%
+      no-repeat local,
     linear-gradient(to right, var(--v2-table-shade), transparent) left center / 14px 100% no-repeat
       scroll,
     linear-gradient(to left, var(--v2-table-shade), transparent) right center / 14px 100% no-repeat
