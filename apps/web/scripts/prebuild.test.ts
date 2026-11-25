@@ -11,7 +11,11 @@ import { EXCLUDED_DIR, PREVIEW_GROUP, excludePreviewsOnVercel } from './prebuild
 /** A web root with the preview group, a kept group and a plain route, each holding a page. */
 function tree() {
   const root = mkdtempSync(join(tmpdir(), 'prebuild-'));
-  for (const dir of [PREVIEW_GROUP + '/v2-preview/screens', '(v2-kept)/v2-kept/login', 'dashboard']) {
+  for (const dir of [
+    PREVIEW_GROUP + '/v2-preview/screens',
+    '(v2-kept)/v2-kept/login',
+    'dashboard',
+  ]) {
     mkdirSync(join(root, 'app', dir), { recursive: true });
     writeFileSync(join(root, 'app', dir, 'page.tsx'), 'export default () => null;');
   }
