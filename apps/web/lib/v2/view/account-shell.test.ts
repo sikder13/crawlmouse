@@ -8,7 +8,13 @@ import {
 import { FixtureDatasetSchema } from '@crawlmouse/types/v2';
 import { fixture } from '../fixtures';
 import { viewAt } from './account';
-import { accountShellView, isFirstRun, newChanges } from './account-shell';
+import {
+  accountLabel,
+  accountShellView,
+  isFirstRun,
+  newChanges,
+  switcherView,
+} from './account-shell';
 
 const bad = fixture('bad-site');
 const BAD = 'a0000000-0000-4000-8000-000000000001';
@@ -26,6 +32,7 @@ describe('the rail', () => {
       ['Competitors', null],
       ['Reports', null],
       ['Integrations', null],
+      ['Seats', null],
       ['Settings', null],
     ]);
     expect(nav.filter((n) => n.current).map((n) => n.label)).toEqual(['Sites']);
@@ -120,5 +127,50 @@ describe('the stand-in Free account (clean-site has none)', () => {
     expect(STAND_IN_FREE_ACCOUNT.state_history.map((h) => h.state)).toEqual(['free']);
     expect(v.tier).toBe('free');
     expect(v.d.sites.map((s) => s.account_id)).toEqual([STAND_IN_FREE_ACCOUNT.id]);
+  });
+});
+
+describe('accountLabel (D-22)', () => {
+  const a = { kind: 'personal' as const };
+  it.each([
+    [
+      'a name before all',
+      { name: 'Acme', ownerEmail: 'me@x.example', firstSite: 'shop.example' },
+      'Acme',
+    ],
+    [
+      'the owner’s address before a site',
+      { name: null, ownerEmail: 'me@x.example', firstSite: 'shop.example' },
+      'me@x.example',
+    ],
+    [
+      'a site with neither',
+      { name: null, ownerEmail: null, firstSite: 'shop.example' },
+      'shop.example',
+    ],
+    [
+      'the kind with nothing',
+      { name: null, ownerEmail: null, firstSite: null },
+      'Personal account',
+    ],
+    [
+      'blank strings passed over',
+      { name: '  ', ownerEmail: ' ', firstSite: 'shop.example' },
+      'shop.example',
+    ],
+    ['all blank: the kind', { name: '', ownerEmail: '', firstSite: '  ' }, 'Personal account'],
+  ])('%s', (_, fields, label) => {
+    expect(accountLabel({ ...a, ...fields })).toBe(label);
+  });
+
+  it('names the switcher’s accounts by it: two unnamed accounts no longer read alike', () => {
+    const s = switcherView(
+      [
+        { id: 'p1', kind: 'personal', name: null, ownerEmail: 'b@x.example', firstSite: null },
+        { id: 'p2', kind: 'personal', name: null, ownerEmail: null, firstSite: 'a-shop.example' },
+      ],
+      'p1',
+    )!;
+    expect([s.current, s.others.map((o) => o.label)]).toEqual(['b@x.example', ['a-shop.example']]);
   });
 });

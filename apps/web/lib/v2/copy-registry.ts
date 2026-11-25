@@ -94,7 +94,26 @@ export interface CopyChange {
 /** Why a screen shows Agency's price where its artboard says $69 (CC-39 ruling 4). */
 const AGENCY_PRICE_SOURCE = `Owner ruling of 2026-11-03 (D-2026-11-03-2): Agency is ${formatPlanPrice('agency')} a month, read from lib/billing/prices.ts (CC-39 ruling 4)`;
 
+/** Why a segment's back or next link names Links and pages, which came after the lock. */
+const LINKS_TAB_SOURCE =
+  'V2R register, row 5 (CTO rulings of 2026-11-24): the Links and pages tab sits between Site structure and Content';
+
 const BASE_CHANGES: CopyChange[] = [
+  // ── The Links and pages tab, between Site structure and Content ──────────────────────────
+  {
+    screen: 'segment-structure',
+    kind: 'ruling',
+    locked: 'Next: Content an answer engine can quote · 58',
+    rendered: 'Next: Links and pages · no 404 or 410',
+    source: LINKS_TAB_SOURCE,
+  },
+  {
+    screen: 'segment-content',
+    kind: 'ruling',
+    locked: 'Back: Site structure',
+    rendered: 'Back: Links and pages',
+    source: LINKS_TAB_SOURCE,
+  },
   // ── Home ──────────────────────────────────────────────────────────────────────────────────
   {
     screen: 'home',
@@ -464,6 +483,11 @@ export interface Addition {
 
 /** What the brief adds that no locked screen has; marked `data-v2-addition` where it renders. */
 const BASE_ADDITIONS: Addition[] = [
+  {
+    screen: 'result, segments, fix, link-map',
+    what: 'The Links and pages tab and the Broken links and page basics door (row 5)',
+    source: 'V2R register, row 5 (CTO rulings of 2026-11-24)',
+  },
   {
     screen: 'home, result',
     what: 'The evidence class beside each verdict',

@@ -87,12 +87,13 @@ afterEach(() => {
 });
 
 describe('the route files', () => {
-  it('are the v1 page, the v2 overview, six segments, the fix page and the map', () => {
+  it('are the v1 page, the v2 overview, seven segments, the fix page and the map', () => {
     expect(ALL).toEqual([
       'access/page.tsx',
       'changes/page.tsx',
       'content/page.tsx',
       'fix/[fixId]/page.tsx',
+      'links/page.tsx',
       'map/page.tsx',
       'nojs/page.tsx',
       'overview/page.tsx',
@@ -265,6 +266,7 @@ describe('with V2_CHECKS_PUBLIC on', () => {
     changes: () => import('./changes/not-found'),
     content: () => import('./content/not-found'),
     'fix/[fixId]': () => import('./fix/[fixId]/not-found'),
+    links: () => import('./links/not-found'),
     map: () => import('./map/not-found'),
     nojs: () => import('./nojs/not-found'),
     signals: () => import('./signals/not-found'),
