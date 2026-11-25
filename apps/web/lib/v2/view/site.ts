@@ -15,7 +15,7 @@ import {
 } from '@crawlmouse/types/v2';
 import { RAW_FORMATS } from '../copy/reports';
 import { TAGGED_UA_LINE, ALERT_LABELS, SITE_COPY } from '../copy/site';
-import { fixesAsOf } from '../fixtures';
+import { fixesAsOf } from '../dataset-lookups';
 import {
   calendarDays,
   dayDate,

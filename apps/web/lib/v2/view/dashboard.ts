@@ -17,7 +17,7 @@ import { ALL_SHOWN, type Features } from '../features';
 import { formatPlanPrice } from '../copy/plan-price';
 import { TRIAL_DAYS } from '../copy/account';
 import { DASHBOARD_COPY as COPY, SETUP_COPY } from '../copy/dashboard';
-import { fixesAsOf } from '../fixtures';
+import { fixesAsOf } from '../dataset-lookups';
 import {
   calendarDays,
   daysBefore,
