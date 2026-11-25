@@ -15,8 +15,6 @@ import { isProActive } from '@/lib/pro';
 
 // Signed-in application surface — never a search result. `follow` keeps outbound links live.
 export const metadata = {
-  // The rail's name for this page, under the root layout's "%s · Crawlmouse" (D-31).
-  title: 'Sites',
   robots: { index: false, follow: true },
   alternates: { canonical: '/dashboard' },
 };

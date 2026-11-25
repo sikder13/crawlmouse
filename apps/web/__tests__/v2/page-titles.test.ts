@@ -10,7 +10,7 @@ vi.mock('server-only', () => ({}));
 
 describe('signed-in page titles (D-31)', () => {
   it.each([
-    ['/dashboard', () => import('../../app/dashboard/page'), 'Sites'],
+    // The v2 route serves /dashboard; v1's app/dashboard/page.tsx is held to main's file.
     ['/dashboard (v2 route)', () => import('../../app/dashboard/v2/page'), 'Sites'],
     ['/sites/[id]', () => import('../../app/sites/[id]/page'), 'Site'],
   ])(

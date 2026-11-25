@@ -18,6 +18,8 @@ import {
   signedIn,
 } from '../../components/v2/AccountLink';
 import { Button } from '../../components/v2/Button';
+import LoginPage from '../../app/login/page';
+import { withoutV1Chrome } from '../../app/(v2-kept)/_lib/v1-chrome';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -153,12 +155,29 @@ describe('the public pages read no cookie on the server', () => {
     'app/help/page.tsx',
     'app/not-found.tsx',
     'app/login/page.tsx',
+    'app/(v2-kept)/v2-kept/login/page.tsx',
+    'app/v2-home/page.tsx',
     'components/v2/screens/home/HomeScreen.tsx',
     'components/v2/screens/help/HelpScreens.tsx',
     'components/v2/screens/not-found/NotFoundScreen.tsx',
   ])('%s imports no request cookies or headers', (file) => {
     const src = readFileSync(join(WEB, file), 'utf8');
     expect(src).not.toMatch(/from 'next\/headers'|cookies\(\)|supabaseServer/);
+  });
+
+  it('the /login the v2 shell serves (/v2-kept/login, keptPage(LoginPage())) keeps the redirect', () => {
+    // The kept page strips v1's header and footer and keeps the rest of LoginPage's tree.
+    const found: unknown[] = [];
+    const walk = (n: unknown): void => {
+      if (Array.isArray(n)) return n.forEach(walk);
+      if (n && typeof n === 'object' && 'type' in n) {
+        const el = n as { type: unknown; props?: { children?: unknown } };
+        if (el.type === LeaveIfSignedIn) found.push(el);
+        walk(el.props?.children);
+      }
+    };
+    walk(withoutV1Chrome(LoginPage()));
+    expect(found).toHaveLength(1);
   });
 
   it('the three screens draw the island, not a fixed "Log in" link', () => {
