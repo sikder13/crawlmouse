@@ -351,6 +351,22 @@ names a staging check, which no production run waits on. To turn the signal off 
 (`httpsUrl`, `src/config.ts`). Verify:
 `pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts src/signal-config.test.ts src/deploy-files.test.ts src/fly-production.test.ts`.
 
+**When batches are slow, look in this order** (F-331, F-332):
+
+1. **Per crawl batch, compare `finished_at − posted_at` with the summary's `idle_ms_total + fetch_ms_total`:**
+   `select batch, extract(epoch from finished_at - posted_at) as wall_s, ((summary->'timing'->>'idle_ms_total')::numeric + (summary->'timing'->>'fetch_ms_total')::numeric)/1000 as worker_s from crawl_batches where check_id = '<id>' and kind = 'crawl' order by batch;`
+   With the signal heard, the gap is about a second.
+2. **A gap that lands on the poll times means the run polled** (`cadenceFor` and the wait in `inngest/check.ts`):
+   - **For a check of 500 pages or fewer,** the run asks at 5, 15, 35 and 65 s after the post, then every 30 s.
+   - **Above 500 pages,** it asks at 10, 30, 70 and 130 s, then every 60 s.
+   - **A first batch that waited the full timeout before its first poll** (30 s, or 60 s above 500 pages) and every later batch polled is a signal that did not reach the run.
+3. **The route's requests in Vercel, for `/api/webhooks/worker` on that deployment:** two per batch (the repeat), answered 204.
+   - **None:** the worker sends nothing. Check its `APP_SIGNAL_URL` (`fly secrets list` and `fly config show` for its app).
+   - **401:** the two `WORKER_SIGNING_SECRET`s differ.
+   - **400:** a note the parser refuses.
+4. **The worker's own log:** `signal_refused` with the status it got, or `signal_failed` when nothing answered within 3 s. An accepted signal is not logged.
+5. **Requests answered 204 and the run still polls:** read Inngest's status page (status.inngest.com) for delayed `waitForEvent` resumes, then the run's timeline. For each batch the step `crawl-<n>-done-<k>` either timed out or matched.
+
 **Staging only.** The staging app is behind Vercel Deployment Protection, which answers the worker's
 POST with 401 before it reaches the route. Give the staging worker the automation bypass as its own
 secret, from standard input so it stays out of the shell history. The worker sends it as the
