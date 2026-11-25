@@ -94,6 +94,17 @@ export function supabaseShareStore(admin: SupabaseClient): ShareStore {
       });
       if (error) throw new Error(`revoke_share_links failed: ${error.message}`);
     },
+    async fileFacts(link) {
+      const [report, site] = await Promise.all([
+        admin.from('reports').select('created_at').eq('id', link.reportId).maybeSingle(),
+        admin.from('sites').select('host').eq('id', link.siteId).maybeSingle(),
+      ]);
+      if (report.error) throw new Error(`reports read failed: ${report.error.message}`);
+      if (site.error) throw new Error(`sites read failed: ${site.error.message}`);
+      return report.data && site.data
+        ? { host: site.data.host as string, createdAt: report.data.created_at as string }
+        : null;
+    },
   };
 }
 
@@ -101,9 +112,11 @@ export function supabaseShareStore(admin: SupabaseClient): ShareStore {
 export function supabaseShareFiles(admin: SupabaseClient): ShareFiles {
   const bucket = () => admin.storage.from(REPORTS_BUCKET);
   return {
-    async signedUrl(path, seconds) {
+    async signedUrl(path, seconds, filename) {
       // A download, as the member's own is (generate-run.ts): the object is not opened in place.
-      const { data, error } = await bucket().createSignedUrl(path, seconds, { download: true });
+      const { data, error } = await bucket().createSignedUrl(path, seconds, {
+        download: filename ?? true,
+      });
       if (error || !data) throw new Error(`reports: sign failed: ${error?.message ?? 'no data'}`);
       return data.signedUrl;
     },

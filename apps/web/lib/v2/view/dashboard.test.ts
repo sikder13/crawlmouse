@@ -149,9 +149,15 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.crawlersNow!.map((r) => r.ua)).toHaveLength(8);
   });
 
-  it('lists what is left to set up from the Pro gates: two of five (FACTS l.57)', () => {
-    expect(v.setup!.title).toBe('Two things left to set up');
-    expect(v.setup!.items.map((i) => i.done)).toEqual([true, true, false, true, false]);
+  it('lists the set-up items that have something behind them: Slack, competitor, staging', () => {
+    expect(v.setup!.title).toBe('Everything is set up');
+    expect(v.setup!.items.map((i) => i.done)).toEqual([true, true, true]);
+  });
+
+  it('offers nothing to connect that has no connection behind it', () => {
+    const text = JSON.stringify(v.setup);
+    expect(text).not.toContain('Search Console');
+    expect(text).not.toContain('Vercel Drain');
   });
 
   it('ticks staging only once a deploy has been audited, not when the URL is saved (F-097)', () => {
@@ -393,9 +399,9 @@ describe('Who builds each account route', () => {
       'built',
       'built',
     ]);
-    expect(ACCOUNT_ACTIONS.integrations.owner).toBe('later');
+    expect(ACCOUNT_ACTIONS.integrations.owner).toBe('built');
     expect(new Set(Object.values(ACCOUNT_ACTIONS).map((a) => a.owner))).toEqual(
-      new Set(['CC-26b', 'CC-27b', 'later', 'built']),
+      new Set(['CC-26b', 'CC-27b', 'built']),
     );
   });
 });

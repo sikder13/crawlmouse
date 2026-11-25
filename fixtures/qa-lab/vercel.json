@@ -6,6 +6,10 @@
       "includeFiles": "sites/slow/**",
       "maxDuration": 10
     },
+    "api/sentinel.mjs": {
+      "includeFiles": "sites/sentinel/**",
+      "maxDuration": 10
+    },
     "api/large.mjs": {
       "maxDuration": 10
     }
@@ -185,6 +189,16 @@
         }
       ],
       "dest": "/api/slow?path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "sentinel.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/sentinel?path=/$1"
     },
     {
       "src": "/(.*)",

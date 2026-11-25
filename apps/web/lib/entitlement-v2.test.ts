@@ -46,6 +46,10 @@ describe('GATES, one assertion per gate per tier (ARCH-2 §3.1)', () => {
     expect(GATES.free.fixesVisible).toBe(3);
     expect(GATES.pro.fixesVisible).toBe('all');
     expect(GATES.agency.fixesVisible).toBe('all');
+    // Goal 1 row 22: Free sees one verified fix's before and after, paid plans every one.
+    expect(GATES.free.fixProofs).toBe(1);
+    expect(GATES.pro.fixProofs).toBe('all');
+    expect(GATES.agency.fixProofs).toBe('all');
   });
 
   it('packets', () => {
@@ -135,6 +139,7 @@ describe('GATES, one assertion per gate per tier (ARCH-2 §3.1)', () => {
         'checksPerSiteDay',
         'competitorsPerSite',
         'exports',
+        'fixProofs',
         'fixesVisible',
         'fullRendersPerMonth',
         'manualChecksPerSiteDay',

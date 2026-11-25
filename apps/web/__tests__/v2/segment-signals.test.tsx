@@ -3,6 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { SEGMENT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/segments';
 import { RESULT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { ResultView } from '../../lib/v2/view/result';
+import { fixture } from '../../lib/v2/fixtures';
+import { signalsView } from '../../lib/v2/view/segment/signals';
+import { SignalsScreen } from '../../components/v2/screens/segment/SignalsScreen';
 import { applyChanges, COPY_CHANGES } from '../../lib/v2/copy-registry';
 import {
   expected,
@@ -73,5 +76,20 @@ describe('a lock entry for a column the locked page hides on a phone', () => {
     for (const c of hidden) phoneText = phoneText.replace(squash(c.locked), '');
     expect(() => applyChanges(phoneText, 'segment-signals', squash, { phone: true })).not.toThrow();
     expect(() => applyChanges(phoneText, 'segment-signals', squash)).toThrow(/no longer matches/);
+  });
+});
+
+describe('Signals for a plan that compares competitors (F-256)', () => {
+  it('draws the compared competitor in full: no Pro ask, no audit-form wording, its own figures', () => {
+    const d = fixture('bad-site');
+    const check = d.checks.find((c) => c.competitors.length > 0)!;
+    const data = signalsView(d, check.id, { competitors: 1 });
+    const html = renderToStaticMarkup(<SignalsScreen data={data} />);
+    expect(html).not.toContain('Compare with Pro');
+    expect(html).not.toContain('named in the audit form');
+    expect(html).not.toContain('with Pro');
+    // summitgear.co's AI readability and its agent signals.
+    expect(html).toContain('A- · 88');
+    expect(html).toContain('4 of 7');
   });
 });

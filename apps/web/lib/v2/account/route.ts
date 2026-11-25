@@ -149,6 +149,10 @@ export const NOTICE_CODES = [
   'asked_recently',
   'report_declined',
   'fix_not_verified',
+  // a report made from Reports' forms (F-125): Download for a file, Open for a page
+  'report_made',
+  'report_made_page',
+  'report_failed',
   // share links (CC-31)
   'share_made',
   'share_revoked',

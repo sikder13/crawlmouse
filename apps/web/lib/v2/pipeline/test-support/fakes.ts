@@ -111,6 +111,22 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
       release(r.id);
       return true;
     },
+    async requeue(checkId, runId, at) {
+      const r = rows.get(checkId);
+      if (r?.status === 'running' && r.inngest_run_id === runId) {
+        Object.assign(r, {
+          status: 'queued',
+          started_at: null,
+          progress: null,
+          inngest_run_id: null,
+          heartbeat_at: at,
+        });
+      } else if (r?.status !== 'queued' || r.inngest_run_id !== null) return false;
+      return true;
+    },
+    async deleteBatches(checkId) {
+      for (const [k, b] of batches) if (b.check_id === checkId) batches.delete(k);
+    },
     async reap() {
       throw new Error('memoryStore: reap is tested on PGlite');
     },

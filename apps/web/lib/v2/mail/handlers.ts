@@ -246,6 +246,8 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
     async checkFinished(checkId) {
       const c = await read(store.finishedCheck(checkId));
       if (c === null) return 'not_found';
+      // A competitor's check is audited for a customer's comparison, not by anyone: not an audit.
+      if (c.competitor) return 'competitor';
       const ref = checkRef(checkId);
       await d.capture(
         'check_finished',

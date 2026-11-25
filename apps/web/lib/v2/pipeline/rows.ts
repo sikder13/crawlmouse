@@ -106,14 +106,26 @@ function contractRecord<T>(schema: ObjectSchema<T>, row: Row, derived: Row = {})
  */
 const PROGRESS_ADDED = { waiting_since: null, sitemap_urls: null, robots_txt: null } as const;
 
+/**
+ * Fields a check's coverage gains in the next deployment, which this one leaves out when it reads a
+ * row (inbox 084: `stopped`). Deployed before any row holds them, so a rollback from that deployment
+ * to this one still reads every check it wrote. Any other unknown field is still refused.
+ */
+const COVERAGE_NEXT = new Set(['stopped']);
+
+const isRecord = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** A coverage without the next deployment's fields (COVERAGE_NEXT); any other value as it is. */
+export const withoutCoverageNext = (coverage: unknown): unknown =>
+  isRecord(coverage)
+    ? Object.fromEntries(Object.entries(coverage).filter(([key]) => !COVERAGE_NEXT.has(key)))
+    : coverage;
+
 export function checkFromRow(row: Row): Check {
-  const progress = row.progress;
-  if (typeof progress !== 'object' || progress === null || Array.isArray(progress)) {
-    return contractRecord(CheckSchema, row);
-  }
-  return contractRecord(CheckSchema, row, {
-    progress: { ...PROGRESS_ADDED, ...(progress as Row) },
-  });
+  const derived: Row = {};
+  if (isRecord(row.progress)) derived.progress = { ...PROGRESS_ADDED, ...row.progress };
+  if (isRecord(row.coverage)) derived.coverage = withoutCoverageNext(row.coverage);
+  return contractRecord(CheckSchema, row, derived);
 }
 export const pageResultFromRow = (row: Row): PageResult => contractRecord(PageResultSchema, row);
 export const linkEdgeFromRow = (row: Row): LinkEdge => contractRecord(LinkEdgeSchema, row);

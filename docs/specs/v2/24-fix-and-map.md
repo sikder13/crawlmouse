@@ -287,6 +287,7 @@ Read through the TypeScript compiler. A screen receives its view and nothing els
 | --------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `kind`                | `"resolved"`                              |                                                                                          |
 | `resolved`            | `string`                                  |                                                                                          |
+| `proof`               | `FixProofView \| null`                    |                                                                                          |
 | `frame`               | `object`                                  |                                                                                          |
 | `frame.domain`        | `string`                                  |                                                                                          |
 | `frame.overview`      | `string`                                  | The crumb's first link and the Overview tab.                                             |

@@ -13,7 +13,8 @@ import { supabaseAdmin } from '../../supabase/admin';
 import { supabaseServer } from '../../supabase/server';
 import { supabaseEvidenceStore } from './evidence';
 import { supabaseCheckReader } from './load';
-import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow, fixPlanOf } from './load-for';
+import { effectiveTier } from '../../entitlement-v2';
+import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow } from './load-for';
 import type { PublicCheckDeps, Viewer } from './public';
 
 export interface RequestAccess {
@@ -62,7 +63,7 @@ export async function requestAccess(): Promise<RequestAccess> {
           .maybeSingle();
         if (error) throw new Error(`public check: reading the account's plan: ${error.code}`);
         if (!row) throw new Error("public check: the site's account was not found");
-        return fixPlanOf(clockFromAccountRow(row as Record<string, unknown>), new Date(now()));
+        return effectiveTier(clockFromAccountRow(row as Record<string, unknown>), new Date(now()));
       },
     },
   };

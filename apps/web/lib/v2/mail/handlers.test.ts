@@ -89,6 +89,7 @@ function store(over: Partial<MailStore> = {}): MailStore {
       trigger: 'scheduled',
       status: 'finished',
       accountId: ACCOUNT,
+      competitor: false,
     })),
     seatInvitation: vi.fn(async () => ({ recipient: INVITEE, accountId: ACCOUNT, marked: false })),
     issueSeatInvite: vi.fn(
@@ -601,6 +602,7 @@ describe('check_finished (D11)', () => {
           trigger: 'manual',
           status: 'partial',
           accountId: null,
+          competitor: false,
         })),
       }),
     );
@@ -609,6 +611,23 @@ describe('check_finished (D11)', () => {
       `check:${checkRef(CHECK)}`,
       null,
     ]);
+  });
+});
+
+describe('check_finished for a competitor’s check (row 18)', () => {
+  it('captures nothing: it is no one’s audit', async () => {
+    const { h, capture } = setup(
+      store({
+        finishedCheck: vi.fn(async () => ({
+          trigger: 'manual',
+          status: 'finished',
+          accountId: null,
+          competitor: true,
+        })),
+      }),
+    );
+    expect(await h.checkFinished(CHECK)).toBe('competitor');
+    expect(capture).not.toHaveBeenCalled();
   });
 });
 

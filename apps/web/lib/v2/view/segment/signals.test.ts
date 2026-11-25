@@ -167,6 +167,60 @@ describe('signalsView: the competitor', () => {
   });
 });
 
+describe('signalsView: a plan that compares competitors (F-256)', () => {
+  /** bad-site's signals page as a reader whose plan compares `competitors`. */
+  const paid = (competitors: number, edit?: Parameters<typeof edited>[1]) => {
+    const { d, id } = edited('bad-site', edit);
+    return signalsView(d, id, { asFirstSeen: asFirstSeen('bad-site'), competitors });
+  };
+
+  it('Pro shows the compared competitor in full, with no preview held back', () => {
+    const v = paid(1);
+    expect(v.competitor).toBeNull();
+    expect(v.compared).toHaveLength(1);
+    // summitgear.co's snapshot: AI readability A- · 88, 4 agent signals.
+    expect(v.compared[0]!.rows.slice(3)).toEqual([
+      { measure: 'AI readability', own: 'D · 41', theirs: 'A- · 88', pro: false },
+      { measure: 'Agent signals present', own: '2 of 7', theirs: '4 of 7', pro: false },
+    ]);
+    expect(v.compared[0]!.rows.some((r) => r.theirs === 'with Pro')).toBe(false);
+  });
+
+  it('says what the competitor’s check could not give, never a held figure', () => {
+    const v = paid(1, (ch) => {
+      const rival = ch.competitors[0] as unknown as Record<string, unknown>;
+      rival.ai_readability = null;
+      rival.signals_present = null;
+    });
+    expect(v.compared[0]!.rows.slice(3).map((r) => r.theirs)).toEqual(['withheld', 'not read']);
+  });
+
+  it('Agency shows every compared competitor up to its three, and no more', () => {
+    const rivals = (n: number) => (ch: { competitors: { host: string }[] }) => {
+      const first = ch.competitors[0]!;
+      ch.competitors.splice(
+        0,
+        ch.competitors.length,
+        ...Array.from({ length: n }, (_, i) => ({ ...first, host: `rival-${i + 1}.example` })),
+      );
+    };
+    expect(paid(3, rivals(3)).compared.map((c) => c.host)).toEqual([
+      'rival-1.example',
+      'rival-2.example',
+      'rival-3.example',
+    ]);
+    expect(paid(3, rivals(4)).compared).toHaveLength(3);
+    // Pro's one, of the same four.
+    expect(paid(1, rivals(4)).compared.map((c) => c.host)).toEqual(['rival-1.example']);
+  });
+
+  it('a reader whose plan compares none still gets the preview held for Pro', () => {
+    const v = paid(0);
+    expect(v.compared).toEqual([]);
+    expect(v.competitor?.rows.slice(3).map((r) => r.theirs)).toEqual(['with Pro', 'with Pro']);
+  });
+});
+
 describe('SIGNAL_CLASSES against the data', () => {
   it('calls no signal experimental that any fixture counts towards the grade', () => {
     for (const name of FIXTURE_NAMES) {

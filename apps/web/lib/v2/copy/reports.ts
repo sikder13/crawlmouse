@@ -89,7 +89,8 @@ export const REPORTS_COPY = {
   newLink: 'New link',
   withdrawLink: 'Withdraw link',
   /** Beside a link just made, which the page shows while the share form's cookie lasts. */
-  madeLink: 'The link, shown here for a short while:',
+  madeLink: 'The link, shown here for two minutes:',
+  copyLink: 'Copy link',
   /** What a row says of a report whose file is not stored; a stored one says nothing. */
   fileStates: { pending: 'Being made', failed: 'Could not be made', stored: null } as Record<
     'pending' | 'failed' | 'stored',

@@ -74,7 +74,12 @@ function Visiting({
   live: boolean;
 }) {
   return (
-    <div className={styles.switcher} data-v2-account-switcher="visiting">
+    // An unnamed account reads by its owner's address (D-22): kept out of autocapture and replay.
+    <div
+      className={`${styles.switcher} ph-no-capture`}
+      data-ph-mask=""
+      data-v2-account-switcher="visiting"
+    >
       <p className={styles.shown}>
         <VisuallyHidden>{`${COPY.acting}: `}</VisuallyHidden>
         {current}
@@ -142,7 +147,14 @@ export function AccountSwitcher({
     return <Visiting current={switcher.current} visiting={switcher.visiting} live={live} />;
   }
   return (
-    <div ref={root} className={styles.switcher} data-v2-account-switcher="" onBlur={onBlur}>
+    // An unnamed account reads by its owner's address (D-22): kept out of autocapture and replay.
+    <div
+      ref={root}
+      className={`${styles.switcher} ph-no-capture`}
+      data-ph-mask=""
+      data-v2-account-switcher=""
+      onBlur={onBlur}
+    >
       <button
         ref={button}
         type="button"

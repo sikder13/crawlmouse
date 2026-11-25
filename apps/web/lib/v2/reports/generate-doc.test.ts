@@ -17,7 +17,8 @@ import { structureView } from '../view/segment/structure';
 import { datasetOfBuilds } from '../view/test-support/built-dataset';
 import { inputOf, recheckInputOf, siteShape } from '../view/test-support/generated-check';
 import { docStrings, type DocBlock, type ReportDoc } from './generate';
-import { auditDoc, baselineDoc, compareDoc, fixProofDoc } from './generate-doc';
+import { auditDoc, baselineDoc, compareDoc, fixProofDoc, printable } from './generate-doc';
+import { SCREEN_ONLY } from '../copy/report-doc';
 
 const HOME = 'https://crawlmouse.com/';
 const OPTIONS = { home: HOME };
@@ -62,7 +63,8 @@ const VERDICT_WORDS = Object.values(VERDICTS).map((v) => v.label);
  * word; the footer is the listed line with the date `checkedAt`, linking `HOME`.
  */
 function expectSaidByThePages(doc: ReportDoc, said: readonly string[], checkedAt: string) {
-  const allowed = new Set([...said, ...LISTED, ...VERDICT_WORDS]);
+  // What a page said, less the sentences that only make sense on a screen (F-126).
+  const allowed = new Set([...said, ...said.map(printable), ...LISTED, ...VERDICT_WORDS]);
   const { footer, ...body } = doc;
   const strings = docStrings({ ...body, footer: { text: '', href: '' } }).filter((s) => s !== '');
   expect(strings.filter((s) => !allowed.has(s))).toEqual([]);
@@ -91,6 +93,51 @@ const CHALLENGED = fixture('challenged-site');
 const CHALLENGED_RECHECK = 'c0000000-0000-4000-8000-0000000000ca';
 const CLEAN = fixture('clean-site');
 const CLEAN_CHECK = 'c0000000-0000-4000-8000-000000000065';
+
+describe('the printed report leaves out what only a screen can do (F-126)', () => {
+  const docs = [
+    auditDoc({ dataset: BAD, checkId: BAD_FIRST }, OPTIONS),
+    auditDoc({ dataset: CHALLENGED, checkId: CHALLENGED_RECHECK }, OPTIONS),
+    auditDoc({ dataset: CLEAN, checkId: CLEAN_CHECK }, OPTIONS),
+  ];
+
+  it.each(SCREEN_ONLY.map((s) => [s]))('no audit report says %j', (sentence) => {
+    for (const doc of docs) expect(docStrings(doc).join('\n')).not.toContain(sentence);
+  });
+
+  it.each(SCREEN_ONLY.map((s) => [s]))(
+    'the screen does say %j, so the list above is not empty words',
+    (sentence) => {
+      const screens = [BAD, CHALLENGED, CLEAN].flatMap((d) =>
+        graded(d).map((c) => accessView(d, c.id, { plan: 'pro' }).method),
+      );
+      expect(screens.some((m) => m.includes(sentence))).toBe(true);
+    },
+  );
+
+  it('prints the real method paragraph whole, less only the two sentences', () => {
+    // Read from the screen, then worked out by hand: each sentence of the paragraph except the two.
+    const tagged = BAD.checks.find((c) =>
+      accessView(BAD, c.id, { plan: 'pro' }).method.includes(SCREEN_ONLY[1]),
+    )!;
+    const method = accessView(BAD, tagged.id, { plan: 'pro' }).method;
+    const sentences = method.split(/(?<=\.) /);
+    const kept = sentences.filter((x) => !(SCREEN_ONLY as readonly string[]).includes(x));
+    expect(sentences.length - kept.length).toBe(2);
+    expect(printable(method)).toBe(kept.join(' '));
+    expect(printable(method)).not.toMatch(/ {2}/);
+  });
+
+  it('leaves a sentence with none of them exactly as written', () => {
+    expect(printable('  Two  spaces stay.  ')).toBe('  Two  spaces stay.  ');
+  });
+
+  it('keeps the rest of the paragraph', () => {
+    expect(
+      printable('Tested from our IPs. Select a cell to see the raw request and response.'),
+    ).toBe('Tested from our IPs.');
+  });
+});
 
 describe('auditDoc on the contract fixtures', () => {
   const doc = auditDoc({ dataset: BAD, checkId: BAD_FIRST }, OPTIONS);

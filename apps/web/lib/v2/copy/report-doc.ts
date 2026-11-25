@@ -57,3 +57,13 @@ export const REPORT_DOC_COPY = {
 /** The footer's line: who checked, and when (the check's date as its Result page writes it). */
 export const footerLine = (checkedAt: string): string =>
   `${REPORT_DOC_COPY.checkedWith} · ${checkedAt}`;
+
+/**
+ * Sentences the audit pages carry that only a screen can act on: selecting a cell, and verifying the
+ * site in Settings. The printed report leaves them out (F-126), so a reader of the PDF is not told to
+ * click something on paper.
+ */
+export const SCREEN_ONLY = [
+  'Select a cell to see the raw request and response.',
+  'Verify this site in Settings and we test with the exact strings.',
+] as const;
