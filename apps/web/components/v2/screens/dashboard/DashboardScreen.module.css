@@ -86,11 +86,14 @@
 
 /* A crawler's name is one word that must not run into its markers ("Claude-SearchBot▲"): it keeps
    to one line, so the column takes the longest name's width (an auto-layout table sizes a column to
-   its widest unbreakable content), and the markers start 12px after it. Later than the padding rule
-   above, at the same specificity, so its right padding wins. */
+   its widest unbreakable content). The 12px between name and markers is the markers' own margin,
+   so every cell keeps the locked 4px 0 padding (layout.spec.ts, the by-check rows). */
 .byCheck .byCheckTable tbody th {
   white-space: nowrap;
-  padding-right: 12px;
+}
+
+.byCheck .byCheckTable tbody td > * {
+  margin-left: 12px;
 }
 
 .legendItem {
