@@ -5,6 +5,7 @@
  * one entry here: a slug, a name, its kind and a render over fixture input. Nothing here reads a
  * database, an environment variable or the clock.
  */
+import { ALERT_LABELS } from '../../copy/site';
 import { fixture } from '../../fixtures';
 import { dayDate } from '../../format';
 import { packetPrompt } from '../../view/segment/fixes';
@@ -139,6 +140,8 @@ const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> 
       checkedAt: alertCheck().finished_at ?? '2026-11-09T06:00:00.000Z',
       zone: 'America/Indiana/Indianapolis',
       changes: alertChanges(),
+      // The preview's changes are the scheduled check's, sent for the catch-all rule.
+      rules: [ALERT_LABELS.any_change(null)],
       unsubscribeUrl: opts?.unsubscribeUrl ?? UNSUBSCRIBE,
     }),
   'weekly-summary': (opts) =>

@@ -32,11 +32,13 @@ import { alertTemplate, type MailChange } from '../mail/templates/alert';
 import type { Claim } from '../mail/ledger';
 import {
   evaluateAlerts,
+  regressedFixes,
   type AlertChange,
   type AlertFixEvent,
   type AlertRuleInput,
   type FiredAlert,
 } from './alert-rules';
+import { ALERT_LABELS } from '../copy/site';
 import { slackAlertText, type PostSlack } from './slack';
 import type { Verdict } from '@crawlmouse/types/v2';
 
@@ -254,8 +256,22 @@ export async function deliverAlert(
   const ids = new Set(fired.flatMap((a) => a.changeIds));
   const changes = l.data.changes.filter((c) => ids.has(c.id));
   return channel === 'email'
-    ? deliverEmail(deps, l.ctx, fired, changes)
+    ? deliverEmail(deps, l.ctx, fired, changes, mailNotes(l.ctx, l.data, fired))
     : deliverSlack(deps, l.ctx, fired, changes);
+}
+
+/**
+ * What the email says beyond the changes (F-254): the rules that sent it, by the names the Alerts
+ * screen gives them, in the order they fired, and when each fix found again was marked done.
+ */
+function mailNotes(ctx: Kept, data: AlertData, fired: FiredAlert[]) {
+  const byId = new Map(data.rules.map((r) => [r.id, r]));
+  const rules = [
+    ...new Set(
+      fired.map((a) => ALERT_LABELS[a.kind](byId.get(a.ruleId)?.threshold_points ?? null)),
+    ),
+  ];
+  return { rules, markedDone: regressedFixes(ctx.checkId, data.fixEvents) };
 }
 
 async function deliverEmail(
@@ -263,6 +279,7 @@ async function deliverEmail(
   ctx: Kept,
   fired: FiredAlert[],
   changes: StoredChange[],
+  notes: ReturnType<typeof mailNotes>,
 ): Promise<ChannelAnswer> {
   const now = deps.now();
   const record = async (d: Pick<Delivery, 'status' | 'reason' | 'destination_hash'>) => {
@@ -299,7 +316,14 @@ async function deliverEmail(
           checkId: ctx.checkId,
           checkedAt: ctx.finishedAt ?? now.toISOString(),
           zone: ctx.zone,
-          changes,
+          changes: changes.map((c) => ({
+            ...c,
+            markedDoneAt:
+              c.kind === 'opened' && c.fix_id !== null
+                ? (notes.markedDone.get(c.fix_id) ?? null)
+                : null,
+          })),
+          rules: notes.rules,
           unsubscribeUrl: links.page,
         }),
       headers: () => unsubscribeHeaders({ url: links.oneClick }),

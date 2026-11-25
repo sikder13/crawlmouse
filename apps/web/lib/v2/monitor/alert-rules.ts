@@ -79,17 +79,29 @@ export function textDropPoints(share: AlertInput['textShare']): number | null {
 
 const letterOf = (g: GradeLetter) => g[0];
 
-/** The fixes reopened at this check from a marked-done state. */
-function regressedFixes(checkId: string, events: readonly AlertFixEvent[]): Set<string> {
+/**
+ * The fixes reopened at this check from a marked-done state, each with when it was last marked done
+ * before that (null when its events hold no `marked_done`, which only an `unable_to_verify` reached
+ * some other way would be). The alert mail says that date (F-254).
+ */
+export function regressedFixes(
+  checkId: string,
+  events: readonly AlertFixEvent[],
+): Map<string, string | null> {
   const byFix = new Map<string, AlertFixEvent[]>();
   for (const e of events) byFix.set(e.fix_id, [...(byFix.get(e.fix_id) ?? []), e]);
-  const out = new Set<string>();
+  const out = new Map<string, string | null>();
   for (const [fixId, list] of byFix) {
     const ordered = [...list].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     ordered.forEach((e, k) => {
       if (e.kind !== 'reopened' || e.check_id !== checkId) return;
       const prior = ordered[k - 1]?.kind;
-      if (prior === 'marked_done' || prior === 'unable_to_verify') out.add(fixId);
+      if (prior !== 'marked_done' && prior !== 'unable_to_verify') return;
+      const marked = ordered
+        .slice(0, k)
+        .filter((x) => x.kind === 'marked_done')
+        .at(-1);
+      out.set(fixId, marked?.at ?? null);
     });
   }
   return out;

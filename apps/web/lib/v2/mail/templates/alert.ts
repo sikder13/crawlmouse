@@ -29,8 +29,12 @@ export type MailChange = Pick<
   'kind' | 'subject' | 'severity' | 'summary' | 'where' | 'pages_affected' | 'ua' | 'grade_deltas'
 >;
 
-/** An alert's change also names the fix it opened, which its row links to. */
-export type AlertMailChange = MailChange & Pick<Change, 'fix_id'>;
+/**
+ * An alert's change also names the fix it opened, which its row links to, and, for a fix that was
+ * marked done and found again, when it was marked done (F-254).
+ */
+export type AlertMailChange = MailChange &
+  Pick<Change, 'fix_id'> & { markedDoneAt?: string | null };
 
 export interface AlertMailInput {
   host: string;
@@ -39,6 +43,8 @@ export interface AlertMailInput {
   checkedAt: string;
   zone: string;
   changes: readonly AlertMailChange[];
+  /** The alert rules that sent this message, as the Alerts screen names them (F-254). */
+  rules: readonly string[];
   unsubscribeUrl: string;
 }
 
@@ -101,6 +107,8 @@ export interface RowText {
   detail: string;
   /** The fix's page, for an opened change that names one in an alert; null otherwise. */
   fix: string | null;
+  /** A line under the detail: when a fix found again was marked done (F-254); null otherwise. */
+  note?: string | null;
 }
 
 /**
@@ -170,7 +178,7 @@ export const rowsHtml = (rows: readonly RowText[]) =>
   `<ul style="padding-left:18px;margin:0 0 16px">${rows
     .map(
       (r) =>
-        `<li style="margin:0 0 10px"><strong>${html(r.label)}</strong> ${html(r.line)}<br><span style="color:#6b6257">${html(r.detail)}</span>${r.fix ? `<br><a href="${html(r.fix)}">${html(ALERT_COPY.fix)}</a>` : ''}</li>`,
+        `<li style="margin:0 0 10px"><strong>${html(r.label)}</strong> ${html(r.line)}<br><span style="color:#6b6257">${html(r.detail)}</span>${r.note ? `<br>${html(r.note)}` : ''}${r.fix ? `<br><a href="${html(r.fix)}">${html(ALERT_COPY.fix)}</a>` : ''}</li>`,
     )
     .join('')}</ul>`;
 
@@ -178,7 +186,7 @@ export const rowsText = (rows: readonly RowText[]) =>
   rows
     .map(
       (r) =>
-        `- ${r.label}: ${r.line}\n  ${r.detail}${r.fix ? `\n  ${ALERT_COPY.fix}: ${r.fix}` : ''}`,
+        `- ${r.label}: ${r.line}\n  ${r.detail}${r.note ? `\n  ${r.note}` : ''}${r.fix ? `\n  ${ALERT_COPY.fix}: ${r.fix}` : ''}`,
     )
     .join('\n');
 
@@ -204,6 +212,11 @@ export const ALERT_COPY = {
   grades: (moves: ReturnType<typeof letterMoves>) =>
     moves.map((m) => `${GRADE_NAMES[m.grade]} ${m.from} → ${m.to}`).join(' · '),
   fix: 'Open the fix',
+  /** Which of the reader's rules sent the message (F-254): each by the name the Alerts screen gives it. */
+  sentFor: (rules: readonly string[]) =>
+    `Sent for your alert ${plural(rules.length, 'rule', 'rules')}: ${rules.map((r) => `“${r}”`).join(', ')}.`,
+  /** A fix that rule caught: when it was marked done (F-254). */
+  markedDone: (day: string) => `Marked done ${day}; found again at this check.`,
   more: (n: number) => `And ${count(n)} more on the check’s page.`,
   open: 'Open the check',
   rules: 'Change your alert rules',
@@ -217,7 +230,9 @@ export const alertTemplate: Template<AlertMailInput> = (input): RenderedMail => 
   const rows = shown.map((c) => ({
     ...rowText(c),
     fix: c.kind === 'opened' && c.fix_id ? fixUrl(input.checkId, c.fix_id) : null,
+    note: c.markedDoneAt ? ALERT_COPY.markedDone(dayDate(c.markedDoneAt, input.zone)) : null,
   }));
+  const sentFor = input.rules.length ? ALERT_COPY.sentFor(input.rules) : null;
   const when = `${dayDate(input.checkedAt, input.zone)} at ${clockTime(input.checkedAt, input.zone)}`;
   const check = pageUrl('/audit/', input.checkId);
   const rules = `${mailOrigin()}/alerts`;
@@ -228,6 +243,7 @@ export const alertTemplate: Template<AlertMailInput> = (input): RenderedMail => 
   const title = ALERT_COPY.title(host);
   const body = [
     `<p style="margin:0 0 16px">${html(intro)}</p>`,
+    sentFor ? `<p style="margin:0 0 16px">${html(sentFor)}</p>` : '',
     grades ? `<p style="margin:0 0 16px"><strong>${html(grades)}</strong></p>` : '',
     rowsHtml(rows),
     more ? `<p style="margin:0 0 16px">${html(ALERT_COPY.more(more))}</p>` : '',
@@ -239,6 +255,7 @@ export const alertTemplate: Template<AlertMailInput> = (input): RenderedMail => 
     '',
     intro,
     '',
+    ...(sentFor ? [sentFor, ''] : []),
     ...(grades ? [grades, ''] : []),
     rowsText(rows),
     ...(more ? ['', ALERT_COPY.more(more)] : []),

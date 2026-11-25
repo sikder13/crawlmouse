@@ -36,6 +36,7 @@ const base = {
   checkId: CHECK,
   checkedAt: '2026-10-30T10:02:00Z',
   zone: 'America/Indiana/Indianapolis',
+  rules: [] as string[],
   unsubscribeUrl: UNSUB,
 };
 
@@ -325,5 +326,49 @@ describe('a crawler’s name before its summary', () => {
     expect(line('Claude', 'Claude-SearchBot is now blocked')).toBe(
       '- Changed: Claude: Claude-SearchBot is now blocked',
     );
+  });
+});
+
+describe('which rules sent it, and when a fix found again was marked done (F-254)', () => {
+  const regressed = change({
+    kind: 'opened',
+    subject: 'orphans',
+    severity: 'warn',
+    summary: '3 orphan pages',
+    where: '/blog/*',
+    pages_affected: 3,
+    fix_id: FIX,
+    markedDoneAt: '2026-10-27T15:00:00Z',
+  });
+
+  it('names the rule that sent it, by the name the Alerts screen gives it', () => {
+    const m = alertTemplate({
+      ...base,
+      rules: ['A fix you marked done regresses'],
+      changes: [regressed],
+    });
+    expect(m.text).toContain('Sent for your alert rule: “A fix you marked done regresses”.');
+    expect(m.html).toContain('Sent for your alert rule: “A fix you marked done regresses”.');
+  });
+
+  it('names several in the order given, and says nothing of rules when given none', () => {
+    const two = alertTemplate({ ...base, rules: ['A', 'B'], changes: [change()] });
+    expect(two.text).toContain('Sent for your alert rules: “A”, “B”.');
+    const none = alertTemplate({ ...base, changes: [change()] });
+    expect(none.text).not.toContain('Sent for');
+    expect(none.html).not.toContain('Sent for');
+  });
+
+  it('says the day the fix was marked done, in the account’s zone, under its row', () => {
+    // 2026-10-27T15:00Z is Tue 27 Oct in Indiana (EDT, UTC−4).
+    const m = alertTemplate({ ...base, changes: [regressed, change()] });
+    expect(m.text).toContain('Marked done Tue 27 Oct; found again at this check.');
+    expect(m.html).toContain('Marked done Tue 27 Oct; found again at this check.');
+    expect(m.text.match(/Marked done/g)).toHaveLength(1);
+  });
+
+  it('dates it in the zone: late in UTC is the day before in Indiana', () => {
+    const late = { ...regressed, markedDoneAt: '2026-10-28T02:00:00Z' };
+    expect(alertTemplate({ ...base, changes: [late] }).text).toContain('Marked done Tue 27 Oct;');
   });
 });
