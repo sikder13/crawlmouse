@@ -98,6 +98,11 @@
   margin-top: auto;
 }
 
+/* The sign-out's marker and form only hold its button, which wears the feedback button's look. */
+.signOut {
+  display: contents;
+}
+
 /* Skip to the page: read first, and drawn only while it has focus. */
 .skip {
   position: absolute;

@@ -41,6 +41,7 @@ import {
   seatsPreview,
   type SeatsPreview,
 } from '../../app/(v2-preview)/v2-preview/_preview/seats';
+import { SIGN_OUT } from '../../components/v2/AccountShell';
 import { PILL_STATES } from '../../components/v2/pill-states';
 import { LiveActions } from '../../components/v2/screens/account/LiveActions';
 import { AGENCY_RAIL_COPY, CLIENT_COPY, MATRIX_COPY } from '../../lib/v2/copy/agency';
@@ -77,13 +78,14 @@ const SCREENS: [string, unknown, () => ReactElement][] = [
 
 /**
  * What the shared components these screens use write themselves: the word a status pill speaks
- * before its label (`StatusPill`), and a grade that is withheld (`GradeHalf`,
- * components/v2/screens/site/SiteScreen.tsx).
+ * before its label (`StatusPill`), a grade that is withheld (`GradeHalf`,
+ * components/v2/screens/site/SiteScreen.tsx), and the rail's sign-out (`AccountShell`, D-23).
  */
 const SHARED = [
   ...Object.values(PILL_STATES).flatMap((s) => (s.spoken === null ? [] : [`${s.spoken}:`])),
   'withheld',
   '–',
+  SIGN_OUT,
 ];
 
 /** The text nodes under each of `roots`, trimmed, without the empty ones; a node is read once. */
@@ -156,9 +158,13 @@ describe('the words of Seats, the matrix, the client page and client reports tha
   });
 
   it('reads markers on Seats, the matrix and client reports; the client page’s previews draw none', () => {
+    // The rail's sign-out is a marker on every screen (D-23); these counts are of the screens' own.
+    const own = (texts: string[]) => texts.filter((t) => t !== SIGN_OUT);
     const marked = (of: RegExp) =>
-      SCREENS.filter(([path]) => of.test(path)).flatMap(([, , el]) =>
-        markedText(renderToStaticMarkup(<LiveActions>{el()}</LiveActions>)),
+      own(
+        SCREENS.filter(([path]) => of.test(path)).flatMap(([, , el]) =>
+          markedText(renderToStaticMarkup(<LiveActions>{el()}</LiveActions>)),
+        ),
       ).length;
     const [seats, client, reports] = [
       /\/screens\/seats(\/|$)/,
@@ -171,7 +177,7 @@ describe('the words of Seats, the matrix, the client page and client reports tha
     const matrix = SCREENS.filter(([path]) => ![seats, client, reports].some((r) => r.test(path)));
     expect(matrix.map(([path]) => path)).toContain('/v2-preview/screens/agency');
     expect(
-      matrix.flatMap(([, , el]) => markedText(renderToStaticMarkup(el()))).length,
+      own(matrix.flatMap(([, , el]) => markedText(renderToStaticMarkup(el())))).length,
     ).toBeGreaterThan(0);
   });
 
