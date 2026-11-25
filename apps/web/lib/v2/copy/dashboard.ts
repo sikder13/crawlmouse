@@ -335,20 +335,20 @@ const DAY0: CopyChange[] = [
   },
   {
     screen: 'dashboard-day0',
-    kind: 'facts',
+    kind: 'ruling',
     locked:
       "Connect Search Console to lay Google's AI-feature impressions over these pages Connect",
     rendered: '',
     source:
-      'QA dashboard walk D-16 (F-279): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations)',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations)',
   },
   {
     screen: 'dashboard-day0',
-    kind: 'facts',
+    kind: 'ruling',
     locked: 'before each deploy Add All four stop',
     rendered: 'before each deploy It stops',
     source:
-      'FACTS l.57 and QA dashboard walk D-16: the foot counts the items the card offers, here the one Slack row, so "It stops"; the count is the items’',
+      'V2R register, F-279 (QA dashboard walk D-16) and FACTS l.57: the foot counts the items the card offers, here the one Slack row, so "It stops"; the count is the items’',
   },
   {
     screen: 'dashboard-day0',
@@ -356,7 +356,7 @@ const DAY0: CopyChange[] = [
     locked: 'Add a staging URL so audits run before each deploy',
     rendered: '',
     source:
-      'QA dashboard walk D-16 (F-279): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations)',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations)',
   },
   {
     screen: 'dashboard-day0',
@@ -569,11 +569,11 @@ const HOME: CopyChange[] = [
   },
   {
     screen: 'dashboard',
-    kind: 'facts',
+    kind: 'ruling',
     locked: 'Two things left to set up',
     rendered: 'Everything is set up',
     source:
-      'QA dashboard walk D-06 and D-16: the title counts the rows the card lists as left, and the card lists none (the one offered item, Slack, is connected)',
+      'V2R register, F-269 and F-279 (QA dashboard walk D-06, D-16): the title counts the rows the card lists as left, and the card lists none (the one offered item, Slack, is connected)',
   },
   {
     screen: 'dashboard',
@@ -585,12 +585,12 @@ const HOME: CopyChange[] = [
   },
   {
     screen: 'dashboard',
-    kind: 'facts',
+    kind: 'ruling',
     locked:
       "done One competitor added 2 min Connect Search Console to lay Google's AI-feature impressions over these pages Connect 1 min",
     rendered: '',
     source:
-      'QA dashboard walk D-16 (F-279): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations); the efforts "2 min" and "1 min" are in no record',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations); the efforts "2 min" and "1 min" are in no record',
   },
   {
     screen: 'dashboard',

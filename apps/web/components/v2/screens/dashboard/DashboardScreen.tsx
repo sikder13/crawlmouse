@@ -248,7 +248,12 @@ function CrawlersNow({ data }: Props) {
 function BlockedElsewhere({ data }: Props) {
   return (
     <Card as="section" className={shared.panel}>
-      <div data-v2-addition="" data-v2-blocked-elsewhere="">
+      <div
+        data-v2-addition=""
+        data-v2-blocked-elsewhere=""
+        // Every row is a blocking verdict, so the title's "blocked" is vouched for (FACTS I2).
+        data-v2-verdicts={data.blockedElsewhere.map((b) => b.verdict).join(' ')}
+      >
         <CardHead title={data.blockedTitle} />
         <Table
           label={data.blockedTitle}
