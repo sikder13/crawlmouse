@@ -1073,6 +1073,24 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     },
   ],
   [
+    '(p) a page whose reader stopped counts 3 links and the record holds 1 from it: not all held',
+    [page('/', 200, { is_html: true, links_read: false, links_out: 3 }), page('/a', 200)],
+    [edge('/', '/a')],
+    {
+      pill: 'no 404 or 410',
+      body:
+        'The links of 1 page are not all in this check’s record. ' +
+        'Each of the 2 pages that answered 200 has its own title and meta description.',
+      doorBody:
+        'The links of 1 page are not all in this check’s record. ' +
+        'None of the 2 pages we checked answers an error. ' +
+        'Each of the 2 pages that answered 200 has its own title and meta description.',
+      tab: 'Next: Links and pages · no 404 or 410',
+      brokenEmpty: 'None of the 2 pages we checked answers an error.',
+      headline: '0 missing pages found · 0 redirects · titles and descriptions read on 2 pages',
+    },
+  ],
+  [
     '(m) the control: /a and /b are two pages, each answering 200 with the title "Same"',
     [
       whole('/', 2),
@@ -1258,10 +1276,14 @@ const recordArb = fc
       : links.filter(([a]) => from.has(url(a))).map(([a, b]) => edge(a, b));
     // A page read whole may count more links than the record holds from it: the worker keeps the
     // first 1,000 of a page, and none once its batch has used its room.
+    // A page whose reader stopped counts the links found before it did: a floor that may be above
+    // the links held from it.
     const counted = pages.map((p, i) =>
       p.is_html && p.links_read
         ? { ...p, links_out: heldFrom(p, edges) + extraOut[i]! }
-        : { ...p, links_out: heldFrom(p, edges) },
+        : p.is_html && extraOut[i] === 2
+          ? { ...p, links_out: heldFrom(p, edges) + 2 }
+          : { ...p, links_out: heldFrom(p, edges) },
     );
     return { pages: counted, edges, scope };
   });
@@ -1330,6 +1352,15 @@ describe('Links and pages: counts, rows, pills and clauses agree with the truth 
       redirectNotRecorded: some((r) => r.pages.some((p) => p.redirect === null)),
       extraCrawled: some((r) => (r.scope.extraCrawled ?? 0) > 0 && r.pages.length > 0),
       cutTitle: some((r) => r.pages.some((p) => p.title?.cut === true)),
+      partialAboveHeld: some((r) =>
+        r.pages.some(
+          (p) =>
+            p.status_code === 200 &&
+            p.is_html &&
+            !p.links_read &&
+            p.links_out > heldFrom(p, r.edges),
+        ),
+      ),
       readWholeNotAllHeld: some((r) =>
         r.pages.some(
           (p) =>
@@ -1357,6 +1388,7 @@ describe('Links and pages: counts, rows, pills and clauses agree with the truth 
       redirectNotRecorded: true,
       extraCrawled: true,
       cutTitle: true,
+      partialAboveHeld: true,
       readWholeNotAllHeld: true,
     });
   });
