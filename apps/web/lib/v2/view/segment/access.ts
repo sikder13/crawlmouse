@@ -13,7 +13,7 @@ import type {
   EvidenceClass,
   Verdict,
 } from '@crawlmouse/types/v2';
-import { findCheck } from '../../fixtures';
+import { findCheck } from '../../dataset-lookups';
 import { listOf, percent, templateNoun, testedAt, timeOfDay } from '../../format';
 import {
   EDGE_SENTENCE,
@@ -29,7 +29,7 @@ import { capitalise, count, numberWord, plural } from '../../words';
 import { accessPill, sampledCoverage, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
-import type { ViewDataset } from '../../fixtures';
+import type { ViewDataset } from '../../dataset-lookups';
 
 export interface MatrixCell {
   /** Unique on the page: the crawler and the section ("*" for a cell spanning every section). */

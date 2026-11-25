@@ -20,7 +20,9 @@ const viewer = ACCOUNT_VIEWERS.home();
 const ADD_NOTE =
   'Adding a site starts its first check. Its grades, crawlers and fixes appear here when that check ends.';
 const PRO =
-  'You have Pro until Sat 7 Nov: weekly checks, every fix with its packet, Slack alerts and one competitor per site, on up to 5 sites.';
+  // Competitors are not built (CAPABILITIES.competitors is coming), so the sentence names none (D-16);
+  // the account's Slack is connected, so it is named (review 5).
+  'You have Pro until Sat 7 Nov: weekly checks, every fix with its packet and Slack alerts, on up to 5 sites.';
 
 const withAccount = (
   d: FixtureDataset,
@@ -36,6 +38,14 @@ const railNote = (d: FixtureDataset) =>
 describe('a new trial with no site', () => {
   it('says what the trial includes, until when, and that no card is held', () => {
     expect(dashboardView(noSiteDataset(), viewer).sites.foot).toBe(`${PRO} No card. ${ADD_NOTE}`);
+  });
+
+  it('names Slack whether or not it is connected, since its Connect page is served (#167)', () => {
+    const account = bad.accounts.find((a) => a.id === BAD)!;
+    const d = withAccount(noSiteDataset(), {
+      integrations: account.integrations.map((i) => ({ ...i, connected: false })),
+    });
+    expect(dashboardView(d, viewer).sites.foot).toBe(`${PRO} No card. ${ADD_NOTE}`);
   });
 
   it('does not say "no card" on a trial with a card', () => {
@@ -54,7 +64,7 @@ describe('a new trial with no site', () => {
       ],
     });
     expect(dashboardView(d, viewer).sites.foot).toContain(
-      'You have Agency until Sat 7 Nov: weekly checks, every fix with its packet, Slack alerts and three competitors per site, on up to 25 sites.',
+      'You have Agency until Sat 7 Nov: weekly checks, every fix with its packet and Slack alerts, on up to 25 sites.',
     );
   });
 
