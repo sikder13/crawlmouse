@@ -1788,6 +1788,20 @@ const LIBS: readonly Spec[] = [
     calls: 1,
   },
   {
+    path: 'apps/web/lib/v2/account/session-theme.ts',
+    v2: true,
+    identity: 'the signed-in person',
+    gate: 'own_rows',
+    detail:
+      'The page theme: the caller’s own seats through their own client; the service role reads only their own `users.default_account_id`, to land on the seat the dashboard lands on (`pickSeat`).',
+    check: at('lib/v2/account/session-theme.ts', 'getUser'),
+    proof: by(
+      'lib/v2/account/session-theme.test.tsx',
+      'with no account chosen and seats on different themes, gives the landing seat’s, as the dashboard does',
+    ),
+    calls: 1,
+  },
+  {
     path: 'apps/web/lib/v2/account/pages.ts',
     v2: true,
     identity: 'a seat of the account its caller proved',
@@ -2196,6 +2210,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/lib/rate-limit.ts',
       'apps/web/lib/reports.ts',
       'apps/web/lib/v2/account/pages.ts',
+      'apps/web/lib/v2/account/session-theme.ts',
       'apps/web/lib/v2/account/settings-pages.ts',
       'apps/web/lib/v2/account/viewer.ts',
       'apps/web/lib/v2/ops/operator.ts',
