@@ -1023,6 +1023,7 @@ describe('a challenged crawler is said as the rows hold it (D11)', () => {
       host: input.site.host,
       kept: false,
       plan: 'free',
+      competitors: 0,
       dataset: {
         ...dataset,
         access_tests:
