@@ -203,11 +203,13 @@ describe('/changes, signed in', () => {
     expect(repeated.rows).toHaveLength(allData.rows.length);
   });
 
-  it('an account with no change says so in words', async () => {
+  it('an account with no change and no re-check says so in words', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     h.viewer = signedIn();
     const d = structuredClone(fixture('bad-site'));
     d.changes = [];
+    // First audits only: a re-check that found nothing has a row of its own (F-214).
+    d.checks = d.checks.filter((c) => c.previous_check_id === null);
     h.dataset = d;
     const data = (await child(PAGES.changes())).props.data as {
       rows: unknown[];
@@ -215,5 +217,22 @@ describe('/changes, signed in', () => {
     };
     expect(data.rows).toEqual([]);
     expect(data.empty).toBeTruthy();
+  });
+
+  it('an account whose re-checks found nothing lists them, and calls none a change (F-214)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    h.viewer = signedIn();
+    const d = structuredClone(fixture('bad-site'));
+    d.changes = [];
+    h.dataset = d;
+    const data = (await child(PAGES.changes())).props.data as {
+      rows: { kind: string }[];
+      headline: string | null;
+      empty: string | null;
+    };
+    expect(data.rows.length).toBeGreaterThan(0);
+    expect(data.rows.every((r) => r.kind === 'checked')).toBe(true);
+    expect(data.headline).toMatch(/No later check has found a change\.$/);
+    expect(data.empty).toBeNull();
   });
 });
