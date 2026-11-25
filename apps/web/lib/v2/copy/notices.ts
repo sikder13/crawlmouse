@@ -130,6 +130,7 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   fix_not_verified: () =>
     'That check did not verify the fix, so there is no proof to make. Nothing was made.',
   report_made: () => 'The report is made. Download it from its row below.',
+  report_made_page: () => 'The report is made. Open it from its row below.',
   report_failed: () =>
     'The report could not be made. Try again; if it fails again, write to support@crawlmouse.com.',
   share_made: () =>

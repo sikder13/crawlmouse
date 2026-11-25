@@ -472,6 +472,17 @@ describe('POST /api/reports: a refused form goes back to Reports with a line; JS
     expect(lineOf(form)).toContain('Download');
   });
 
+  it('a made comparison, a page its row opens: back to Reports saying to open it, not download it', async () => {
+    as(w.owner);
+    const form = await post(
+      { kind: 'compare', siteId: w.site.id, checkId: w.site.second, previousCheckId: w.site.first },
+      true,
+    );
+    expect(sentTo(form)).toEqual([303, '/reports', 'report_made_page']);
+    expect(lineOf(form)).toBe('The report is made. Open it from its row below.');
+    expect(lineOf(form)).not.toContain('Download');
+  });
+
   it('400, a request that is not one of the kinds: the notice for a request not understood', async () => {
     as(w.owner);
     const before = await countReports();
@@ -616,7 +627,10 @@ describe('POST /api/reports: the answer', () => {
       storage_path: reportPath(w.accountId, body.reportId, 'pdf'),
     });
     const form = await post({ kind: 'audit_pdf', siteId: w.site.id, checkId: w.site.first }, true);
-    expect([form.status, form.headers.get('location')]).toEqual([303, '/reports?notice=report_failed']);
+    expect([form.status, form.headers.get('location')]).toEqual([
+      303,
+      '/reports?notice=report_failed',
+    ]);
     expect(h.events).toEqual([]);
   });
 

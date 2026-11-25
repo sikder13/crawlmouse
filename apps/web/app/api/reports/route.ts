@@ -198,9 +198,11 @@ export async function POST(req: Request) {
       },
     );
   }
-  // A form says what happened, so the person knows the file is on its row to download (F-125).
+  // A form says what happened and where the report is (F-125): a page is opened from its row,
+  // as lib/v2/view/reports.ts offers Open for an html report, and a file is downloaded from it.
   if (body.kind === 'form') {
-    return noticeTo(REPORTS_PAGE, made.outcome === 'stored' ? 'report_made' : 'report_failed');
+    if (made.outcome !== 'stored') return noticeTo(REPORTS_PAGE, 'report_failed');
+    return noticeTo(REPORTS_PAGE, format === 'html' ? 'report_made_page' : 'report_made');
   }
   return made.outcome === 'stored'
     ? Response.json({ reportId }, { status: 201 })
