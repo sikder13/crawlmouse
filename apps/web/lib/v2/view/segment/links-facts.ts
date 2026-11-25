@@ -426,9 +426,13 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
     const into = edges.filter(
       (e) => asked.has(spell(e.to_url)) && !asked.has(spell(e.from_url)) && e.from_url !== e.to_url,
     );
+    // Two linking URLs that shorten to one path (`http://host/a`, `https://host/a`) are two pages
+    // to the count: each is then shown whole, so the cell lists what the count counts.
+    const fromUrls = [...new Set(into.map((e) => e.from_url))];
+    const clash = new Set(fromUrls.map(path)).size < fromUrls.length;
     const linkedFrom = into.map((e) => ({
       url: e.from_url,
-      path: path(e.from_url),
+      path: clash ? e.from_url : path(e.from_url),
       anchor: isBlank(e.anchor_text) ? null : e.anchor_text,
     }));
     const froms = [...new Set(linkedFrom.map((l) => l.path))];

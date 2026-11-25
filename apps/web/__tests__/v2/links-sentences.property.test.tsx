@@ -401,7 +401,15 @@ function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Sc
   const stand = '0 pages in this check’s record';
   for (const r of [...v.broken.rows, ...v.unlinked.rows, ...v.errors.rows]) {
     const truth = t.rows.find((x) => path(x.at) === r.path && x.status === r.status)!;
-    const froms = distinct(truth.into.map((e) => path(e.from_url)));
+    // Each distinct linking URL once; shown whole when two of them differ only in their scheme, so
+    // the cell lists as many pages as the count counts.
+    const fromUrls = distinct(truth.into.map((e) => e.from_url));
+    const noScheme = (u: string) => {
+      const x = new URL(u);
+      return `${x.host}${x.pathname}${x.search}`;
+    };
+    const spellOut = new Set(fromUrls.map(noScheme)).size < fromUrls.length;
+    const froms = fromUrls.map((u) => (spellOut ? u : path(u)));
     expect(distinct(r.linkedFrom.map((l) => l.path))).toEqual(froms);
     if (!froms.length) {
       expect([r.linkedSummary, r.linkedAll]).toEqual([stand, stand]);
@@ -780,6 +788,8 @@ interface Said {
   headline: string;
   /** The redirects table, as [Requested as, Hops, Ends at]: the screen's rows and the PDF's. */
   redirects?: string[][];
+  /** The missing-page rows that a link leads to, as [page, linked summary, linked from]. */
+  broken?: string[][];
   /** Each column's two lines: [missing, shared]. */
   titles?: [string, string];
   descriptions?: [string, string];
@@ -1073,6 +1083,28 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     },
   ],
   [
+    '(o) https://host/a and http://host/a, each answering 200, both link to /gone (404): two pages',
+    [
+      page('/a', 200),
+      page('/a', 200, { url: `${HTTP_ORIGIN}/a`, final_url: `${HTTP_ORIGIN}/a` }),
+      gone('/gone', 404),
+    ],
+    [edge('/a', '/gone'), { ...edge('/a', '/gone'), from_url: `${HTTP_ORIGIN}/a` }],
+    {
+      pill: '1 missing page',
+      body:
+        '1 missing page, linked from 2 pages in this check’s record, answering 404. ' +
+        '2 pages share a title with another; 2 pages share a meta description with another.',
+      doorBody:
+        '1 missing page, linked from 2 pages in this check’s record, answering 404. ' +
+        '2 pages share a title with another; 2 pages share a meta description with another.',
+      tab: 'Next: Links and pages · 1 missing page',
+      brokenEmpty: null,
+      headline: '1 missing page found · 0 redirects · titles and descriptions read on 2 pages',
+      broken: [['/gone', `${ORIGIN}/a, ${HTTP_ORIGIN}/a`, `${ORIGIN}/a, ${HTTP_ORIGIN}/a`]],
+    },
+  ],
+  [
     '(p) a page whose reader stopped counts 3 links and the record holds 1 from it: not all held',
     [page('/', 200, { is_html: true, links_read: false, links_out: 3 }), page('/a', 200)],
     [edge('/', '/a')],
@@ -1131,6 +1163,9 @@ describe('Links and pages on hand-counted records: the pill, body, tab, empty st
       headline: v.headline.title,
       ...(want.redirects
         ? { redirects: v.redirects.rows.map((r) => [r.path, r.hops, r.endsText]) }
+        : {}),
+      ...(want.broken
+        ? { broken: v.broken.rows.map((r) => [r.pageText, r.linkedSummary, r.linkedAll]) }
         : {}),
       ...(want.titles ? { titles: col(v.titles) } : {}),
       ...(want.descriptions ? { descriptions: col(v.descriptions) } : {}),
