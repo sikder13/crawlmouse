@@ -242,6 +242,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'array slice \u2014 cannot split a surrogate pair',
   ],
   [
+    "apps/web/app/api/agency/brand/route.ts :: const hash = createHash('sha256').update(logo.bytes).digest('hex').slice(0, 16);",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
     "apps/web/app/api/reports/[slug]/logo/route.ts :: const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);",
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
