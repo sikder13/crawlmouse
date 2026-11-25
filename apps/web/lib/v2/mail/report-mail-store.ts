@@ -12,6 +12,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { hashToken } from '../account/tokens';
+import type { ReportDoc } from '../reports/generate';
 import type { Generated } from '../reports/generate-run';
 import { hashShareToken, newShareToken, type ShareFiles } from '../reports/share';
 import { parseStoredDoc } from '../reports/share-doc';
@@ -73,6 +74,18 @@ const Sent = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('sent'), account_id: z.uuid(), first: z.boolean() }),
   z.object({ outcome: z.enum(['already', 'not_found']) }),
 ]);
+
+/**
+ * Who a scheduled client report says it is from (white-label, Goal 1 row 24): the agency stamped on
+ * the report when it was made, which the shared page shows too; the account's name for a report
+ * with none. The template's no-link guard (`accountNameText`) applies to either.
+ */
+export function senderName(
+  doc: Pick<ReportDoc, 'brand'>,
+  accountName: string | null,
+): string | null {
+  return doc.brand?.name ?? accountName;
+}
 
 export function supabaseReportMailStore(deps: ReportMailStoreDeps): ReportMailStore {
   const { admin } = deps;
@@ -204,7 +217,7 @@ export function supabaseReportMailStore(deps: ReportMailStoreDeps): ReportMailSt
 
       return {
         recipient: pause.email,
-        agencyName: pause.account_name,
+        agencyName: senderName(doc, pause.account_name),
         host: pause.host,
         headline: doc.title,
         lines: doc.lines,
