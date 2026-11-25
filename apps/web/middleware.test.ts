@@ -570,7 +570,14 @@ describe('a public route that reads JSON refuses another site and a body not dec
 });
 
 describe('the matcher sends every guarded route through the middleware', () => {
-  const matches = (url: string) => unstable_doesMiddlewareMatch({ config, nextConfig: {}, url });
+  // On crawlmouse.com: on an agency's host every path matches (row 25, tested below).
+  const matches = (url: string) =>
+    unstable_doesMiddlewareMatch({
+      config,
+      nextConfig: {},
+      url,
+      headers: { host: 'crawlmouse.com' },
+    });
 
   it.each([...guarded, ...lenient].map((p) => samplePath(p)))('%s', (path) => {
     expect(matches(path)).toBe(true);
@@ -869,5 +876,131 @@ describe('the v1 cutover table (CC-36 D1, D2): each row both ways', () => {
     for (const row of V1_CUTOVER) {
       expect(unstable_doesMiddlewareMatch({ config, url: example(row.from) }), row.from).toBe(true);
     }
+  });
+});
+
+describe('an agency’s own host (Goal 1 row 25)', () => {
+  const HOST = 'reports.agency-example.com';
+  const TOKEN = 'AbCdEfGhIjKlMnOpQrStUv';
+  const REPORT = '0b6f6c1e-3f0a-4c55-9d2e-2a7c4f1e9b10';
+  const PORTAL = 'x-crawlmouse-portal-host';
+  const at = (path: string, init: { method?: string; headers?: Record<string, string> } = {}) =>
+    new NextRequest(
+      new Request(`https://${HOST}${path}`, {
+        method: init.method ?? 'GET',
+        headers: { host: HOST, ...init.headers },
+      }),
+    );
+  const noRefresh = () => {
+    throw new Error('the session refresh ran on a portal host');
+  };
+  const forwarded = (res: NextResponse, name: string) =>
+    (res.headers.get('x-middleware-override-headers') ?? '').split(',').includes(name)
+      ? res.headers.get(`x-middleware-request-${name}`)
+      : undefined;
+
+  it('passes a share link and its page, with the host set, noindex, and no refresh or cookie', async () => {
+    for (const path of [`/s/${TOKEN}`, `/s/view/${REPORT}`]) {
+      const res = await handleEdge(at(path), noRefresh);
+      expect(res.headers.get('x-middleware-next'), path).toBe('1');
+      expect(forwarded(res, PORTAL), path).toBe(HOST);
+      expect(res.headers.get('X-Robots-Tag'), path).toBe('noindex, nofollow, noarchive');
+      expect(res.headers.get('set-cookie'), path).toBeNull();
+      expect(res.cookies.getAll(), path).toEqual([]);
+    }
+  });
+
+  it('forwards the share cookie alone: a session cookie the parent domain sets is never read', async () => {
+    const res = await handleEdge(
+      at(`/s/view/${REPORT}`, {
+        headers: { cookie: `${AUTH_COOKIE}=stolen; cm_share=${TOKEN}; other=1` },
+      }),
+      noRefresh,
+    );
+    expect(forwarded(res, 'cookie')).toBe(`cm_share=${TOKEN}`);
+    const bare = await handleEdge(
+      at(`/s/view/${REPORT}`, { headers: { cookie: `${AUTH_COOKIE}=stolen` } }),
+      noRefresh,
+    );
+    // Not in the override list: the request reaches the app with no Cookie header at all.
+    expect(bare.headers.get('x-middleware-override-headers')).not.toBeNull();
+    expect(forwarded(bare, 'cookie')).toBeUndefined();
+  });
+
+  it('a portal header a client sends is replaced by the host it came on', async () => {
+    const res = await handleEdge(
+      at(`/s/${TOKEN}`, { headers: { [PORTAL]: 'other.agency.com' } }),
+      noRefresh,
+    );
+    expect(forwarded(res, PORTAL)).toBe(HOST);
+  });
+
+  it('is a 404 for every other path and method, API writes and sign-in included', async () => {
+    const refused: Array<[string, string]> = [
+      ['GET', '/'],
+      ['GET', '/dashboard'],
+      ['GET', '/login'],
+      ['GET', '/sitemap.xml'],
+      ['GET', '/robots.txt'],
+      ['GET', '/r/some-report'],
+      ['GET', '/ingest/e'],
+      ['POST', '/api/agency/brand'],
+      ['POST', '/api/auth/magic-link'],
+      ['POST', '/api/webhooks/stripe'],
+      ['GET', '/api/health'],
+      ['POST', `/s/${TOKEN}`],
+      // Every retired v1 address, its `:name` and `*` segments filled in.
+      ...V1_CUTOVER.map(
+        (r) => ['GET', r.from.replace(/:[^/]+/g, 'x').replace(/\*$/, 'x')] as [string, string],
+      ),
+    ];
+    for (const [method, path] of refused) {
+      const res = await handleEdge(at(path, { method }), noRefresh);
+      expect(res.status, `${method} ${path}`).toBe(404);
+      expect(res.headers.get('X-Robots-Tag'), path).toBe('noindex, nofollow, noarchive');
+      expect(res.headers.get('x-middleware-next'), path).toBeNull();
+      expect(res.cookies.getAll(), path).toEqual([]);
+    }
+  });
+
+  it('on our own hosts, a portal header a client sends is deleted before any page reads it', async () => {
+    const req = new NextRequest(
+      new Request('https://crawlmouse.com/dashboard', {
+        headers: { host: 'crawlmouse.com', [PORTAL]: HOST },
+      }),
+    );
+    await handleEdge(req, async (r) => {
+      expect(r.headers.get(PORTAL)).toBeNull();
+      return NextResponse.next();
+    });
+  });
+
+  it('the matcher sends every path on a foreign host through the middleware, and none more on ours', () => {
+    const on = (host: string, url: string) =>
+      unstable_doesMiddlewareMatch({ config, nextConfig: {}, url, headers: { host } });
+    for (const url of ['/', '/ingest/e', '/api/webhooks/stripe', '/favicon.ico', '/_next/image']) {
+      expect(on(HOST, url), url).toBe(true);
+    }
+    for (const host of [
+      'crawlmouse.com',
+      'www.crawlmouse.com',
+      'crawlmouse-001.vercel.app',
+      'localhost:3000',
+    ]) {
+      for (const url of [
+        '/ingest/e',
+        '/api/webhooks/stripe',
+        '/_next/static/x.js',
+        '/favicon.ico',
+      ]) {
+        expect(on(host, url), `${host}${url}`).toBe(false);
+      }
+    }
+  });
+
+  it('the matcher’s host pattern is OWN_HOST_MATCHER, character for character', async () => {
+    const { OWN_HOST_MATCHER } = await import('@/lib/v2/agency/portal-host');
+    const entry = config.matcher[1] as { missing: Array<{ value: string }> };
+    expect(entry.missing[0]!.value).toBe(OWN_HOST_MATCHER);
   });
 });
