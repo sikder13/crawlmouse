@@ -71,7 +71,7 @@ describe('changesView: a check that found changes', () => {
       '17 pages changed content',
     ]);
     expect(v.headline).toEqual({
-      title: 'Four changes found at the Fri 06:02 check.',
+      title: 'Four changes found at the Fri 06:02 EDT check.',
       pill: { state: 'neutral', label: '4 changes' },
     });
     expect(v.history).toHaveLength(6);
@@ -91,7 +91,7 @@ describe('changesView: a check that found changes', () => {
   it('says when, where, the effect, the robots.txt lines and who was told, in the account’s time', () => {
     const [claude, , grade, content] = v.rows;
     expect(claude).toMatchObject({
-      when: 'Fri 06:02',
+      when: 'Fri 06:02 EDT',
       kind: 'opened',
       pill: { state: 'bad', label: 'opened' },
       subject: 'crawler access',
@@ -99,7 +99,7 @@ describe('changesView: a check that found changes', () => {
       pages: '214 pages',
       effect: 'none',
       verdict: { verdict: 'disallowed_by_robots', evidence: 'declared' },
-      told: 'email and Slack #seo, Fri 06:03',
+      told: 'email and Slack #seo, Fri 06:03 EDT',
     });
     expect(claude!.cause).toBe(
       'First observed after robots.txt changed Thu 19:40: a group for "User-agent: ClaudeBot" and "User-agent: Claude-SearchBot" with "Disallow: /" was added.',
@@ -157,8 +157,8 @@ describe('changesView: a check that found changes', () => {
     const c = changesView(fixture('challenged-site'), CHALLENGED_RECHECK);
     expect(c.history).toHaveLength(2);
     expect(c.rows).toHaveLength(1);
-    expect(c.headline.title).toBe('One change found at the Wed 15:13 check.');
-    expect(c.rows[0]!.told).toBe('email and Slack #clients-granitepeak, Wed 15:14');
+    expect(c.headline.title).toBe('One change found at the Wed 15:13 EDT check.');
+    expect(c.rows[0]!.told).toBe('email and Slack #clients-granitepeak, Wed 15:14 EDT');
   });
 
   it('compares with the check before it', () => {

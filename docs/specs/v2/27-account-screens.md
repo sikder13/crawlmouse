@@ -512,11 +512,12 @@ From `apps/web/lib/v2/copy/{alerts,reports,settings,trial-end}.ts`, listed in `c
 
 What this step adds that no locked screen has, marked `data-v2-addition` where it renders:
 
-| Screen   | Addition                                                                                                                                                              | Source                                                                   |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| reports  | A Show button beside the site picker: the picker reloads the card for another site without changing the page on input (WCAG 3.2.2)                                    | CC-27 plan, approved; the artboard draws the picker alone                |
-| settings | A line under the email kinds when mail to the reader’s own address hard-bounced or was reported as spam, saying that only sign-in links and account mail go to it now | CC-28 D7 (Resend’s bounces and complaints suppress all but account mail) |
-| settings | A line under the cards, “A question about this account? Email support”: a mailto to the support address whose body carries the account’s id and the page’s path       | CC-33 D5 (lib/v2/support/mailto.ts)                                      |
+| Screen   | Addition                                                                                                                                                                        | Source                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| reports  | A Show button beside the site picker: the picker reloads the card for another site without changing the page on input (WCAG 3.2.2)                                              | CC-27 plan, approved; the artboard draws the picker alone                |
+| settings | For a developer seat, Settings in its rail and one line: the account’s address, email and plan are changed by its owner or an account manager. The page had been the public 404 | D-03 (QA’s production dashboard walk, 24 Nov)                            |
+| settings | A line under the email kinds when mail to the reader’s own address hard-bounced or was reported as spam, saying that only sign-in links and account mail go to it now           | CC-28 D7 (Resend’s bounces and complaints suppress all but account mail) |
+| settings | A line under the cards, “A question about this account? Email support”: a mailto to the support address whose body carries the account’s id and the page’s path                 | CC-33 D5 (lib/v2/support/mailto.ts)                                      |
 
 ## Changes to earlier steps’ code
 

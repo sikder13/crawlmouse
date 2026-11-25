@@ -1,6 +1,6 @@
-# The crawl worker on staging. No addresses and no secrets here: the two secrets
-# (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set with `flyctl secrets set`;
-# see docs/ops/worker-runbook.md.
+# The crawl worker on staging. No secrets here, and one address, the production app's signal route
+# (APP_SIGNAL_URL below): the two secrets (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set
+# with `flyctl secrets set`; see docs/ops/worker-runbook.md.
 app = "crawlmouse-worker-staging"
 primary_region = "iad"
 kill_signal = "SIGTERM"
@@ -23,6 +23,11 @@ kill_timeout = "5s"
   # and the result store full, and holds the peak resident memory to a fixed bound per level well
   # under the VM below (see PEAK_RSS_MIB there).
   NODE_OPTIONS = "--max-old-space-size=512 --max-semi-space-size=4"
+  # The app's route for "this batch has ended" (src/signal.ts): production's, an address and not a
+  # secret, the same in fly.production.toml. On staging the worker's own APP_SIGNAL_URL secret, its
+  # staging app's route, takes its place: Fly gives a secret precedence over an [env] variable of the
+  # same name. The apex, not www: the worker refuses a redirect, and www answers 308 (F-332).
+  APP_SIGNAL_URL = "https://crawlmouse.com/api/webhooks/worker"
 
 [http_service]
   internal_port = 8080

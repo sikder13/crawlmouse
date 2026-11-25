@@ -88,6 +88,9 @@ export async function POST(req: Request): Promise<Response> {
   }
   const note = parseWorkerNote(raw);
   if (note === null) return new Response(null, { status: 400 });
+  // The sentinel's look, batch 0: its function polls the look and waits on no event, so the note is
+  // answered and sends none (F-333). Refusing it only filled the worker's log with signal_refused.
+  if (note.batch === 0) return new Response(null, { status: 204 });
   try {
     // No event id: the worker's repeat is the same note, and must not be dropped as a duplicate.
     await inngest.send({
