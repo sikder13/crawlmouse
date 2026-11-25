@@ -902,6 +902,25 @@ export function withoutTrialOffer(
   return query.notice === 'refused' ? { ...view, startPro: null } : view;
 }
 
+/**
+ * The account's next check, for the header (D-04): the soonest of its primary sites' scheduled
+ * checks, each as `nextCheckLine` names it, so a paused site, a staging copy and, on Free, a site
+ * after the first are passed over. Without the scheduler's column (a preview), the first site's
+ * weekly stand-in, as before.
+ */
+function accountNextCheck(
+  v: AccountView,
+  next: NextChecks | undefined,
+  dayDateOf: (ts: string) => string,
+): string | null {
+  if (next === undefined) return nextCheckLine(primarySite(v), v, next, dayDateOf);
+  const soonest = primarySites(v)
+    .filter((s) => nextCheckLine(s, v, next, dayDateOf) !== null)
+    .map((s) => ({ s, at: instant(next.get(s.id)!) }))
+    .sort((a, b) => a.at - b.at || a.s.id.localeCompare(b.s.id))[0];
+  return soonest ? nextCheckLine(soonest.s, v, next, dayDateOf) : null;
+}
+
 export function dashboardView(
   d: AccountDataset,
   viewer: Viewer,
@@ -943,7 +962,7 @@ export function dashboardView(
 
   const fixes = result ? fixesAsOf(v.d, result) : [];
   const first = fixes[0];
-  const nextAt = nextCheckLine(primary, v, next, (ts) => dayDate(ts, zone));
+  const nextAt = accountNextCheck(v, next, (ts) => dayDate(ts, zone));
   // The live column's time is the scheduler's, whatever the saved cadence (on Free the first site
   // runs monthly, Q4), so it is named without one; the preview's stand-in is weekly by construction.
   const nextText = nextAt ? `${next ? 'next check' : 'next weekly check'} ${nextAt}` : null;
