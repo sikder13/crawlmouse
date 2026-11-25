@@ -13,7 +13,10 @@
  *
  * A table's column names are drawn again at the top of each page the table runs onto. A row, a
  * before-and-after pair, a paragraph or a heading with its first lines moves to a new page when it
- * would otherwise be split and fits on one; one taller than a page runs on, line by line.
+ * would otherwise be split and fits on one; one taller than a page runs on, line by line. A
+ * section's first paragraph is kept whole with its heading when the two fit on a page together;
+ * when they do not, the heading is kept with the paragraph's first lines and the paragraph runs on,
+ * so a paragraph that fits a page alone can still be split there.
  */
 import type { DocBlock, DocSide, ReportDoc } from './generate';
 
@@ -324,8 +327,8 @@ class Flow {
     }
   }
 
-  /** One string as a paragraph across the page's width. */
   /**
+   * One string as a paragraph across the page's width.
    * A paragraph that fits on a page is not split by a page's footer (F-126); a longer one runs on.
    * `keepWhole` is false for a section's first paragraph: its heading has already been kept with it.
    */
