@@ -64,6 +64,25 @@ export async function loadResults(deps: StepDeps, event: CheckRequested): Promis
 export const isCrawl = (b: BatchResult): b is CrawlBatchResult => b.kind === 'crawl';
 
 /**
+ * The results a crawl batch is planned from (nextCrawlBatch reads pages and discovered URLs only),
+ * with every crawl result's edges let go as it is read: a post holds none of the check's edges,
+ * however many the check has (QA's gate on #182, F2). Otherwise what loadResults reads.
+ */
+export async function loadResultsForPlanning(
+  deps: StepDeps,
+  event: CheckRequested,
+): Promise<BatchResult[]> {
+  const rows = await deps.store.batches(event.checkId);
+  const done = rows.filter((r) => r.status === 'done' && r.result_path !== null);
+  const out: BatchResult[] = [];
+  for (const r of done) {
+    const b = BatchResultSchema.parse(await getJson(deps.evidence, r.result_path!));
+    out.push(isCrawl(b) ? { ...b, link_edges: [] } : b);
+  }
+  return out;
+}
+
+/**
  * The memory this process may use, in MiB: the smaller of its container's limit
  * (`process.constrainedMemory`, which answers a huge number where there is none) and the machine's.
  * On a Vercel function this is the function instance's size. Under Fluid compute, invocations that
