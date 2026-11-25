@@ -157,7 +157,7 @@ describe('changesView: a check that found changes', () => {
             (r, i) =>
               // Seen earlier only for an opened row: a resolved or changed one was observed here.
               (specs[i]!.seenEarlier && specs[i]!.kind === 'opened'
-                ? /^First seen at the Sat 22:34 check[.;]/.test(r.cause)
+                ? /^First seen at the Sat 24 Oct 22:34 check[.;]/.test(r.cause)
                 : /^First observed /.test(r.cause)) && !/\bcaused by\b/i.test(r.cause),
           )
         );
@@ -199,25 +199,38 @@ describe('changesView: a fix found again (F-213)', () => {
   }
 
   it('says where it was first seen, not "first observed at this check"', () => {
-    // The first audit finished 2026-10-25T02:34Z: Sat 22:34 in Indiana (EDT, UTC−4).
+    // The first audit finished 2026-10-25T02:34Z: Sat 24 Oct 22:34 in Indiana (EDT, UTC−4). The
+    // day is named: a reopened fix can be weeks old, and a weekday alone would not say which check.
     expect(reopened(FIRST_AUDIT).cause).toBe(
-      'First seen at the Sat 22:34 check. What we found: Marked done on 2026-10-28, and found again on this check.',
+      'First seen at the Sat 24 Oct 22:34 check. What we found: Marked done on 2026-10-28, and found again on this check.',
     );
   });
 
   it('says so with no cause, and with a dated one', () => {
     expect(reopened(FIRST_AUDIT, null).cause).toBe(
-      'First seen at the Sat 22:34 check; we found no cause.',
+      'First seen at the Sat 24 Oct 22:34 check; we found no cause.',
     );
     const dated = fixture('bad-site').changes.find((c) => c.id === OPENED)!.cause!;
     expect(reopened(FIRST_AUDIT, dated).cause).toBe(
-      'First seen at the Sat 22:34 check. What we found: robots.txt changed Thu 19:40: a group for "User-agent: ClaudeBot" and "User-agent: Claude-SearchBot" with "Disallow: /" was added.',
+      'First seen at the Sat 24 Oct 22:34 check. What we found: robots.txt changed Thu 19:40: a group for "User-agent: ClaudeBot" and "User-agent: Claude-SearchBot" with "Disallow: /" was added.',
     );
   });
 
-  it('says an earlier check when the dataset does not hold the one it was first seen at', () => {
+  it('says another check when the dataset does not hold the one it was first seen at', () => {
     expect(reopened('c0000000-0000-4000-8000-0000000000ff').cause).toBe(
-      'First seen at an earlier check. What we found: Marked done on 2026-10-28, and found again on this check.',
+      'First seen at another check. What we found: Marked done on 2026-10-28, and found again on this check.',
+    );
+  });
+
+  it('does not call a check queued after this one the check it was first seen at', () => {
+    const d = structuredClone(fixture('bad-site'));
+    const change = d.changes.find((c) => c.id === OPENED)!;
+    change.cause = REOPENED;
+    d.fixes.find((f) => f.id === change.fix_id)!.first_seen_check_id = FIRST_AUDIT;
+    // The first audit moved after the row's own check (…006, queued 2026-10-30).
+    d.checks.find((c) => c.id === FIRST_AUDIT)!.queued_at = '2026-10-31T00:00:00Z';
+    expect(changesView(d, HISTORY).rows.find((r) => r.key === OPENED)!.cause).toBe(
+      'First observed at this check. What we found: Marked done on 2026-10-28, and found again on this check.',
     );
   });
 

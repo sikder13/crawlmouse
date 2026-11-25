@@ -10,7 +10,12 @@ import { findCheck, fixture } from '../../lib/v2/fixtures';
 
 const d = fixture('bad-site');
 const change = d.changes.find((c) => c.id === '90000000-0000-4000-8000-000000000001')!;
-const row = rowOf(change, findCheck(d, change.check_id), (ts) => ts, firstSeenOf(d, change));
+const row = rowOf(
+  change,
+  findCheck(d, change.check_id),
+  (ts) => ts,
+  firstSeenOf(d, change, (ts) => ts),
+);
 const headers = (html: string) =>
   [...html.matchAll(/<th scope="col"[^>]*>([^<]*)</g)].map((m) => m[1]);
 

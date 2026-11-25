@@ -131,8 +131,7 @@ function logEntries(changes: readonly Change[]): LogEntry[] {
 
 /**
  * The log's entries with a row for each re-check that recorded no change (F-214): a finished or
- * partial check that has a check before it and no change row of its own. Newest first, a change
- * before a re-check finished at the same instant.
+ * partial check that has a check before it and no change row of its own. Newest first.
  */
 function withQuietChecks(v: AccountView, changes: readonly Change[]): LogEntry[] {
   const found = new Set(changes.map((c) => c.check_id));
@@ -144,7 +143,20 @@ function withQuietChecks(v: AccountView, changes: readonly Change[]): LogEntry[]
         !found.has(c.id),
     )
     .map((c) => ({ change: null, findings: null, quiet: c }));
-  return [...logEntries(changes), ...quiet].sort((a, b) => instant(timeOf(b)) - instant(timeOf(a)));
+  // At one instant a change comes before a re-check, and entries of one kind keep their order:
+  // changes by id (accountChanges), re-checks by check id.
+  const rank = (e: LogEntry) => (e.change ? 0 : 1);
+  const tie = (e: LogEntry) => (e.change ? '' : e.quiet.id);
+  return [...logEntries(changes), ...quiet]
+    .map((e, i) => ({ e, i }))
+    .sort(
+      (a, b) =>
+        instant(timeOf(b.e)) - instant(timeOf(a.e)) ||
+        rank(a.e) - rank(b.e) ||
+        tie(a.e).localeCompare(tie(b.e)) ||
+        a.i - b.i,
+    )
+    .map(({ e }) => e);
 }
 
 export function changesLogView(
@@ -181,7 +193,7 @@ export function changesLogView(
     if (e.change === null) return quietRow(v, e.quiet, clock, hostOf.get(e.quiet.site_id)!);
     const { change: c, findings } = e;
     return {
-      ...rowOf(c, findCheck(v.d, c.check_id), clock, firstSeenOf(v.d, c)),
+      ...rowOf(c, findCheck(v.d, c.check_id), clock, firstSeenOf(v.d, c, clock)),
       ...(findings === null
         ? {}
         : {

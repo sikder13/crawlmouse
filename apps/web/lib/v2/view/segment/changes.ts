@@ -12,7 +12,7 @@ type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
 type CheckTrigger = Check['trigger'];
 import { findCheck, siteOf } from '../../fixtures';
-import { dateTimeUtc, listOf, weekdayTime } from '../../format';
+import { dateTimeUtc, dayDate, hourMinute, listOf, weekdayTime } from '../../format';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { ANONYMOUS_VISIBLE_MS, type DoorView } from '../result';
 
@@ -145,29 +145,45 @@ function clockOf(d: ViewDataset, check: Check) {
     account ? weekdayTime(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
 }
 
-/**
- * Where the fix an `opened` row reopened was first seen, when that was an earlier check than the
- * row's own (F-213): that check, or `'earlier'` when the dataset does not hold it. Null for any other
- * row, including a fix first seen at this check, which is what "first observed at this check" means.
- */
-export type FirstSeen = Check | 'earlier' | null;
+/** The same clock with the day of the month: "Sat 24 Oct 22:34". */
+function datedClockOf(d: ViewDataset, check: Check) {
+  const account = d.accounts.find((a) => a.id === siteOf(d, check).account_id);
+  const zone = account?.timezone ?? 'UTC';
+  return (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}${account ? '' : ' UTC'}`;
+}
 
-export function firstSeenOf(d: Pick<ViewDataset, 'fixes' | 'checks'>, c: Change): FirstSeen {
+/**
+ * Where the fix an `opened` row reopened was first seen, when that was a check queued before the
+ * row's own (F-213): that check's finish, read by `dated`, a clock that names the day, since a
+ * reopened fix can be weeks old; or `'another'` when the dataset does not hold that check. Null for
+ * any other row, including a fix first seen at this check, which is what "first observed at this
+ * check" means.
+ */
+export type FirstSeen = { when: string } | 'another' | null;
+
+export function firstSeenOf(
+  d: Pick<ViewDataset, 'fixes' | 'checks'>,
+  c: Change,
+  dated: (ts: string) => string,
+): FirstSeen {
   if (c.kind !== 'opened' || c.fix_id === null) return null;
   const fix = d.fixes.find((f) => f.id === c.fix_id);
   if (!fix || fix.first_seen_check_id === c.check_id) return null;
   const seen = d.checks.find((x) => x.id === fix.first_seen_check_id);
-  return seen?.finished_at ? seen : 'earlier';
+  if (!seen?.finished_at) return 'another';
+  const own = d.checks.find((x) => x.id === c.check_id);
+  if (own && Date.parse(seen.queued_at) >= Date.parse(own.queued_at)) return null;
+  return { when: dated(seen.finished_at) };
 }
 
 /** "First observed after robots.txt changed Thu 19:40: …": when we saw it, and what we found. */
-function causeOf(c: Change, seen: FirstSeen, at: (ts: string) => string): string {
+function causeOf(c: Change, seen: FirstSeen): string {
   const lead =
     seen === null
       ? 'First observed at this check'
-      : seen === 'earlier'
-        ? 'First seen at an earlier check'
-        : `First seen at the ${at(seen.finished_at!)} check`;
+      : seen === 'another'
+        ? 'First seen at another check'
+        : `First seen at the ${seen.when} check`;
   if (!c.cause) return `${lead}; we found no cause.`;
   const text = c.cause.text.replace(/\.$/, '');
   if (c.cause.changed_at && seen === null) return `First observed after ${text}.`;
@@ -204,7 +220,7 @@ export function rowOf(
       ? c.grade_deltas.map((g) => `${GRADES[g.grade]} ${g.from_score} → ${g.to_score}`).join(', ')
       : 'none',
     verdict: crawler ? { verdict: crawler.verdict, evidence: crawler.evidence_class } : null,
-    cause: causeOf(c, seen, at),
+    cause: causeOf(c, seen),
     diff: [
       ...(c.cause?.diff?.removed ?? []).map((line) => ({ sign: '−' as const, line })),
       ...(c.cause?.diff?.added ?? []).map((line) => ({ sign: '+' as const, line })),
@@ -254,6 +270,7 @@ export function changesView(
   const frame = segmentFrame(d, checkId, 'changes', options);
   const kept = frame.keptUntil === null;
   const at = clockOf(d, check);
+  const dated = datedClockOf(d, check);
   const audits = auditsUpTo(d, check);
   const history = audits.map((c) => ({
     key: c.id,
@@ -314,7 +331,7 @@ export function changesView(
 
   const rows = d.changes
     .filter((c) => c.check_id === check.id)
-    .map((c) => rowOf(c, check, at, firstSeenOf(d, c)));
+    .map((c) => rowOf(c, check, at, firstSeenOf(d, c, dated)));
   const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);
   return {

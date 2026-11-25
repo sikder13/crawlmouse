@@ -445,14 +445,14 @@ describe('a re-check that recorded no change, in the Changes log (F-214)', () =>
     }
   });
 
-  it('lists only a finished or partial re-check: none for a first audit, a queued, failed or running one', () => {
+  it('lists only a finished or partial re-check: none for a failed one or a first audit', () => {
     const d = structuredClone(bad);
     const failed = d.checks.find((c) => c.id.endsWith('020'))!;
     failed.status = 'failed';
     const v = changesLogView(d, viewer, { site: DRIVEPEI }, BASE);
     expect(v.rows).toEqual([]);
-    // drivepei.ca's …021 is queued, and its first audit …01f changed nothing and found nothing.
-    expect(log().rows.filter((r) => /0(21|1f)$/.test(r.key))).toEqual([]);
+    // drivepei.ca's first audit …01f changed nothing and found nothing.
+    expect(log().rows.filter((r) => r.key.endsWith('01f'))).toEqual([]);
     const partial = structuredClone(bad);
     partial.checks.find((c) => c.id.endsWith('020'))!.status = 'partial';
     expect(changesLogView(partial, viewer, { site: DRIVEPEI }, BASE).rows).toHaveLength(1);
@@ -477,5 +477,47 @@ describe('a re-check that recorded no change, in the Changes log (F-214)', () =>
       'Tue 27 Oct 10:32',
       'Mon 26 Oct 09:14',
     ]);
+  });
+
+  it('orders entries of one instant: a change, then re-checks by id', () => {
+    const d = structuredClone(bad);
+    const at = '2026-10-30T10:02:00Z'; // when …001 to …004 were found at …006
+    for (const id of ['020', '005']) {
+      d.checks.find((c) => c.id.endsWith(id))!.finished_at = at;
+    }
+    const keys = changesLogView(d, viewer, {}, BASE)
+      .rows.slice(0, 6)
+      .map((r) => r.key.slice(-3));
+    expect(keys).toEqual(['001', '002', '003', '004', '005', '020']);
+  });
+
+  it('places a re-check by when it finished, not when it was queued', () => {
+    const d = structuredClone(bad);
+    // …004 queued 30 hours before now and finished 20 hours before it: inside the last 24 hours.
+    const check = d.checks.find((c) => c.id.endsWith('004'))!;
+    check.queued_at = '2026-10-29T04:05:00Z';
+    check.started_at = '2026-10-29T04:05:00Z';
+    check.finished_at = '2026-10-29T14:05:00Z';
+    const v = changesLogView(d, viewer, { site: OUTFITTER, since: '24h' }, BASE);
+    expect(v.rows.filter((r) => r.kind === 'checked').map((r) => r.key.slice(-3))).toEqual([
+      '004',
+      '005',
+    ]);
+  });
+
+  it('says where a reopened fix was first seen, with its day (F-213)', () => {
+    const d = structuredClone(bad);
+    const change = d.changes.find((c) => c.id.endsWith('001'))!;
+    change.cause = {
+      text: 'Marked done on 2026-10-28, and found again on this check.',
+      changed_at: null,
+      diff: null,
+    };
+    d.fixes.find((f) => f.id === change.fix_id)!.first_seen_check_id =
+      'c0000000-0000-4000-8000-000000000001';
+    const row = changesLogView(d, viewer, {}, BASE).rows.find((r) => r.key === change.id)!;
+    expect(row.cause).toBe(
+      'First seen at the Sat 24 Oct 22:34 check. What we found: Marked done on 2026-10-28, and found again on this check.',
+    );
   });
 });
