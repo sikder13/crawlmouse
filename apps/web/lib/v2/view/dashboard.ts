@@ -59,6 +59,7 @@ import {
 } from './checks';
 import { points, type DoorView } from './result';
 import { auditHref } from './audit-hrefs';
+import { placeOrder } from './free-fixes';
 import { listedChanges } from './listed-changes';
 import { nextCheckLine, type NextChecks } from './site';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
@@ -919,7 +920,10 @@ export function dashboardView(
           .map((c) => changeRow(v, s, c)),
       );
 
-  const fixes = result ? fixesAsOf(v.d, result) : [];
+  // In place order, as the site table numbers them (F-276).
+  const fixes = result
+    ? placeOrder(v.d, result, v.gates.fixesVisible === 'all' ? 'pro' : 'free')
+    : [];
   const first = fixes[0];
   const nextAt = nextCheckLine(primary, v, next, (ts) => dayDate(ts, zone));
   // The live column's time is the scheduler's, whatever the saved cadence (on Free the first site

@@ -116,20 +116,57 @@ describe('the dashboard’s top fixes', () => {
   });
 });
 
-describe('the agency client page', () => {
-  it('numbers its own rows from 1, each named by its fix', () => {
+describe('one place for a fix on every surface (review #5)', () => {
+  /** Free, on the large-site vector: three rows open, the rest locked. */
+  function freeVector(): FixtureDataset {
+    const d = largeVector();
+    d.accounts = d.accounts.map((a) =>
+      a.id === ACCOUNT
+        ? {
+            ...a,
+            state: 'free' as const,
+            trial_ends_at: null,
+            state_history: [{ state: 'free' as const, since: '2026-10-01T00:00:00.000Z' }],
+          }
+        : a,
+    );
+    for (const f of d.fixes) f.crawler_uas = [];
+    return d;
+  }
+
+  it('the site table, its button and the fix page give each fix the same place', () => {
+    const d = freeVector();
+    const v = siteView(d, { accountId: ACCOUNT, now: d.as_of }, SITE, undefined, {
+      allFixes: true,
+    });
+    const check = d.checks
+      .filter((c) => c.site_id === SITE && c.finished_at)
+      .sort((a, b) => Date.parse(b.finished_at!) - Date.parse(a.finished_at!))[0]!;
+    const live = fixesAsOf(d, check);
+    for (const row of v.fixes.rows) {
+      const position = fixView(d, check.id, row.key, { plan: 'free' }).frame.position;
+      expect(position).toBe(`${row.name} · ${row.place} of ${live.length}`);
+    }
+    const button = v.header.actions.find((a) => a.primary)!.label;
+    const m = /^Open the (\w+) fix · (Fix \d+)/.exec(button)!;
+    const opened = v.fixes.rows.find((r) => r.name === m[2])!;
+    const page = fixView(d, check.id, opened.key, { plan: 'free' }).frame.position;
+    expect(page).toBe(`${opened.name} · ${opened.place} of ${live.length}`);
+    expect(m[1]).toBe(ordinalWord(opened.place));
+  });
+
+  it('the agency client page gives a fix the site table’s place', () => {
     const d = structuredClone(fixture('challenged-site'));
-    // The fix not to raise (marked done) ranks first, so the site page's place of the one to raise
-    // is 2, and the client page's own list starts it at 1.
     const mine = d.fixes.filter((f) => f.site_id === GRANITEPEAK);
     const done = mine.find((f) => f.status === 'marked_done')!;
     const other = mine.find((f) => f !== done)!;
     [done.rank, other.rank] = [1, 2];
     const v = agencyClientView(d, ACCOUNT_VIEWERS.withheld(), GRANITEPEAK)!;
     if (v.kind !== 'client') throw new Error(`client page kind ${v.kind}`);
-    const rows = v.fixes.rows;
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.map((r) => r.place)).toEqual(rows.map((_, i) => i + 1));
-    expect(rows.every((r) => /^Fix \d+$/.test(r.name))).toBe(true);
+    const site = siteView(d, ACCOUNT_VIEWERS.withheld(), GRANITEPEAK).fixes.rows;
+    for (const r of v.fixes.rows) {
+      expect(r.place).toBe(site.find((s) => s.key === r.key)!.place);
+    }
+    expect(v.fixes.rows[0]!.place).toBe(2);
   });
 });

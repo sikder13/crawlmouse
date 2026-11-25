@@ -29,3 +29,13 @@ export function openFixes(d: ViewDataset, check: Check, plan: FixPlan = 'free'):
 export function isFreeFix(d: ViewDataset, check: Check, fix: Pick<Fix, 'id'>): boolean {
   return freeFixes(d, check).some((f) => f.id === fix.id);
 }
+
+/**
+ * The live fixes at `check` in place order, the one order every surface numbers fixes by (F-276):
+ * the fixes `plan` opens, then the rest, each by rank (`fixesAsOf`). A row's place is its index + 1.
+ */
+export function placeOrder(d: ViewDataset, check: Check, plan: FixPlan = 'free'): Fix[] {
+  const live = fixesAsOf(d, check);
+  const open = new Set(openFixes(d, check, plan).map((f) => f.id));
+  return [...live.filter((f) => open.has(f.id)), ...live.filter((f) => !open.has(f.id))];
+}

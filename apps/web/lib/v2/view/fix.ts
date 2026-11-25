@@ -12,10 +12,10 @@ import { GATES } from '../../entitlement-v2';
 import { FIX_PROOF_COPY } from '../copy/fix-proof';
 import type { Check, CrawlerResult, Fix } from '@crawlmouse/types/v2';
 import { instant } from '@crawlmouse/types/v2';
-import { findCheck, fixesAsOf, siteOf } from '../fixtures';
+import { findCheck, siteOf } from '../fixtures';
 import { dayTimeUtc, listOf, percent } from '../format';
 import { count, numberWord, plural } from '../words';
-import { freeFixes, type FixPlan } from './free-fixes';
+import { freeFixes, placeOrder, type FixPlan } from './free-fixes';
 import { noPacketLine } from './no-packet';
 import { noPacketReason } from './packet-reason';
 import { ACCOUNT_NAV } from './account-actions';
@@ -540,7 +540,8 @@ export function fixView(
   if (instant(findCheck(d, fix.first_seen_check_id).queued_at) > instant(check.queued_at)) {
     throw new Error(`Fix ${fixId} was not seen yet at check ${checkId}`);
   }
-  const live = fixesAsOf(d, check);
+  // Its place is the one the site table gives it (F-276): open fixes first, then by rank.
+  const live = placeOrder(d, check, plan);
   // a pending AI effect names fixes of this site by fingerprint, resolved or not
   const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const at = live.findIndex((x) => x.id === fixId);

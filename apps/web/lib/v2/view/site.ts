@@ -58,7 +58,7 @@ import {
 } from './checks';
 import { action, type ActionInput, type ActionView } from './account-actions';
 import { accountShellView, type ShellView } from './account-shell';
-import { isFreeFix } from './free-fixes';
+import { isFreeFix, placeOrder } from './free-fixes';
 import { points } from './result';
 import { CAUSE_SHORT } from './segment/access';
 import { groupPoints, packetPrompt } from './segment/fixes';
@@ -553,9 +553,7 @@ export function siteView(
   // The fixes this tier opens first, so open and locked rows do not alternate, and each in the
   // engine's order of impact, as the dashboard and the main button read them (F-099). A single fix
   // past the fold is shown, not folded into a row of one.
-  const inTable = [...byNumber].sort(
-    (a, b) => Number(lockedFix(v, result, a)) - Number(lockedFix(v, result, b)) || byRank(a, b),
-  );
+  const inTable = placeOrder(v.d, result, v.gates.fixesVisible === 'all' ? 'pro' : 'free');
   // The button names the row it opens by its place, then the fix by its name (F-276, CTO 081), so
   // "fix 2" cannot read as the second row.
   const targetLabel = target
