@@ -137,6 +137,8 @@ describe('a grade row where one letter held and another moved (QA N1, CTO ruling
     d.changes.push({
       ...moved,
       id: MIXED,
+      // Sent, so the Alerts page lists it among the alerts fired.
+      notified: moved.notified ?? d.changes.find((c) => c.notified)!.notified,
       summary: 'Technical SEO A → A (90 → 91); AI readability D → F (41 → 22)',
       grade_deltas: [
         { grade: 'technical_seo', from_score: 90, to_score: 91, from_grade: 'A', to_grade: 'A' },
@@ -162,6 +164,7 @@ describe('a grade row where one letter held and another moved (QA N1, CTO ruling
     const row = mixed().d.changes.find((c) => c.id === MIXED)!;
     expect(rowText(row).line).toBe('AI readability D → F (41 → 22)');
     expect(onlyMoved(row).grade_deltas.map((g) => g.grade)).toEqual(['ai_readability']);
+    // The Alerts page reads `accountChanges`, which is `listedChanges`, so it names the moved letter.
     const { alertsView } = await import('./alerts');
     const { d } = mixed();
     const page = JSON.stringify(alertsView(d, { accountId: ACCOUNT, now: d.as_of }));
