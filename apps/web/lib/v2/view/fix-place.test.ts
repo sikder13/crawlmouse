@@ -143,6 +143,9 @@ describe('one place for a fix on every surface (review #5)', () => {
       .filter((c) => c.site_id === SITE && c.finished_at)
       .sort((a, b) => Date.parse(b.finished_at!) - Date.parse(a.finished_at!))[0]!;
     const live = fixesAsOf(d, check);
+    // Places 1 to 3 are the three Free opens, in rank order; the locked rows follow.
+    expect(v.fixes.rows.map((r) => r.pro)).toEqual(v.fixes.rows.map((_, i) => i >= 3));
+    expect(v.fixes.rows.slice(0, 3).map((r) => r.key)).toEqual(live.slice(0, 3).map((f) => f.id));
     for (const row of v.fixes.rows) {
       const position = fixView(d, check.id, row.key, { plan: 'free' }).frame.position;
       expect(position).toBe(`${row.name} · ${row.place} of ${live.length}`);
