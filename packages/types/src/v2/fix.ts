@@ -159,7 +159,8 @@ export const FixSchema = z
     id: IdSchema,
     site_id: IdSchema,
     fingerprint: FingerprintSchema,
-    number: z.int().min(0),
+    /** The fix's name on screen ("Fix N"); the engine numbers a site's fixes from 1 (F-276). */
+    number: z.int().min(1),
     type: FixTypeSchema,
     section: FixSectionSchema,
     title: z.string().min(1),

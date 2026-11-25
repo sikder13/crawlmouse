@@ -139,7 +139,7 @@ export const ALERTS_CHANGES: CopyChange[] = [
     locked: '1 open: ClaudeBot blocked',
     rendered: '1 open: Claude-SearchBot blocked',
     source:
-      'The fixture’s open fix 0 removes the Claude-SearchBot block (FACTS I6 scores Claude-SearchBot); ClaudeBot, also blocked, has no fix of its own',
+      'The fixture’s open fix 16 removes the Claude-SearchBot block (FACTS I6 scores Claude-SearchBot); ClaudeBot, also blocked, has no fix of its own',
   },
   {
     screen: 'alerts',
@@ -153,7 +153,7 @@ export const ALERTS_CHANGES: CopyChange[] = [
     kind: 'fixture',
     locked: 'Open the ClaudeBot fix',
     rendered: 'Open the Claude-SearchBot fix',
-    source: 'The fixture’s fix 0 is “Remove the Claude-SearchBot block from robots.txt”',
+    source: 'The fixture’s fix 16 is “Remove the Claude-SearchBot block from robots.txt”',
   },
   {
     screen: 'alerts',

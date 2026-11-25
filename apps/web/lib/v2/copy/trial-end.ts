@@ -231,9 +231,9 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     screen: 'trial-end',
     kind: 'fixture',
     locked: 'Fixes 1–3, the free three packets stay open · fix 0 closed Sat 31 Oct',
-    rendered: 'Fixes 0, 1 and 2, the free three packets stay open',
+    rendered: 'Fixes 1, 2 and 16, the free three packets stay open',
     source:
-      'The fixture’s free three at the weekly check are fixes 1, 2 and 0 (CC-22’s freeFixes, by rank); fix 0 is open, and no check of Sat 31 Oct is in the fixture',
+      'The fixture’s free three at the weekly check are fixes 1, 2 and 16 (CC-22’s freeFixes, by rank); fix 16 is open, and no check of Sat 31 Oct is in the fixture',
   },
   {
     screen: 'trial-end',
@@ -259,7 +259,7 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked: 'Fixes 4–14, eleven on Pro',
     rendered: 'Fixes 3–15, thirteen on Pro',
     source:
-      'The fixture’s weekly check has sixteen open fixes, 0 to 15; the free three aside, thirteen',
+      'The fixture’s weekly check has sixteen open fixes, 1 to 16; the free three aside, thirteen',
   },
   {
     screen: 'trial-end',
@@ -294,7 +294,7 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked: 'robots.txt, Sat 31 Oct · AI visibility F 22 → D 41',
     rendered: '/blog/* on nahltech.com, Fri 30 Oct · Technical SEO B 79 → B+ 84',
     source:
-      'The fixture’s one fix closed in the trial is nahltech.com’s fix 1, verified Fri 30 Oct; fix 0 is open (and FACTS A1 would make the label AI readability)',
+      'The fixture’s one fix closed in the trial is nahltech.com’s fix 1, verified Fri 30 Oct; fix 16 is open (and FACTS A1 would make the label AI readability)',
   },
   {
     screen: 'trial-end',

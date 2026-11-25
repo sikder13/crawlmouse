@@ -74,7 +74,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
       'Detected Fri 06:02 · robots.txt changed Thu 19:40 · 214 pages · this check: AI readability D → F · sent to Slack #seo',
     );
     expect(v.changed[2]!.line).toBe('Fri 06:01 · Technical SEO B → B+ · from your fix list');
-    // Fix 0 is open, so its change offers it; ClaudeBot's change has no fix; fix 20 is resolved.
+    // Fix 16 is open, so its change offers it; ClaudeBot's change has no fix; fix 20 is resolved.
     expect(v.changed.map((c) => c.actions.map((a) => a.label))).toEqual([
       ['Diff', 'Copy fix', 'Email to my developer'],
       ['Diff'],

@@ -659,7 +659,7 @@ describe('fixView: other fixtures and states', () => {
     const d = fixture('bad-site');
     const other = d.fixes.find((x) => x.status === 'verified_resolved')!;
     expect(() => fixView(d, BAD, other.id)).toThrow(/another site/);
-    expect(() => fixView(d, BAD, fixOf(0).id)).toThrow(/not seen/);
+    expect(() => fixView(d, BAD, fixOf(16).id)).toThrow(/not seen/);
   });
 });
 

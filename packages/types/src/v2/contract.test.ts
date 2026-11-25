@@ -749,7 +749,7 @@ describe('bad-site.json carries the FACTS numbers', () => {
     );
   });
 
-  it('the free three are the three largest open fixes of the latest check (FACTS), so fix 0 joins fixes 1 and 2', () => {
+  it('the free three are the three largest open fixes of the latest check (FACTS), so fix 16 joins fixes 1 and 2', () => {
     expect(FACTS).toContain('Free shows the three largest open fixes of the latest check');
     // "Largest" read as estimated points on both grades; an effect not yet estimated counts as 0.
     const size = (f: { effect: { technical_seo: number | null; ai_readability: number | null } }) =>
@@ -758,7 +758,7 @@ describe('bad-site.json carries the FACTS numbers', () => {
       .fixes.filter((f) => f.site_id === site().id && f.rank !== null)
       .sort((a, b) => a.rank! - b.rank!);
     const free = live.filter((f) => f.rank! <= 3);
-    expect(free.map((f) => f.number).sort((a, b) => a - b)).toEqual([0, 1, 2]);
+    expect(free.map((f) => f.number).sort((a, b) => a - b)).toEqual([1, 2, 16]);
     const smallestFree = Math.min(...free.map(size));
     const largestRest = Math.max(...live.filter((f) => f.rank! > 3).map(size));
     expect(smallestFree).toBeGreaterThan(largestRest);
@@ -788,10 +788,10 @@ describe('bad-site.json carries the FACTS numbers', () => {
       scored: false,
       verdict: 'disallowed_by_robots',
     });
-    const fix0 = data().fixes.find((f) => f.site_id === site().id && f.number === 0)!;
-    expect(fix0.first_seen_check_id).toBe(latest().id);
-    expect(fix0.crawler_uas).toEqual(['Claude-SearchBot']);
-    expect(fix0.effect.ai_readability).toBe(19);
+    const fix16 = data().fixes.find((f) => f.site_id === site().id && f.number === 16)!;
+    expect(fix16.first_seen_check_id).toBe(latest().id);
+    expect(fix16.crawler_uas).toEqual(['Claude-SearchBot']);
+    expect(fix16.effect.ai_readability).toBe(19);
   });
 });
 

@@ -35,7 +35,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
   });
 
   it('opens the newest crawler fix as its one orange action', () => {
-    // Fix 0 (Claude-SearchBot, +19 AI) is the highest-ranked of the three new fixes.
+    // Fix 16 (Claude-SearchBot, +19 AI) is the highest-ranked of the three new fixes.
     expect(v.header.actions.filter((a) => a.primary).map((a) => a.label)).toEqual([
       'Open the Claude-SearchBot packet · +19 AI',
     ]);
@@ -80,7 +80,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
     expect(v.fixes.rows.map((r) => [r.number, r.isNew, r.pro, r.effect])).toEqual([
       [1, false, false, '+24 AI'],
       [2, false, false, '+22 AI'],
-      [0, true, false, '+19 AI'],
+      [16, true, false, '+19 AI'],
       [3, false, false, '+4 SEO'],
       [5, false, false, '+2 SEO'],
     ]);

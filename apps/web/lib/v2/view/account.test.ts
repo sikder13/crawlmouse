@@ -26,7 +26,7 @@ describe('viewAt', () => {
     expect(v.d.checks.map((c) => c.trigger)).toEqual(['first_audit']);
     // Change 7, a first-audit finding, is there; it is not a change since anything (dashboard).
     expect(v.d.changes.map((c) => c.previous_check_id)).toEqual([null]);
-    // Fixes 1 to 13 were first seen at the first audit; 0, 14 and 15 at Friday's check.
+    // Fixes 1 to 13 were first seen at the first audit; 14, 15 and 16 at Friday's check.
     expect(v.d.fixes.map((f) => f.number).sort((a, b) => a - b)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
     ]);

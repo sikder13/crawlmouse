@@ -42,9 +42,9 @@ describe('the free-fix rule', () => {
 
   it('follows the order at each check: a rank-3 fix seen later takes the third free place', () => {
     const d = fixture('bad-site');
-    // At the weekly check that found the robots.txt change, fix 0 (rank 3) is live, so fix 3
+    // At the weekly check that found the robots.txt change, fix 16 (rank 3) is live, so fix 3
     // (rank 4), free at the first audit, is not.
     const later = findCheck(d, 'c0000000-0000-4000-8000-000000000006');
-    expect(freeFixes(d, later).map((f) => f.number)).toEqual([1, 2, 0]);
+    expect(freeFixes(d, later).map((f) => f.number)).toEqual([1, 2, 16]);
   });
 });

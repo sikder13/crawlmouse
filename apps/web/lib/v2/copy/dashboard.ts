@@ -247,7 +247,7 @@ const DAY0: CopyChange[] = [
     locked: 'first audit · 14 fixes',
     rendered: 'first audit · 13 fixes',
     source:
-      'The fixture’s first audit found fixes 1 to 13; fixes 0, 14 and 15 were first seen at Friday’s check, after day 0',
+      'The fixture’s first audit found fixes 1 to 13; fixes 14, 15 and 16 were first seen at Friday’s check, after day 0',
   },
   {
     screen: 'dashboard-day0',

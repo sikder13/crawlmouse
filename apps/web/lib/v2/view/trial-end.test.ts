@@ -53,11 +53,11 @@ describe('Trial ending, the header and banner', () => {
 
 describe('Trial ending, what stays and what pauses', () => {
   it('keeps the oldest primary site, the free three and the public link', () => {
-    // The free three at the primary site's latest result (c…06), by rank: fix 1, fix 2, fix 0.
+    // The free three at the primary site's latest result (c…06), by rank: fix 1, fix 2, fix 16.
     expect(view().stays.map((r) => [r.what, r.how])).toEqual([
       ['example-outfitter.com', 'monthly checks, email if changed'],
       ['Every check, every audit, the evidence', 'kept'],
-      ['Fixes 0, 1 and 2, the free three', 'packets stay open'],
+      ['Fixes 1, 2 and 16, the free three', 'packets stay open'],
       ['Public audit link', 'keeps working'],
       ['Alerts on example-outfitter.com', 'still sent by email, after each monthly check'],
     ]);
