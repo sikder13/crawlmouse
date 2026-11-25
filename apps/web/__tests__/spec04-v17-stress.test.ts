@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { OG_CARD_HEADERS } from '../lib/og-card-cache';
 import {
   MINT_REPORTS_PER_IP_PER_DAY_ANON,
   MINT_REPORTS_PER_DAY,
@@ -42,7 +43,14 @@ describe('mint/OG flood cost controls (§11, V17)', () => {
     // the model it delegates to: together they are the OG card's implementation, and the contract each
     // asserts is unchanged.
     const og = read('app/r/[slug]/opengraph-image.tsx') + read('lib/og-report-model.ts');
-    expect(og).toMatch(/revalidate\s*=\s*3600/); // repeated unfurls hit the CDN, not satori
+    // Repeated unfurls hit the CDN, not satori. F-241 replaced the route's hour of ISR with a
+    // per-request render behind a five-minute CDN cache, so a takedown leaves the edge quickly: every
+    // card the route draws carries those headers, and their CDN lifetime is never zero.
+    const route = read('app/r/[slug]/opengraph-image.tsx');
+    const drawn = route.match(/new ImageResponse\(/g)?.length ?? 0;
+    expect(drawn).toBeGreaterThan(0);
+    expect(route.match(/headers: OG_CARD_HEADERS/g)?.length).toBe(drawn);
+    expect(OG_CARD_HEADERS['cache-control']).toMatch(/\bs-maxage=[1-9]\d*\b/);
     expect(og).toContain('getPublicReport(slug)'); // slug-scoped — cannot render arbitrary images
   });
 });
