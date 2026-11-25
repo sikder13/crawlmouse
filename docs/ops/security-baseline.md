@@ -79,6 +79,14 @@ read -rs SENTRY_TOKEN && curl -sS -X POST -H "Authorization: Bearer $SENTRY_TOKE
 In project settings → Inbound Filters, turn on the browser-extension filter so extension-injected
 scripts do not fill the CSP reports.
 
+In-app browsers inject scripts of their own; Facebook's on iOS injects
+`connect.facebook.net/en_US/pcm.js`, which the report-only policy reports (Sentry `CRAWLMOUSE-S`).
+Sentry drops reports for the hosts in `apps/web/lib/security/csp-ignored-sources.ts` once they are
+in Project Settings → Security Headers → CSP → **Additional ignored sources**, one per line:
+`connect.facebook.net`. The owner copies the list there by hand: nothing syncs it, so a host added to
+the file is added there too. The file's test pins that no entry is a host our policy allows:
+`pnpm --filter @crawlmouse/web exec vitest run lib/security/csp-ignored-sources.test.ts`.
+
 ## Known gaps (and who closes them)
 
 The spec's "Known gaps and follow-ups" section is the list, each with its owner.
