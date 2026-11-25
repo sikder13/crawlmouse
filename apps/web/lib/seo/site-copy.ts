@@ -1,4 +1,5 @@
 import { GATES } from '../entitlement-v2';
+import { ALL_SHOWN, type Features } from '../v2/features';
 import { numberWord } from '../v2/words';
 
 /**
@@ -19,15 +20,16 @@ export const V2_HOME_DESCRIPTION =
 /**
  * The `/llms.txt` descriptor: ruling 3's wording, except that "gives the fix for each problem it
  * finds" is true only on Pro and Agency, so it names what Free gives, read from GATES (questions Q14).
- * The plans and prices that follow it are generated (lib/seo/llms-v2.ts).
+ * The plans and prices that follow it are generated (lib/seo/llms-v2.ts). With `ai_letter` hidden
+ * (the Goal 1 switch, read by the route), it grades SEO and names no AI readability grade.
  */
-export function v2LlmsDescriptor(): string {
+export function v2LlmsDescriptor(features: Features = ALL_SHOWN): string {
   const free = GATES.free.fixesVisible;
   const freeFixes = free === 'all' ? 'every one' : `${numberWord(free)} per check`;
   return (
     'Crawlmouse (by Nahl Technologies) checks whether search engines and AI crawlers can read a ' +
     'website. It fetches the site as Googlebot, GPTBot, ClaudeBot and PerplexityBot, shows what each ' +
-    `one received, grades SEO and AI readability, and gives the fix for the problems it finds: ${freeFixes} ` +
+    `one received, ${features.ai_letter ? 'grades SEO and AI readability' : 'grades SEO'}, and gives the fix for the problems it finds: ${freeFixes} ` +
     'on the free plan, every one on Pro and Agency. Free for one site, no install.'
   );
 }

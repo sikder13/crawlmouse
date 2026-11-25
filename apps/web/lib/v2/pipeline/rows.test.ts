@@ -123,6 +123,7 @@ describe('checkFromRow', () => {
     });
     expect(checkFromRow({ ...check }).coverage).toEqual(check.coverage);
     expect(check.coverage!.stopped).not.toBeNull();
+    expect(() => checkFromRow({ ...check, coverage: { ...check.coverage, other: 1 } })).toThrow();
   });
 
   it('still refuses a progress field the contract does not define', () => {

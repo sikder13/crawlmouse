@@ -2,6 +2,7 @@
  * What each screen preview renders, from the contract fixtures. Kept in one place so the preview
  * pages are one line each and the tests can render exactly what the pages render.
  */
+import { ALL_SHOWN, type Features } from '../../../../lib/v2/features';
 import { fixture } from '../../../../lib/v2/fixtures';
 import { stateAt } from '../../../../lib/v2/progress';
 import { CHECKS, recording } from '../../../../lib/v2/recordings';
@@ -17,12 +18,17 @@ import { ACCOUNT_VIEWERS, BAD_ACCOUNT_ID, DATASET } from './accounts';
 import { fixHref } from './fixes';
 import { MAP_PATHS, segmentHrefs } from './segments';
 
-/** Home's data: the bad site's first audit, its example the bad-site recording at its end. */
-export function homePreview() {
-  return homeView(fixture('bad-site'), CHECKS.badFirstAudit, {
-    map: mapDrawing('bad-site'),
-    end: stateAt(recording('bad-site').events, Infinity),
-  });
+/**
+ * Home's data: the bad site's first audit, its example the bad-site recording at its end.
+ * `features`: what the Goal 1 switch hides; the preview page passes `shownFeatures()`.
+ */
+export function homePreview(features: Features = ALL_SHOWN) {
+  return homeView(
+    fixture('bad-site'),
+    CHECKS.badFirstAudit,
+    { map: mapDrawing('bad-site'), end: stateAt(recording('bad-site').events, Infinity) },
+    features,
+  );
 }
 
 /** The challenged-site fixture's other checks, which stand in for the Result page's states. */
