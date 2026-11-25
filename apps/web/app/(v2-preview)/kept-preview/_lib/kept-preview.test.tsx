@@ -29,4 +29,15 @@ describe('the kept-page previews', () => {
     },
     60_000,
   );
+
+  // F-265: a preview carries the v2 tone exactly when its target does (kept-pages.test.tsx).
+  const TONED = new Set(['author', 'blog', 'blog-research', 'blog-post', 'guides']);
+  it.each(KEPT_PREVIEW_INDEX)(
+    '$v1: its preview carries the v2 tone only for the blog, guides and author pages',
+    async (p) => {
+      const markup = renderToStaticMarkup(<>{await KEPT_RENDERS[p.slug]!()}</>);
+      expect((markup.match(/data-v1-tone="v2"/g) ?? []).length).toBe(TONED.has(p.slug) ? 1 : 0);
+    },
+    60_000,
+  );
 });
