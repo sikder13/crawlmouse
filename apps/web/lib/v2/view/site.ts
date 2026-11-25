@@ -15,17 +15,19 @@ import {
 } from '@crawlmouse/types/v2';
 import { RAW_FORMATS } from '../copy/reports';
 import { TAGGED_UA_LINE, ALERT_LABELS, SITE_COPY } from '../copy/site';
-import { fixesAsOf } from '../fixtures';
+import { fixesAsOf } from '../dataset-lookups';
 import {
   calendarDays,
   dayDate,
   dayMonth,
   hourMinute,
+  hourMinuteZoned,
+  zoneName,
   listOf,
   percent,
   weekday,
   weekdayLong,
-  weekdayTime,
+  weekdayTimeZoned,
 } from '../format';
 import { aiWithheldSummary } from '../sentences';
 
@@ -62,6 +64,7 @@ import { points } from './result';
 import { CAUSE_SHORT } from './segment/access';
 import { groupPoints, packetPrompt } from './segment/fixes';
 import { SEGMENTS } from './segment/frame';
+import { titleAmong } from './fix-title';
 
 export interface GradeCardView {
   label: string;
@@ -211,7 +214,7 @@ function checksLine(checks: readonly Check[], site: Site, zone: string): string 
   const scheduled = checks.find((c) => c.trigger === 'scheduled');
   if (scheduled && site.schedule && site.schedule.cadence !== 'on_deploy') {
     parts.push(
-      `${site.schedule.cadence} from ${dayDate(scheduled.finished_at!, zone)} around ${String(site.schedule.hour_local).padStart(2, '0')}:00`,
+      `${site.schedule.cadence} from ${dayDate(scheduled.finished_at!, zone)} around ${String(site.schedule.hour_local).padStart(2, '0')}:00 ${zoneName(scheduled.finished_at!, zone)}`,
     );
   }
   return parts.join(', ');
@@ -276,7 +279,7 @@ function causeNow(r: CrawlerResult, v: AccountView): string {
       .filter((c) => c.ua === r.ua && c.kind === 'opened' && c.cause?.changed_at)
       .sort((a, b) => instant(b.detected_at) - instant(a.detected_at))[0];
     if (change)
-      return `robots.txt changed ${weekdayTime(change.cause!.changed_at!, zoneOf(v))}: ${r.ua} disallowed`;
+      return `robots.txt changed ${weekdayTimeZoned(change.cause!.changed_at!, zoneOf(v))}: ${r.ua} disallowed`;
   }
   return CAUSE_SHORT[r.cause];
 }
@@ -288,7 +291,7 @@ function diffOf(v: AccountView, f: Fix): string | null {
   if (!change || !diff) return null;
   const lines = [...diff.removed.map((l) => `− ${l}`), ...diff.added.map((l) => `+ ${l}`)];
   const when = change.cause!.changed_at
-    ? `, ${weekdayTime(change.cause!.changed_at, zoneOf(v))}`
+    ? `, ${weekdayTimeZoned(change.cause!.changed_at, zoneOf(v))}`
     : '';
   const n = diff.added.length;
   return [
@@ -326,7 +329,7 @@ function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): Fix
   return {
     key: f.id,
     number: f.number,
-    title: f.title,
+    title: titleAmong(f, all),
     isNew,
     newLabel: isNew ? `new ${weekday(result.finished_at!, zoneOf(v))}` : null,
     diff: diffOf(v, f),
@@ -433,6 +436,7 @@ function scheduleInputs(s: Site, weekly: boolean, zone: string): ActionInput[] {
 function scheduleValue(s: Site, zone: string, nextAt: string | null): string {
   const sch = s.schedule;
   if (!sch || s.paused || sch.cadence === 'on_deploy') return scheduleCell(s);
+  // FACTS H4 names the zone by its full name after the time, so the time carries no abbreviation.
   const time = nextAt ? hourMinute(nextAt, zone) : `${String(sch.hour_local).padStart(2, '0')}:00`;
   // FACTS H4 (Site settings): the account's zone by its own name.
   return `${scheduleCell(s)} around ${time}, ${zone}`;
@@ -462,7 +466,7 @@ export function nextCheckLine(
   // A time already reached (the global ceiling or CRAWL_PAUSED left the site waiting) is not named
   // as a past date: the check is due now.
   if (instant(at) <= instant(v.now)) return 'due now';
-  return `${dayDateOf(at)} around ${hourMinute(at, zoneOf(v))}`;
+  return `${dayDateOf(at)} around ${hourMinuteZoned(at, zoneOf(v))}`;
 }
 
 export interface SiteOptions {
@@ -514,7 +518,10 @@ export function siteView(
     ended && ended !== result && ended.status === 'failed' ? 'latest check failed' : null,
     ...v.inFlight.filter((f) => f.siteId === site.id).map((f) => `check ${f.status}`),
     nextAt ? `next ${nextAt}` : null,
-    result.coverage ? `${count(result.coverage.pages_crawled)} pages` : null,
+    // A check that stopped short says so beside its page count (D-07); its cause is not named.
+    result.coverage
+      ? `${count(result.coverage.pages_crawled)} pages${result.status === 'partial' ? ', partial check' : ''}`
+      : null,
     fixLine,
   ]
     .filter(Boolean)
@@ -687,7 +694,9 @@ export function siteView(
         {
           label: 'Page cap',
           value: `${count(v.account.limits.pages_per_audit)} on ${PLAN_NAMES[v.tier]}${
-            result.coverage ? ` · ${count(result.coverage.pages_crawled)} crawled` : ''
+            result.coverage
+              ? ` · ${count(result.coverage.pages_crawled)} crawled${result.status === 'partial' ? ', partial check' : ''}`
+              : ''
           }`,
           mono: false,
           muted: false,
@@ -794,7 +803,7 @@ export function siteView(
         on: r.enabled,
         fired:
           r.last_fired_at && r.last_fired_check_id && siteChecks.has(r.last_fired_check_id)
-            ? `fired ${weekdayTime(r.last_fired_at, zone)}`
+            ? `fired ${weekdayTimeZoned(r.last_fired_at, zone)}`
             : null,
         extra:
           !r.enabled && r.kind === 'any_change' && contentNow.length

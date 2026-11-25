@@ -21,10 +21,12 @@ import {
   PLAN_NAMES,
   primarySite,
   primarySites,
+  readerRole,
   readerSeat,
   resultChecks,
   type AccountView,
 } from './account';
+import { roleMay } from '../agency/guard';
 import type { SeatRole } from '../account/profile';
 import {
   ACCOUNT_NAV,
@@ -74,6 +76,10 @@ export interface SwitcherAccount {
   id: string;
   kind: 'personal' | 'agency';
   name: string | null;
+  /** The reader's own email, on an account the reader owns (`AccountViewer.accounts`). */
+  ownerEmail?: string | null;
+  /** The host of the account's oldest live site. */
+  firstSite?: string | null;
 }
 
 /** The rail's account switcher, for a person with seats on several accounts. */
@@ -126,8 +132,13 @@ export const newChanges = (v: AccountView): Change[] =>
   );
 
 /** No site has two results yet, so there is nothing to compare: the day-0 layout. */
+/**
+ * One result or none on every site that holds a slot. A staging copy is not counted (F-097), as
+ * the dashboard's "since" and "last check" read primary sites only: counting it would leave the
+ * first run with a staging copy's second check and no primary check to name (QA gate #191 F2).
+ */
 export const isFirstRun = (v: AccountView) =>
-  v.d.sites.every((s) => resultChecks(v, s.id).length <= 1);
+  primarySites(v).every((s) => resultChecks(v, s.id).length <= 1);
 
 /**
  * Where the plan's terms and its Keep action are read: in the rail's trial card (the default),
@@ -241,15 +252,20 @@ function trialCard(
   };
 }
 
-/** An account with no name, or a blank one, reads by its kind. */
+/** An account with no name, no owner's address the reader may see and no site reads by its kind. */
 const UNNAMED: Record<SwitcherAccount['kind'], string> = {
   personal: 'Personal account',
   agency: 'Agency account',
 };
 
-/** An account as the switcher names it. */
-export const accountLabel = (a: Pick<SwitcherAccount, 'kind' | 'name'>): string =>
-  a.name?.trim() || UNNAMED[a.kind];
+/**
+ * An account as the switcher names it: its name; else, unnamed, the reader's own address on an
+ * account they own, then its first site, so two unnamed accounts of one person are told apart and
+ * an account of someone else's says whose site it holds (D-22, F-285); else its kind.
+ */
+export const accountLabel = (
+  a: Pick<SwitcherAccount, 'kind' | 'name' | 'ownerEmail' | 'firstSite'>,
+): string => a.name?.trim() || a.ownerEmail?.trim() || a.firstSite?.trim() || UNNAMED[a.kind];
 
 const switchTo = (a: SwitcherAccount, label: string): ActionView =>
   action('switchAccount', label, {}, { fields: { accountId: a.id } });
@@ -337,7 +353,12 @@ const SAME_PLACE: Partial<Record<RailLabel, RailLabel>> = { Sites: 'Clients', Cl
 function rail(v: AccountView, current: RailLabel | null): NavItemView[] {
   const fresh = newChanges(v).length;
   const agency = v.tier === 'agency';
-  const links: readonly { label: RailLabel; href: string }[] = agency ? AGENCY_NAV : ACCOUNT_NAV;
+  // Integrations answers a role that may not edit the account's alerts with a 404 (its page's gate),
+  // so that role's rail does not link it (QA's F5). A preview reads as the owner.
+  const integrations = roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts');
+  const links: readonly { label: RailLabel; href: string }[] = (
+    agency ? AGENCY_NAV : ACCOUNT_NAV
+  ).filter((n) => n.label !== 'Integrations' || integrations);
   const marked = links.some((n) => n.label === current) ? current : current && SAME_PLACE[current];
   return links.map((n) => ({
     ...n,

@@ -1,5 +1,4 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { seeOther } from '@/lib/billing/request-body';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { siteUrl } from '@/lib/site-url';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -56,8 +55,9 @@ const ABANDONED_AFTER_MS = 15 * 60 * 1000;
  * then is the service-role client made: 409 `fix_not_verified` for a fix the named check did not
  * verify (404 for a fix of another site); then the row is written (`create_report`, which checks
  * the checks against the site again), the file made and stored, and `report_generated` sent. The
- * answer is 201 `{reportId}` to JSON and a 303 to `/reports` to a form; when the file could not be
- * made the row is left failed, and JSON gets 500 `report_failed` with the row's id.
+ * answer is 201 `{reportId}` to JSON and a 303 to `/reports?notice=report_made` to a form; when the
+ * file could not be made the row is left failed, JSON gets 500 `report_failed` with the row's id, and
+ * a form a 303 to `/reports?notice=report_failed`.
  *
  * The Reports screen's forms post here. A form refused with either 400, the 402, the 403, the 409
  * or the 429 is sent back to `/reports` with the refusal's notice (`NOTICE_LINES`; for the 429,
@@ -198,7 +198,12 @@ export async function POST(req: Request) {
       },
     );
   }
-  if (body.kind === 'form') return seeOther('/reports');
+  // A form says what happened and where the report is (F-125): a page is opened from its row,
+  // as lib/v2/view/reports.ts offers Open for an html report, and a file is downloaded from it.
+  if (body.kind === 'form') {
+    if (made.outcome !== 'stored') return noticeTo(REPORTS_PAGE, 'report_failed');
+    return noticeTo(REPORTS_PAGE, format === 'html' ? 'report_made_page' : 'report_made');
+  }
   return made.outcome === 'stored'
     ? Response.json({ reportId }, { status: 201 })
     : refuse(500, 'report_failed', { reportId });

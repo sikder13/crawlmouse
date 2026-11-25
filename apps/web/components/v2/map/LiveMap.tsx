@@ -13,6 +13,7 @@ import {
 import { LAYOUT_GAP_MS, MOTION, prefersReducedMotion } from '../../../lib/v2/motion';
 import type { MapNode } from '../../../lib/v2/progress';
 import { mapLabel } from '../../../lib/v2/map-label';
+import { capMap } from '../../../lib/v2/map-cap';
 import { segmentSteps, segmentTransform } from '../../../lib/v2/segment-motion';
 import { MapSvg, drawnPositions } from './MapSvg';
 
@@ -49,7 +50,12 @@ export const LiveMap = memo(function LiveMap({
   complete: boolean;
   className?: string;
 }) {
-  const input = useMemo(() => layoutInput(nodes), [nodes]);
+  // At most LIVE_MAP_MAX_NODES pages, and a page drawn once stays drawn (map-cap.ts).
+  const drawn = useRef<ReadonlySet<string>>(new Set());
+  const { shown: input, more } = useMemo(() => capMap(layoutInput(nodes), drawn.current), [nodes]);
+  useEffect(() => {
+    drawn.current = new Set(input.map((n) => n.id));
+  }, [input]);
   // Panels are drawn over the map from 1024px (CrawlScreen.module.css); narrower, a map that grows
   // as the replay plays keeps its pages where they fall, as a finished one does. A cold layout, at
   // rest, keeps to `complete` alone, as the server's does, so the two match at every width.
@@ -68,7 +74,7 @@ export const LiveMap = memo(function LiveMap({
       svgRef={svgRef}
       nodes={input}
       positions={shown}
-      label={mapLabel(input, building)}
+      label={mapLabel(input, building, more)}
       className={className}
       settling={settling}
     />

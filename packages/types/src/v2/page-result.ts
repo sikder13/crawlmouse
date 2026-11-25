@@ -101,9 +101,11 @@ export const PageResultSchema = z
      */
     is_html: z.boolean(),
     /**
-     * Every link on the page was read: the whole response was parsed and no link was left unread. False
-     * for a page read in part or not at all, so `links_out` 0 is never mistaken for "no links". Only
-     * an HTML response can be true.
+     * Every link on the page was read and is in the record: the whole response was parsed, no link was
+     * left unread, and none was left out of the stored edges (past the per-page edge limit, or for the
+     * batch's result room). False for a page read in part or not at all, so `links_out` 0 is never
+     * mistaken for "no links", and a `links_out` above the page's stored edges is never read as all of
+     * them. Only an HTML response can be true.
      */
     links_read: z.boolean(),
     /** robots.txt's verdict on this URL for each search engine (Googlebot, Bingbot). */

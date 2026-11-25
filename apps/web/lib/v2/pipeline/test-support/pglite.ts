@@ -28,6 +28,52 @@ export function pglitePersistDb(db: Db): PersistDb {
       );
       return rows[0]!.answer;
     },
+    // F-330, as the service role does it through PostgREST (persist.ts supabasePersistDb).
+    async edgeTarget(checkId, fetching) {
+      const l = JSON.stringify(fetching);
+      await db.query(
+        `insert into public.measurement_lineages (id, engine_sha, detector_ruleset_version,
+           crawler_registry_version, worker_release, population_version, created_at)
+         select (l ->> 'id')::uuid, l ->> 'engine_sha', l ->> 'detector_ruleset_version',
+                l ->> 'crawler_registry_version', l ->> 'worker_release', l ->> 'population_version',
+                (l ->> 'created_at')::timestamptz
+           from (select $1::jsonb as l) x
+         on conflict (engine_sha, detector_ruleset_version, crawler_registry_version, worker_release,
+                      population_version) do nothing`,
+        [l],
+      );
+      const { rows: lineage } = await db.query<{ id: string }>(
+        `select m.id from public.measurement_lineages m, (select $1::jsonb as l) x
+          where m.engine_sha = l ->> 'engine_sha'
+            and m.detector_ruleset_version = l ->> 'detector_ruleset_version'
+            and m.crawler_registry_version = l ->> 'crawler_registry_version'
+            and m.worker_release is not distinct from l ->> 'worker_release'
+            and m.population_version is not distinct from l ->> 'population_version'`,
+        [l],
+      );
+      const { rows: month } = await db.query<{ check_month: string }>(
+        `select check_month::text as check_month from public.checks where id = $1`,
+        [checkId],
+      );
+      if (lineage.length !== 1 || month.length !== 1) throw new Error('edgeTarget: not one row');
+      await db.query(`select public.v2_premake_month_partitions($1::date, $1::date)`, [
+        month[0]!.check_month,
+      ]);
+      return { lineageId: lineage[0]!.id, checkMonth: month[0]!.check_month };
+    },
+    async insertEdges(rows) {
+      await db.query(
+        `insert into public.link_edges (check_id, check_month, lineage_id, from_url, to_url,
+           anchor_text, is_generic_anchor, js_only)
+         select r.check_id, r.check_month, r.lineage_id, r.from_url, r.to_url, r.anchor_text,
+                r.is_generic_anchor, r.js_only
+           from jsonb_to_recordset($1::jsonb) as r (check_id uuid, check_month date,
+             lineage_id uuid, from_url text, to_url text, anchor_text text,
+             is_generic_anchor boolean, js_only boolean)
+         on conflict (check_id, from_hash, to_hash, check_month) do nothing`,
+        [JSON.stringify(rows)],
+      );
+    },
   };
 }
 

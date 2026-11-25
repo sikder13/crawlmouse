@@ -8,5 +8,5 @@ export { metadata } from '@/app/blog/page';
 /** `/blog` in the v2 shell while V2_CHECKS_PUBLIC is on (CC-36 D3, `V2_REWRITES`); a 404 with it off. */
 export default function KeptBlogIndex() {
   if (!checksPublicEnabled()) return notFound();
-  return keptPage(BlogIndex());
+  return keptPage(BlogIndex(), [], 'v2');
 }

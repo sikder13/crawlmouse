@@ -15,6 +15,9 @@ import {
   dayMonth,
   dayOfMonth,
   hourMinute,
+  hourMinuteZoned,
+  weekdayTimeZoned,
+  zoneName,
   nextWeekly,
   sameDay,
   weekday,
@@ -209,5 +212,19 @@ describe('the account zone', () => {
     expect(dayDate(daysBefore('2026-11-04T04:30:00Z', 3, IND), IND)).toBe('Sat 31 Oct');
     // Sat 7 Nov 21:41 EST, three days before: Wed 4 Nov 21:41 EST, no change of offset between.
     expect(daysBefore('2026-11-08T02:41:00Z', 3, IND)).toBe('2026-11-05T02:41:00.000Z');
+  });
+});
+
+// D-17 (QA's production walk): the account pages named no zone, and UTC read as the customer's own.
+describe('times that name their zone', () => {
+  const INDY = 'America/Indiana/Indianapolis';
+  it('names the zone in force at that instant, either side of the clocks going back', () => {
+    expect(hourMinuteZoned('2026-10-30T10:02:00Z', INDY)).toBe('06:02 EDT');
+    expect(hourMinuteZoned('2026-11-06T11:00:00Z', INDY)).toBe('06:00 EST');
+    expect(weekdayTimeZoned('2026-10-29T23:40:00Z', INDY)).toBe('Thu 19:40 EDT');
+  });
+  it('names UTC as UTC', () => {
+    expect(zoneName('2026-11-25T06:32:00Z', 'UTC')).toBe('UTC');
+    expect(hourMinuteZoned('2026-11-25T06:32:00Z', 'UTC')).toBe('06:32 UTC');
   });
 });

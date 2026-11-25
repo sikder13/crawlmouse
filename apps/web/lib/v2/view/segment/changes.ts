@@ -6,13 +6,21 @@
  */
 import { everySectionMeasured } from '../section-measured';
 import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
-import type { ViewDataset } from '../../fixtures';
+import type { ViewDataset } from '../../dataset-lookups';
 
 type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
 type CheckTrigger = Check['trigger'];
-import { findCheck, siteOf } from '../../fixtures';
-import { dateTimeUtc, dayDate, hourMinute, listOf, weekdayTime } from '../../format';
+import { findCheck, siteOf } from '../../dataset-lookups';
+import {
+  dateTimeUtc,
+  dayDate,
+  hourMinute,
+  hourMinuteZoned,
+  listOf,
+  weekdayTime,
+  weekdayTimeZoned,
+} from '../../format';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { ANONYMOUS_VISIBLE_MS, type DoorView } from '../result';
 
@@ -142,14 +150,18 @@ const EXAMPLE: ChangeRowView[] = [
 function clockOf(d: ViewDataset, check: Check) {
   const account = d.accounts.find((a) => a.id === siteOf(d, check).account_id);
   return (ts: string) =>
-    account ? weekdayTime(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
+    account ? weekdayTimeZoned(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
 }
 
-/** The same clock with the day of the month: "Sat 24 Oct 22:34". */
+/** The same clock with the day of the month: "Sat 24 Oct 22:34 EDT". */
 function datedClockOf(d: ViewDataset, check: Check) {
   const account = d.accounts.find((a) => a.id === siteOf(d, check).account_id);
   const zone = account?.timezone ?? 'UTC';
-  return (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}${account ? '' : ' UTC'}`;
+  // Named with its zone, as every time on this page is (D-17).
+  return (ts: string) =>
+    account
+      ? `${dayDate(ts, zone)} ${hourMinuteZoned(ts, zone)}`
+      : `${dayDate(ts, zone)} ${hourMinute(ts, zone)} UTC`;
 }
 
 /**
@@ -176,8 +188,26 @@ export function firstSeenOf(
   return { when: dated(seen.finished_at) };
 }
 
-/** "First observed after robots.txt changed Thu 19:40: …": when we saw it, and what we found. */
-function causeOf(c: Change, seen: FirstSeen): string {
+/**
+ * "First observed after robots.txt changed Thu 19:40: …": when we saw it, and what we found.
+ * - `seen`: where the fix an opened row reopened was first seen (F-213); its lead replaces "First
+ *   observed at this check".
+ * - A grade change with no cause found, between checks that read different numbers of pages, says so
+ *   (D-08): the grade moved with what was read. That is a row first observed here.
+ */
+function causeOf(c: Change, seen: FirstSeen, check: Check, previous: Check | null): string {
+  const now = check.coverage?.pages_crawled;
+  const before = previous?.coverage?.pages_crawled;
+  if (
+    seen === null &&
+    !c.cause &&
+    c.grade_deltas.length &&
+    now != null &&
+    before != null &&
+    now !== before
+  ) {
+    return `First observed at this check, which read ${count(now)} ${plural(now, 'page', 'pages')}; the check before read ${count(before)}. The grade moved with the pages read, and we found no other cause.`;
+  }
   const lead =
     seen === null
       ? 'First observed at this check'
@@ -192,13 +222,15 @@ function causeOf(c: Change, seen: FirstSeen): string {
 
 /**
  * One change as a row: `check` is the check that found it, `at` the clock its times are read by,
- * `seen` where the fix it reopened was first seen (`firstSeenOf`).
+ * `seen` where the fix it reopened was first seen (`firstSeenOf`), and `previous` the check before it
+ * where the dataset holds it (its pages read, D-08).
  */
 export function rowOf(
   c: Change,
   check: Check,
   at: (ts: string) => string,
   seen: FirstSeen,
+  previous: Check | null = null,
 ): ChangeRowView {
   const crawler = c.ua ? check.crawlers.find((x) => x.ua === c.ua) : undefined;
   const n = c.notified;
@@ -220,7 +252,7 @@ export function rowOf(
       ? c.grade_deltas.map((g) => `${GRADES[g.grade]} ${g.from_score} → ${g.to_score}`).join(', ')
       : 'none',
     verdict: crawler ? { verdict: crawler.verdict, evidence: crawler.evidence_class } : null,
-    cause: causeOf(c, seen),
+    cause: causeOf(c, seen, check, previous),
     diff: [
       ...(c.cause?.diff?.removed ?? []).map((line) => ({ sign: '−' as const, line })),
       ...(c.cause?.diff?.added ?? []).map((line) => ({ sign: '+' as const, line })),
@@ -331,7 +363,15 @@ export function changesView(
 
   const rows = d.changes
     .filter((c) => c.check_id === check.id)
-    .map((c) => rowOf(c, check, at, firstSeenOf(d, c, dated)));
+    .map((c) =>
+      rowOf(
+        c,
+        check,
+        at,
+        firstSeenOf(d, c, dated),
+        d.checks.find((x) => x.id === c.previous_check_id) ?? null,
+      ),
+    );
   const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);
   return {

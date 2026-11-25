@@ -38,6 +38,26 @@ const NAV = [
 ];
 
 describe('AccountShell', () => {
+  it('ends the rail with Sign out: a POST to the logout route, after the feedback button (D-23)', () => {
+    const host = mount(
+      <AccountShell nav={NAV}>
+        <p>page</p>
+      </AccountShell>,
+    );
+    const rail = host.querySelector('header')!;
+    const form = rail.querySelector<HTMLFormElement>('form[action="/api/auth/logout"]');
+    expect(form).not.toBeNull();
+    expect(form!.method).toBe('post');
+    const button = form!.querySelector('button')!;
+    // Literal here, so a change to the shell's word fails this test.
+    expect([button.type, button.textContent]).toEqual(['submit', 'Sign out']);
+    // The rail's last child, so no earlier child of the rail moves; marked as an addition to the
+    // locked rail, which has no sign-out.
+    expect(rail.lastElementChild!.contains(form)).toBe(true);
+    expect(rail.lastElementChild!.hasAttribute('data-v2-addition')).toBe(true);
+    expect(host.querySelector('main form')).toBeNull();
+  });
+
   const out = renderToStaticMarkup(
     <AccountShell nav={NAV} card={<p>card</p>} theme={<p>theme</p>}>
       <h1>page</h1>

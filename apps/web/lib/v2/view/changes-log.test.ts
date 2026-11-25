@@ -66,10 +66,10 @@ describe('the Changes log', () => {
     expect(v.shell.nav.find((n) => n.current)!.label).toBe('Changes');
   });
 
-  it('dates each row, since a log spans weeks: Sat 24 Oct 22:34 for the first audit’s change', () => {
-    // 2026-10-25T02:34Z is 22:34 the evening before in Indiana (EDT, UTC−4).
-    expect(log().rows.at(-1)!.when).toBe('Sat 24 Oct 22:34');
-    expect(log().rows[0]!.when).toBe('Fri 30 Oct 06:02');
+  it('dates each row, since a log spans weeks: Sat 24 Oct 22:34 EDT for the first audit’s change', () => {
+    // 2026-10-25T02:34Z is 22:34 EDT the evening before in Indiana (EDT, UTC−4).
+    expect(log().rows.at(-1)!.when).toBe('Sat 24 Oct 22:34 EDT');
+    expect(log().rows[0]!.when).toBe('Fri 30 Oct 06:02 EDT');
   });
 
   it('filters by kind, and says how many of how many match', () => {
@@ -160,10 +160,10 @@ describe('the Changes log', () => {
   });
 
   it('reads a notification sent after now as not yet sent', () => {
-    // 10:02:30Z: the morning's changes are found, their email goes out at 10:03.
+    // 10:02:30Z: the morning's changes are found, their email goes out at 10:03 EDT.
     const early = changesLogView(bad, { ...viewer, now: '2026-10-30T10:02:30Z' }, {}, BASE);
     expect(early.rows.find((r) => r.key.endsWith('001'))!.told).toBe('nobody was notified');
-    expect(log().rows[0]!.told).toBe('email and Slack #seo, Fri 30 Oct 06:03');
+    expect(log().rows[0]!.told).toBe('email and Slack #seo, Fri 30 Oct 06:03 EDT');
   });
 });
 
@@ -408,7 +408,7 @@ describe('a re-check that recorded no change, in the Changes log (F-214)', () =>
     expect(v.rows[0]).toEqual({
       key: 'check-c0000000-0000-4000-8000-000000000020',
       site: 'drivepei.ca',
-      when: 'Fri 30 Oct 06:01',
+      when: 'Fri 30 Oct 06:01 EDT',
       kind: 'checked',
       pill: { state: 'neutral', label: 'checked' },
       summary: 'Scheduled check: no change in what both checks measured.',
@@ -417,7 +417,7 @@ describe('a re-check that recorded no change, in the Changes log (F-214)', () =>
       pages: null,
       effect: 'none',
       verdict: null,
-      cause: 'Compared with the check of Mon 26 Oct 15:11.',
+      cause: 'Compared with the check of Mon 26 Oct 15:11 EDT.',
       diff: [],
       told: 'nobody was notified',
     });
@@ -428,14 +428,14 @@ describe('a re-check that recorded no change, in the Changes log (F-214)', () =>
     const v = log({ site: OUTFITTER });
     // …002 finished 2026-10-26T13:14:10Z (09:14 EDT), compared with the first audit at 22:34 on the 24th.
     expect(row(v, '002')).toMatchObject({
-      when: 'Mon 26 Oct 09:14',
+      when: 'Mon 26 Oct 09:14 EDT',
       summary: 'Re-run: nothing changed.',
-      cause: 'Compared with the check of Sat 24 Oct 22:34.',
+      cause: 'Compared with the check of Sat 24 Oct 22:34 EDT.',
     });
     expect(row(v, '004')).toMatchObject({
-      when: 'Wed 28 Oct 16:04',
+      when: 'Wed 28 Oct 16:04 EDT',
       summary: 'Re-check after a fix: nothing changed.',
-      cause: 'Compared with the check of Tue 27 Oct 10:32.',
+      cause: 'Compared with the check of Tue 27 Oct 10:32 EDT.',
     });
   });
 
@@ -468,14 +468,14 @@ describe('a re-check that recorded no change, in the Changes log (F-214)', () =>
     // From 2026-10-29T10:05Z: …005 finished at 12:42Z that day, …004 the day before.
     const v = log({ site: OUTFITTER, since: '24h' });
     expect(v.rows.filter((r) => r.kind === 'checked').map((r) => r.when)).toEqual([
-      'Thu 29 Oct 08:42',
+      'Thu 29 Oct 08:42 EDT',
     ]);
     const week = log({ site: OUTFITTER, since: '7d' });
     expect(week.rows.filter((r) => r.kind === 'checked').map((r) => r.when)).toEqual([
-      'Thu 29 Oct 08:42',
-      'Wed 28 Oct 16:04',
-      'Tue 27 Oct 10:32',
-      'Mon 26 Oct 09:14',
+      'Thu 29 Oct 08:42 EDT',
+      'Wed 28 Oct 16:04 EDT',
+      'Tue 27 Oct 10:32 EDT',
+      'Mon 26 Oct 09:14 EDT',
     ]);
   });
 
@@ -517,7 +517,7 @@ describe('a re-check that recorded no change, in the Changes log (F-214)', () =>
       'c0000000-0000-4000-8000-000000000001';
     const row = changesLogView(d, viewer, {}, BASE).rows.find((r) => r.key === change.id)!;
     expect(row.cause).toBe(
-      'First seen at the Sat 24 Oct 22:34 check. What we found: Marked done on 2026-10-28, and found again on this check.',
+      'First seen at the Sat 24 Oct 22:34 EDT check. What we found: Marked done on 2026-10-28, and found again on this check.',
     );
   });
 });

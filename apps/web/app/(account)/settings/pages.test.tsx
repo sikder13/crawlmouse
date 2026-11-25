@@ -52,8 +52,10 @@ import { agencyAccount } from '@/lib/v2/agency/test-support';
 import { DeleteScreen } from '@/components/v2/screens/settings/DeleteScreen';
 import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
 import { SettingsScreen } from '@/components/v2/screens/settings/SettingsScreen';
+import { SettingsNotYoursScreen } from '@/components/v2/screens/settings/SettingsNotYoursScreen';
 import { TrialEndedScreen, TrialEndScreen } from '@/components/v2/screens/trial-end/TrialEndScreen';
 import DeletePage from './delete/page';
+import IntegrationsPage from './integrations/page';
 import SettingsPage from './page';
 import PlanPage from './plan/page';
 import TrialEndedPage from '../trial-ended/page';
@@ -211,6 +213,7 @@ const PAGES = [
   ['/settings/plan', PlanPage],
   ['/settings/delete', DeletePage],
   ['/trial-ended', TrialEndedPage],
+  ['/settings/integrations', IntegrationsPage],
 ] as const;
 
 describe('with V2_CHECKS_PUBLIC off', () => {
@@ -270,9 +273,51 @@ describe('/settings', () => {
     expect(await text({})).not.toContain(SETTINGS_NOTICES.saved);
   });
 
-  it('is a 404 for a developer', async () => {
+  it('Integrations is a 404 for a developer', async () => {
     as(developer);
-    await expect(SettingsPage(q())).rejects.toMatchObject(notFoundError);
+    await expect(IntegrationsPage(q())).rejects.toMatchObject(notFoundError);
+  });
+
+  it('Integrations shows an account manager the form, with their own rail', async () => {
+    as(sharedManager);
+    const markup = renderToStaticMarkup((await IntegrationsPage(q())) as ReactElement);
+    expect(markup).toContain('name="slackWebhookUrl"');
+    expect(markup.toLowerCase()).toContain('autocomplete="off"');
+    // Settings › Plan is a 404 for a manager, so nothing on the page links there.
+    expect(markup).not.toContain('href="/settings/plan"');
+  });
+
+  it('Integrations on Free gives an account manager no link to the plan page', async () => {
+    as(manager);
+    const markup = renderToStaticMarkup((await IntegrationsPage(q())) as ReactElement);
+    expect(markup).not.toContain('name="slackWebhookUrl"');
+    expect(markup).not.toContain('href="/settings/plan"');
+  });
+
+  it('Integrations: a paid account gets the Slack form, Free the way to Pro', async () => {
+    as(shared);
+    const paid = renderToStaticMarkup((await IntegrationsPage(q())) as ReactElement);
+    expect(paid).toContain('action="/api/alert-rules"');
+    expect(paid).toContain('name="slackWebhookUrl"');
+    as(owner);
+    const free = renderToStaticMarkup((await IntegrationsPage(q())) as ReactElement);
+    expect(free).not.toContain('name="slackWebhookUrl"');
+    expect(free).toContain('href="/settings/plan"');
+  });
+
+  it('a developer gets a page that says Settings are not theirs to change, never the 404 (D-03)', async () => {
+    as(developer);
+    const el = screen(await SettingsPage(q()));
+    expect(el.type).toBe(SettingsNotYoursScreen);
+    const html = renderToStaticMarkup(el);
+    expect(html).toContain(renderToStaticMarkup(<>{SETTINGS_COPY.notYours}</>));
+    // The rail, so the seat is still in its account.
+    expect(html).toContain('href="/dashboard"');
+    // Nothing that changes the account: no account form, no address, no delete. (The rail's own
+    // controls, the theme and the switcher, stay.)
+    expect(html).not.toContain('action="/api/account"');
+    expect(html).not.toContain(owner.email);
+    expect(html).not.toContain('href="/settings/delete"');
   });
 
   it('says when mail to the reader’s own address is suppressed, and names that address (CC-28 D7)', async () => {

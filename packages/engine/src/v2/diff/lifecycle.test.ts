@@ -16,6 +16,7 @@ import {
   fixWithHistory,
   side,
 } from '../../../fixtures/v2/diff/builders.js';
+import { noteDay } from './changes.js';
 import { diffCheck } from './diff.js';
 import type { PageGone } from '@crawlmouse/types/v2';
 import { LIFECYCLE } from './lifecycle.js';
@@ -272,14 +273,14 @@ describe('the note that a fix was reported done', () => {
   it('names the day it was marked done when it is found again', () => {
     const { result } = run('detected', 'marked_done');
     expect(result.changes[0]!.cause?.text).toBe(
-      'Marked done on 2026-10-03, and found again on this check.',
+      'Marked done on 3 Oct 2026, and found again on this check.',
     );
   });
 
   it('names the day it was marked done when an unverifiable fix is found again', () => {
     const { result } = run('detected', 'unable_to_verify');
     expect(result.changes[0]!.cause?.text).toBe(
-      'Marked done on 2026-10-03, and found again on this check.',
+      'Marked done on 3 Oct 2026, and found again on this check.',
     );
   });
 
@@ -299,12 +300,42 @@ describe('the note that a fix was reported done', () => {
   it('says a resolved fix was resolved before when it is found again', () => {
     const { result } = run('detected', 'verified_resolved');
     expect(result.changes[0]!.cause?.text).toBe(
-      'Resolved on 2026-10-03, and found again on this check.',
+      'Resolved on 3 Oct 2026, and found again on this check.',
     );
   });
 
   it('carries no note on a fix found for the first time', () => {
     const { result } = run('detected', 'none');
     expect(result.changes[0]!.cause).toBeNull();
+  });
+});
+
+// D-33: the reopen note writes its day as a reader does, the UTC day of the event.
+describe('noteDay', () => {
+  it('writes the UTC day as day, month and year, for every month', () => {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    months.forEach((m, i) => {
+      const at = `2026-${String(i + 1).padStart(2, '0')}-09T12:00:00.000Z`;
+      expect(noteDay(at)).toBe(`9 ${m} 2026`);
+    });
+  });
+
+  it('takes the UTC day at either edge of it', () => {
+    expect(noteDay('2026-11-30T23:59:59.999Z')).toBe('30 Nov 2026');
+    expect(noteDay('2026-12-01T00:00:00.000Z')).toBe('1 Dec 2026');
+    expect(noteDay('2026-12-31T23:30:00.000-01:00')).toBe('1 Jan 2027');
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cadenceFor,
   runCheck,
   type BatchAt,
   type CheckStepTools,
@@ -16,9 +17,14 @@ import {
   PACE,
   FIRST_ACCEPT_BY_S,
   QUEUE_WAIT_MAX_S,
+  RENDER_SHARE_S,
   RESERVE_S,
+  MAX_PAGE_CAP,
+  crawlCeilingS,
+  finishSFor,
+  reserveS,
 } from '../limits';
-import { addBackMs, batchSeconds, fetchEndsAt, phaseEndsAt, tailOf } from './time';
+import { addBackMs, batchSeconds, fetchEndsAt, phaseEndsAt, renderEndsAt, tailOf } from './time';
 
 const S = 1000;
 const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
@@ -32,12 +38,68 @@ const so = (over: Partial<RunSoFar> = {}): RunSoFar => ({
   busyBeforeCrawlMs: 0,
   waitingSince: null,
   discovered: null,
+  pageCap: 500,
   ...over,
 });
 
+// Inbox 079: Pro and Agency read 2,000 pages. A site answering a paced request in 1.0 s or less is
+// read to 2,000 pages, so a large check's crawl and reserve grow with its cap; a check of 500 pages
+// keeps today's windows. The run's finish timeout is one setting on the function, the largest cap's.
+describe('the time plan by page cap (2,000 pages)', () => {
+  it('a check of 500 pages or fewer keeps today’s windows and waits', () => {
+    for (const cap of [1, 100, 500]) {
+      expect([crawlCeilingS(cap), reserveS(cap), finishSFor(cap)]).toEqual([480, 180, 2220]);
+      expect(cadenceFor(cap)).toEqual({
+        pollStartS: PACE.pollStartS,
+        pollMaxS: PACE.pollMaxS,
+        busyWaitS: PACE.busyWaitS,
+      });
+    }
+  });
+
+  it('gives 2,000 pages 1.7 s a page: 1.0 s a page, and the polls of a run that hears no signal', () => {
+    expect(MAX_PAGE_CAP).toBe(2000);
+    expect(crawlCeilingS(MAX_PAGE_CAP)).toBeGreaterThanOrEqual(MAX_PAGE_CAP * 1.0);
+    expect(crawlCeilingS(MAX_PAGE_CAP)).toBe(3400);
+    expect(reserveS(MAX_PAGE_CAP)).toBe(300);
+    expect(finishSFor(MAX_PAGE_CAP)).toBe(FIRST_ACCEPT_BY_S + 3400 + ACCESS_SLICE_S + 300);
+    expect(finishSFor(MAX_PAGE_CAP)).toBe(5260);
+  });
+
+  // Review of 16009429: a site with no sitemap reads its home page alone in the first batch, so at 40
+  // batches of 50 it could never reach 2,000 pages, and its crawl ended on the batch count.
+  it('allows enough crawl batches to reach 2,000 pages with four batches short of full', () => {
+    expect((PACE.maxCrawlBatches - 4) * 50).toBeGreaterThanOrEqual(MAX_PAGE_CAP);
+  });
+
+  it('the run’s finish timeout is the largest cap’s, so no check is cut short by it', () => {
+    expect(PACE.finishS).toBe(finishSFor(MAX_PAGE_CAP));
+    // A cap past MAX_PAGE_CAP reads no more pages (PACE.maxCrawlBatches) and plans no longer.
+    for (const cap of [500, 1000, 2000, 2001, 100_000])
+      expect(finishSFor(cap)).toBeLessThanOrEqual(PACE.finishS);
+  });
+
+  it('ends a check’s fetching and its crawl by its own cap’s plan', () => {
+    expect(fetchEndsAt(so({ pageCap: 500 }))).toBe(T0 + (2220 - 180) * S);
+    expect(fetchEndsAt(so({ pageCap: 2000 }))).toBe(T0 + (finishSFor(2000) - 300) * S);
+    const at = T0 + 400 * S;
+    const large = so({ pageCap: 2000, crawlFrom: at });
+    expect(phaseEndsAt({ kind: 'crawl' }, large, at)).toBe(at + 3400 * S);
+    expect(phaseEndsAt({ kind: 'crawl' }, so({ crawlFrom: at }), at)).toBe(at + 480 * S);
+  });
+
+  it('a large check polls from 10 s up to 60 s and waits 60 s on a busy worker', () => {
+    expect(cadenceFor(2000)).toEqual({ pollStartS: 10, pollMaxS: 60, busyWaitS: 60 });
+    // An access batch keeps its grace and one poll inside its phase, at its own poll wait.
+    const end = T0 + 600 * S;
+    expect(batchSeconds(end, T0, 240, 'kept_inside', 2000)).toBe(240);
+    expect(batchSeconds(end, end - 300 * S, 240, 'kept_inside', 2000)).toBe(300 - 60 - 60);
+  });
+});
+
 describe('the time plan', () => {
-  it('the finish timeout is its parts: claim waits, discovery, the wait budget, the crawl, the access slice, the reserve', () => {
-    expect(PACE.finishS).toBe(
+  it('a 500-page check’s finish is its parts: claim waits, discovery, the wait budget, the crawl, the access slice, the reserve', () => {
+    expect(finishSFor(500)).toBe(
       PACE.claimWaits * PACE.claimWaitS +
         DISCOVER_S +
         QUEUE_WAIT_MAX_S +
@@ -45,15 +107,18 @@ describe('the time plan', () => {
         ACCESS_SLICE_S +
         RESERVE_S,
     );
-    expect(PACE.finishS).toBe(2220);
+    expect(finishSFor(500)).toBe(2220);
     expect(QUEUE_WAIT_MAX_S).toBe(900);
-    // The latest first batch that still gets a whole window: the finish timeout less the crawl,
-    // the access slice and the reserve.
-    expect(FIRST_ACCEPT_BY_S).toBe(PACE.finishS - CRAWL_CEILING_S - ACCESS_SLICE_S - RESERVE_S);
+    // The latest first batch that still gets a whole window: the finish less the crawl, the access
+    // slice and the reserve, at every cap.
+    expect(FIRST_ACCEPT_BY_S).toBe(finishSFor(500) - CRAWL_CEILING_S - ACCESS_SLICE_S - RESERVE_S);
+    expect(FIRST_ACCEPT_BY_S).toBe(
+      finishSFor(2000) - crawlCeilingS(2000) - ACCESS_SLICE_S - reserveS(2000),
+    );
   });
 
   it('ends the fetching phases RESERVE_S before the finish timeout', () => {
-    expect(fetchEndsAt(T0)).toBe(T0 + (PACE.finishS - RESERVE_S) * S);
+    expect(fetchEndsAt(so())).toBe(T0 + (finishSFor(500) - RESERVE_S) * S);
   });
 
   it('ends the crawl at its ceiling after the first accepted batch, or leaves the access slice, whichever first', () => {
@@ -63,9 +128,9 @@ describe('the time plan', () => {
       T0 + (10 + CRAWL_CEILING_S) * S,
     );
     expect(phaseEndsAt(crawl, so({ crawlFrom: T0 + 1700 * S }), now)).toBe(
-      fetchEndsAt(T0) - ACCESS_SLICE_S * S,
+      fetchEndsAt(so()) - ACCESS_SLICE_S * S,
     );
-    expect(phaseEndsAt({ kind: 'access' }, so(), now)).toBe(fetchEndsAt(T0));
+    expect(phaseEndsAt({ kind: 'access' }, so(), now)).toBe(fetchEndsAt(so()));
   });
 
   it('before any crawl batch is accepted, the crawl clock has not started: the window is measured from now', () => {
@@ -75,9 +140,15 @@ describe('the time plan', () => {
     const plan = so({ crawlFrom: null, busyMs: 600 * S });
     expect(phaseEndsAt(crawl, plan, now)).toBe(now + CRAWL_CEILING_S * S);
     // So the first batch the worker takes is given its full budget, however long it waited.
-    expect(batchSeconds(phaseEndsAt(crawl, plan, now), now, CRAWL_BATCH_BUDGET.max_seconds)).toBe(
-      CRAWL_BATCH_BUDGET.max_seconds,
-    );
+    expect(
+      batchSeconds(
+        phaseEndsAt(crawl, plan, now),
+        now,
+        CRAWL_BATCH_BUDGET.max_seconds,
+        'kept_inside',
+        500,
+      ),
+    ).toBe(CRAWL_BATCH_BUDGET.max_seconds);
   });
 
   it('busy time after the first accepted batch is added back to the crawl end (the fetch end holds the whole budget already)', () => {
@@ -102,11 +173,13 @@ describe('the time plan', () => {
 
   it('gives a batch its budget, or what the phase leaves after the grace and one poll wait', () => {
     const end = T0 + 1000 * S;
-    expect(batchSeconds(end, T0, 240)).toBe(240);
-    expect(batchSeconds(end, end - 300 * S, 240)).toBe(300 - 60 - 30);
+    expect(batchSeconds(end, T0, 240, 'kept_inside', 500)).toBe(240);
+    expect(batchSeconds(end, end - 300 * S, 240, 'kept_inside', 500)).toBe(300 - 60 - 30);
     // Under MIN_BATCH_S nothing is posted.
-    expect(batchSeconds(end, end - (MIN_BATCH_S + 90) * S, 240)).toBe(MIN_BATCH_S);
-    expect(batchSeconds(end, end - (MIN_BATCH_S + 89) * S, 240)).toBeNull();
+    expect(batchSeconds(end, end - (MIN_BATCH_S + 90) * S, 240, 'kept_inside', 500)).toBe(
+      MIN_BATCH_S,
+    );
+    expect(batchSeconds(end, end - (MIN_BATCH_S + 89) * S, 240, 'kept_inside', 500)).toBeNull();
   });
 
   it('F-247: a crawl of 50-second batches uses its ceiling, not stopping ~115 s short', () => {
@@ -121,6 +194,7 @@ describe('the time plan', () => {
           T0 + t * S,
           CRAWL_BATCH_BUDGET.max_seconds,
           tail,
+          plan.pageCap,
         );
         if (s === null) return used;
         const ran = Math.min(s, 50);
@@ -147,7 +221,7 @@ describe('the time plan', () => {
     });
     const phase = (kind: BatchAt['kind'], most: number, batches: number) => {
       for (let n = 0; n < batches; n++) {
-        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most, tailOf(kind));
+        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most, tailOf(kind), 500);
         if (s === null) return;
         // The batch reaches its deadline, and the poll that sees it comes one poll wait later.
         t += s + PACE.pollGraceS + PACE.pollMaxS;
@@ -161,6 +235,7 @@ describe('the time plan', () => {
       t * S,
       ACCESS_BATCH_BUDGET.max_seconds,
       tailOf('access'),
+      plan.pageCap,
     );
     expect(firstAccess).toBeGreaterThanOrEqual(
       Math.min(
@@ -171,8 +246,8 @@ describe('the time plan', () => {
     phase('access', ACCESS_BATCH_BUDGET.max_seconds, 2);
     const fetching = t;
     t += RESERVE_S;
-    expect(fetching).toBeLessThanOrEqual(PACE.finishS - RESERVE_S);
-    expect(t).toBeLessThanOrEqual(PACE.finishS);
+    expect(fetching).toBeLessThanOrEqual(finishSFor(500) - RESERVE_S);
+    expect(t).toBeLessThanOrEqual(finishSFor(500));
   });
 
   it('the same worst case with the budget spent AFTER the first batch fits too', () => {
@@ -186,14 +261,14 @@ describe('the time plan', () => {
     t += QUEUE_WAIT_MAX_S;
     const phase = (kind: BatchAt['kind'], most: number, batches: number) => {
       for (let n = 0; n < batches; n++) {
-        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most, tailOf(kind));
+        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most, tailOf(kind), 500);
         if (s === null) return;
         t += s + PACE.pollGraceS + PACE.pollMaxS;
       }
     };
     phase('crawl', CRAWL_BATCH_BUDGET.max_seconds, PACE.maxCrawlBatches);
     phase('access', ACCESS_BATCH_BUDGET.max_seconds, 2);
-    expect(t).toBeLessThanOrEqual(PACE.finishS - RESERVE_S);
+    expect(t).toBeLessThanOrEqual(finishSFor(500) - RESERVE_S);
   });
 });
 
@@ -219,6 +294,8 @@ function simulate(opts: {
   busyLater?: number;
   /** A batch is done this long after its post; unset, `slowBatches` decides. */
   doneAfterS?: number;
+  /** The check's page cap: 500 unless set, the plan these tests were written for. */
+  pageCap?: number;
 }) {
   const clock = { now: T0 };
   const ids: string[] = [];
@@ -261,6 +338,7 @@ function simulate(opts: {
         clock.now,
         most,
         tailOf(at.kind),
+        soFar.pageCap,
       );
       if (seconds === null) return { status: 'none', why: 'no_time' };
       const busyFor = at.batch === 1 ? (opts.busyFirst ?? 0) : (opts.busyLater ?? 0);
@@ -294,12 +372,13 @@ function simulate(opts: {
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
     fail: async () => ({ failed: true, siteId: 's' }),
+    requeue: async () => ({ requeued: false }),
   };
   const event = {
     ...SITE,
     checkId: 'c',
     trigger: 'manual' as const,
-    pageCap: 100_000,
+    pageCap: opts.pageCap ?? 500,
   };
   return runCheck({ event: { data: event }, step: tools, runId: 'r' }, steps).then((result) => ({
     result,
@@ -309,13 +388,33 @@ function simulate(opts: {
   }));
 }
 
+// Review of the render budget: each retry of the render step read a new start, so two failed attempts
+// of 90 s each ran the check past the reserve. The render's end is counted from the earlier of the
+// step's start and the end of the fetching phases.
+describe('the render step’s end (RENDER_SHARE_S of the reserve)', () => {
+  const fetchEnd = fetchEndsAt(so());
+  it('gives a step that starts before the fetching phases end its whole share', () => {
+    const start = fetchEnd - 600 * S;
+    expect(renderEndsAt(start, so())).toBe(start + RENDER_SHARE_S * S);
+  });
+
+  it('gives a step that starts after them, a retry or a late start, only what the share has left', () => {
+    expect(renderEndsAt(fetchEnd + 60 * S, so())).toBe(fetchEnd + RENDER_SHARE_S * S);
+    // However many attempts, rendering never runs past the share, so the steps after it keep the rest.
+    for (const late of [0, 30, 90, 200]) {
+      const end = renderEndsAt(fetchEnd + late * S, so());
+      expect(end).toBeLessThanOrEqual(T0 + (PACE.finishS - (RESERVE_S - RENDER_SHARE_S)) * S);
+    }
+  });
+});
+
 describe('the time plan through the orchestration (finding 8)', () => {
   it('slow batches and every claim wait: the fetching ends in time to leave RESERVE_S', async () => {
     const run = await simulate({ latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: true });
     expect(run.result.status).toBe('partial');
     const fetchingEndedS = (run.stepsAt.get('render')! - T0) / S;
     // One step's latency is the render step's own start.
-    expect(fetchingEndedS).toBeLessThanOrEqual(PACE.finishS - RESERVE_S + 1);
+    expect(fetchingEndedS).toBeLessThanOrEqual(finishSFor(500) - RESERVE_S + 1);
     expect(run.ids).toContain('access-1-read');
   });
 
@@ -324,6 +423,48 @@ describe('the time plan through the orchestration (finding 8)', () => {
     expect(run.ids.filter((id) => /^crawl-\d+-read$/.test(id))).toHaveLength(PACE.maxCrawlBatches);
     expect(run.ids.length).toBeLessThan(STEP_LIMIT);
     expect(run.ids.length).toBeLessThanOrEqual(worstCaseSteps());
+  });
+});
+
+describe('a 2,000-page check through the orchestration (inbox 079)', () => {
+  const crawlReads = (ids: string[]) => ids.filter((id) => /^crawl-\d+-read$/.test(id)).length;
+
+  it.each([1, 3])(
+    'at %i s a step and every claim wait, a site at 1.0 s a page is read to 2,000 pages, in time and under the step limit',
+    async (latencyS) => {
+      // 50 pages a batch at 1.0 s a page.
+      const run = await simulate({
+        latencyS,
+        busyClaims: PACE.claimWaits,
+        slowBatches: false,
+        doneAfterS: 50,
+        pageCap: 2000,
+      });
+      // 50 pages a batch: the cap's worth of batches, and more if the time allows.
+      expect(crawlReads(run.ids)).toBeGreaterThanOrEqual(MAX_PAGE_CAP / 50);
+      expect((run.stepsAt.get('render')! - T0) / S).toBeLessThanOrEqual(
+        finishSFor(2000) - reserveS(2000) + 1,
+      );
+      expect(run.ids.length).toBeLessThanOrEqual(worstCaseSteps(2000));
+      expect(run.ids.length).toBeLessThan(STEP_LIMIT);
+    },
+  );
+
+  it('slow batches and as long a wait as is still graded: still ends within its finish, under the step limit', async () => {
+    const shape = { latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: true, pageCap: 2000 };
+    let busyFirst = 0;
+    for (let n = QUEUE_WAIT_MAX_S / cadenceFor(2000).busyWaitS; n >= 0; n--) {
+      if ((await simulate({ ...shape, busyFirst: n })).result.status !== 'failed') {
+        busyFirst = n;
+        break;
+      }
+    }
+    const run = await simulate({ ...shape, busyFirst });
+    expect(run.result.status).not.toBe('failed');
+    expect((run.stepsAt.get('render')! - T0) / S).toBeLessThanOrEqual(
+      finishSFor(2000) - reserveS(2000) + 1,
+    );
+    expect(run.ids.length).toBeLessThanOrEqual(worstCaseSteps(2000));
   });
 });
 
@@ -407,7 +548,9 @@ describe('waiting on the worker (CC-42A decisions 1 and 2)', () => {
     const shape = { latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: true };
     const run = await simulate({ ...shape, busyFirst: await mostGraded(shape) });
     expect(run.result.status).toBe('partial');
-    expect((run.stepsAt.get('render')! - T0) / S).toBeLessThanOrEqual(PACE.finishS - RESERVE_S + 1);
+    expect((run.stepsAt.get('render')! - T0) / S).toBeLessThanOrEqual(
+      finishSFor(500) - RESERVE_S + 1,
+    );
     expect(run.ids.length).toBeLessThanOrEqual(worstCaseSteps());
   });
 });
@@ -428,21 +571,32 @@ const STEP_LIMIT = 1000;
  * re-post and its fail; the crawl adds one post that plans nothing; the claim, discover, render,
  * build, persist, finalize, emit, fail and emit-failed are one each.
  */
-const LONG_SLEEP_S = Math.min(PACE.pollMaxS, PACE.busyWaitS, PACE.claimWaitS);
-function shortPolls(): number {
+const longSleepS = (cap: number) => {
+  const c = cadenceFor(cap);
+  return Math.min(c.pollMaxS, c.busyWaitS, PACE.claimWaitS);
+};
+const LONG_SLEEP_S = longSleepS(500);
+function shortPolls(cap = 500): number {
   let n = 0;
-  for (let w = PACE.pollStartS; w < LONG_SLEEP_S; w *= 2) n++;
+  for (let w = cadenceFor(cap).pollStartS; w < longSleepS(cap); w *= 2) n++;
   return n;
 }
-function worstCaseSteps(): number {
+/** As above, for a check of `cap` pages: its sleeps all fall within its own plan, finishSFor(cap). */
+function worstCaseSteps(cap = 500): number {
   const batches = PACE.maxCrawlBatches + 2;
-  const sleeps = 2 * batches * shortPolls() + Math.floor(PACE.finishS / LONG_SLEEP_S);
+  const sleeps = 2 * batches * shortPolls(cap) + Math.floor(finishSFor(cap) / longSleepS(cap));
   return 2 * sleeps + 5 * batches + 1 + 9;
 }
 
 describe('the step count (finding 18)', () => {
-  it('the worst case from PACE is under Inngest’s per-run step limit', () => {
-    expect(worstCaseSteps()).toBeLessThan(STEP_LIMIT);
+  it('the worst case from PACE is under Inngest’s per-run step limit, at every page cap', () => {
+    for (const cap of [500, 1000, 1500, 2000]) expect(worstCaseSteps(cap)).toBeLessThan(STEP_LIMIT);
+    // At 30 s waits a 2,000-page plan would pass the limit: why a large check waits longer.
+    const at30 = (cap: number) =>
+      2 * (2 * (PACE.maxCrawlBatches + 2) * 3 + Math.floor(finishSFor(cap) / 30)) +
+      5 * (PACE.maxCrawlBatches + 2) +
+      10;
+    expect(at30(2000)).toBeGreaterThanOrEqual(STEP_LIMIT);
   });
 
   it('the sleeps the bound counts as short are exactly a posting’s doubling polls: 5, 10 and 20 s', () => {

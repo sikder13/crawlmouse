@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { AccountSchema, SeatSchema } from '@crawlmouse/types/v2';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { GATES } from '../../entitlement-v2';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
@@ -189,11 +189,12 @@ describe('accountFromRow', () => {
     });
   });
 
-  it('refuses a stored logo it has no URL for, rather than drop it', async () => {
+  it('maps a stored logo to its public URL in the report-logos bucket', async () => {
     const w = await seedWorld(db, 'logo');
+    const path = `agency/${w.accountId}/0123456789abcdef.png`;
     await db.query(
-      `insert into public.agency_brands (account_id, agency_name, logo_path) values ($1, 'L', 'x/logo.png')`,
-      [w.accountId],
+      `insert into public.agency_brands (account_id, agency_name, logo_path) values ($1, 'L', $2)`,
+      [w.accountId, path],
     );
     const account = await one('accounts', 'id', w.accountId);
     const brand = await one('agency_brands', 'account_id', w.accountId);
@@ -205,8 +206,54 @@ describe('accountFromRow', () => {
         apiKeys: [],
         brand: b,
       });
-    expect(build({ ...brand, logo_path: null }).branding?.logo_url).toBeNull();
-    expect(() => build(brand)).toThrow(/logo/);
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://proj.supabase.co/');
+    try {
+      expect(build({ ...brand, logo_path: null }).branding?.logo_url).toBeNull();
+      // Written out by hand, not through logoPublicUrl: the URL the v1 report serves logos at.
+      expect(build(brand).branding?.logo_url).toBe(
+        `https://proj.supabase.co/storage/v1/object/public/report-logos/${path}`,
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('a stored logo with no https URL to serve it at is left out and logged, and the account still loads', async () => {
+    const w = await seedWorld(db, 'logo-nourl');
+    await db.query(
+      `insert into public.agency_brands (account_id, agency_name, logo_path) values ($1, 'L', 'agency/x/a.png')`,
+      [w.accountId],
+    );
+    const account = await one('accounts', 'id', w.accountId);
+    const brand = await one('agency_brands', 'account_id', w.accountId);
+    const build = () =>
+      accountFromRow({ account, email: 'a@example.com', subscription: null, apiKeys: [], brand });
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+      expect(build().branding?.logo_url).toBeNull();
+      // A local Supabase serves http, which the contract's https URL refuses.
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://127.0.0.1:54321');
+      expect(build().branding?.logo_url).toBeNull();
+      expect(err).toHaveBeenCalledTimes(2);
+      expect(String(err.mock.calls[0]?.[0])).toMatch(/no https URL/);
+    } finally {
+      vi.unstubAllEnvs();
+      err.mockRestore();
+    }
+  });
+
+  it('refuses an agency_brands row read without its logo_path column', async () => {
+    const w = await seedWorld(db, 'logo-nocol');
+    await db.query(`insert into public.agency_brands (account_id, agency_name) values ($1, 'L')`, [
+      w.accountId,
+    ]);
+    const account = await one('accounts', 'id', w.accountId);
+    const brand = await one('agency_brands', 'account_id', w.accountId);
+    delete brand.logo_path;
+    expect(() =>
+      accountFromRow({ account, email: 'a@example.com', subscription: null, apiKeys: [], brand }),
+    ).toThrow(/logo_path/);
   });
 
   it('an account whose history holds an Agency trial holds its consent, and is refused with none recorded', async () => {

@@ -1,9 +1,13 @@
 import type { ReactNode } from 'react';
+import { SignOutForm } from '../auth/SignOutForm';
 import { BrandLink } from './BrandLink';
 import { FeedbackButton } from './FeedbackButton';
 import { StatusPill } from './StatusPill';
 import shell from './PageShell.module.css';
 import styles from './AccountShell.module.css';
+
+/** The rail's sign-out button (D-23): a word the shell writes itself, on every account rail. */
+export const SIGN_OUT = 'Sign out';
 
 export interface RailLink {
   label: string;
@@ -92,6 +96,15 @@ export function AccountShell({
         {theme ? <div className={styles.theme}>{theme}</div> : null}
         {/* Last in the rail, so it moves no earlier child's place (and so no id React gives one). */}
         <FeedbackButton className={styles.feedback} />
+        {/* After the feedback button for the same reason (D-23, F-286): the logout route ends the
+            session on the server, clears its cookies and sends the browser to the home page. */}
+        <span className={styles.signOut} data-v2-addition="">
+          <SignOutForm>
+            <button type="submit" className={styles.feedback}>
+              {SIGN_OUT}
+            </button>
+          </SignOutForm>
+        </span>
       </header>
       <main id="account-main" className={styles.main}>
         {children}

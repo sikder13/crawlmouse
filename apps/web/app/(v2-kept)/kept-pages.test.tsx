@@ -41,9 +41,12 @@ const row = (data: unknown) => {
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({ from: () => row({ id: AUDIT_ID, url: 'https://example.com/' }) }),
 }));
+// Signed in, except on `/login`, which sends a signed-in person on (D-38) and draws its form only
+// for someone signed out.
+const session = vi.hoisted(() => ({ user: { id: 'user-1' } as { id: string } | null }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
-    auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
+    auth: { getUser: async () => ({ data: { user: session.user } }) },
     from: () =>
       row({
         id: VERIFY_ID,
@@ -238,10 +241,20 @@ async function render(mod: Module, p: Kept): Promise<string> {
   return renderToStaticMarkup(<>{await mod.default(propsOf(p))}</>);
 }
 
+/**
+ * F-265: the pages whose content wrapper carries the v2 tone (`KeptV2Tone.module.css`), listed here
+ * rather than read from the targets, so a target that drops or gains it fails.
+ */
+const TONED = new Set(['/blog', '/blog/:slug', '/blog/research', '/guides', '/authors/:slug']);
+
 beforeEach(() => vi.stubEnv('V2_CHECKS_PUBLIC', '1'));
 afterEach(() => vi.unstubAllEnvs());
 
 describe.each(PAGES)('the kept page $from', (p) => {
+  beforeEach(() => {
+    session.user = p.from === '/login' ? null : { id: 'user-1' };
+  });
+
   it('is a 404 with V2_CHECKS_PUBLIC off', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
     const target = await p.target();
@@ -300,5 +313,25 @@ describe.each(PAGES)('the kept page $from', (p) => {
     }
     expect(got.innerHTML).toBe(`${p.before ?? ''}${want.innerHTML}`);
     expect(got.innerHTML.length).toBeGreaterThan(200);
+  }, 60_000);
+
+  it(`${TONED.has(p.from) ? 'carries' : 'does not carry'} the v2 tone on its content wrapper`, async () => {
+    const page = fragment(await render(await p.target(), p));
+    // The legal pages' wrapper sits inside LegalShell's frame, not directly under the shell.
+    const contents = page.querySelectorAll('[data-v1-content]');
+    expect(contents).toHaveLength(1);
+    const content = contents[0]!;
+    if (TONED.has(p.from)) {
+      expect(content.parentElement!.matches('[data-v2-shell]')).toBe(true);
+      expect(content.getAttribute('data-v1-tone')).toBe('v2');
+      // The module's class beside v1's own, which stay as they were.
+      expect(content.className).toMatch(
+        /^flex-1 bg-cream text-ink font-sans antialiased \S*tone\S*$/,
+      );
+    } else {
+      expect(content.hasAttribute('data-v1-tone')).toBe(false);
+      expect(content.className).not.toMatch(/tone/);
+    }
+    expect(page.querySelectorAll('[data-v1-tone]')).toHaveLength(TONED.has(p.from) ? 1 : 0);
   }, 60_000);
 });

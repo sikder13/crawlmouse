@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId, notFound, refuse } from '@/lib/v2/account/route';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
+import { isNamedKind, reportFileName } from '@/lib/v2/reports/file-name';
+import type { ReportFormat } from '@/lib/v2/reports/generate';
 import { supabaseReportBucket } from '@/lib/v2/reports/generate-run';
 
 export const runtime = 'nodejs';
@@ -39,7 +41,7 @@ export async function GET(req: Request, { params }: Context) {
   if (!isId(id)) return notFound();
   const { data: report, error } = await sb
     .from('reports')
-    .select('id, account_id, site_id, kind, format, file_state')
+    .select('id, account_id, site_id, kind, format, file_state, created_at')
     .eq('id', id)
     .maybeSingle();
   if (error) throw new Error(`reports read failed: ${error.message}`);
@@ -60,9 +62,26 @@ export async function GET(req: Request, { params }: Context) {
     .maybeSingle();
   if (fileError) throw new Error(`reports path read failed: ${fileError.message}`);
   if (file === null) return refuse(409, 'not_ready', {}, PRIVATE);
+  // The site's host for the file's name, read through the caller's own session like the report.
+  const { data: site, error: siteError } = await sb
+    .from('sites')
+    .select('host')
+    .eq('id', report.site_id)
+    .maybeSingle();
+  if (siteError) throw new Error(`sites read failed: ${siteError.message}`);
+  const kind = report.kind as string;
   const url = await supabaseReportBucket(admin).signedUrl(
     file.storage_path as string,
     SIGNED_SECONDS,
+    // A kind with no name of its own here, or a site row gone, keeps the stored object's name.
+    site === null || !isNamedKind(kind)
+      ? undefined
+      : reportFileName({
+          host: site.host as string,
+          createdAt: report.created_at as string,
+          kind,
+          format: report.format as ReportFormat,
+        }),
   );
   const key = { accountId: report.account_id as string, userId: user.id };
   await agencyCaptureFor(req)('report_downloaded', key, {

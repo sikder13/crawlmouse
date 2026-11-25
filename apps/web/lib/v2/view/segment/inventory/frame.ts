@@ -4,13 +4,13 @@ import { entry } from './types';
 export const FRAME_INVENTORY = [
   entry(
     'segment-domain',
-    ['access', 'nojs', 'structure', 'content', 'signals', 'changes'],
+    ['access', 'nojs', 'structure', 'links', 'content', 'signals', 'changes'],
     'The site, in the crumb',
     ['sites[].host'],
   ),
   entry(
     'segment-kept-until',
-    ['access', 'nojs', 'structure', 'content', 'signals', 'changes'],
+    ['access', 'nojs', 'structure', 'links', 'content', 'signals', 'changes'],
     'Until when an unkept audit is kept, in the crumb (expires_at, or finished_at + 24 h)',
     ['checks[].expires_at', 'checks[].finished_at'],
   ),
@@ -20,7 +20,13 @@ export const FRAME_INVENTORY = [
   entry('segment-next-structure', ['nojs'], 'The next link’s figure: the site-structure score', [
     'checks[].technical_seo.site_structure_score',
   ]),
-  entry('segment-next-content', ['structure'], 'The next link’s figure: the content score', [
+  entry(
+    'segment-next-links',
+    ['structure'],
+    'The next link’s figure: the missing pages, and how many pages of the record link to them',
+    ['page_results[].status_code', 'link_edges[]'],
+  ),
+  entry('segment-next-content', ['links'], 'The next link’s figure: the content score', [
     'checks[].content.score',
   ]),
   entry('segment-next-signals', ['content'], 'The next link’s figure: signals present', [

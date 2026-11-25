@@ -464,6 +464,25 @@ describe('POST /api/reports: a refused form goes back to Reports with a line; JS
     return noticeLine(Object.fromEntries(to.searchParams), 'UTC')!.text;
   };
 
+  it('a made report: back to Reports saying it is made and where to download it (F-125)', async () => {
+    as(w.owner);
+    const form = await post({ kind: 'audit_pdf', siteId: w.site.id, checkId: w.site.first }, true);
+    expect(sentTo(form)).toEqual([303, '/reports', 'report_made']);
+    expect(lineOf(form)).toBe(NOTICE_LINES.report_made(null));
+    expect(lineOf(form)).toContain('Download');
+  });
+
+  it('a made comparison, a page its row opens: back to Reports saying to open it, not download it', async () => {
+    as(w.owner);
+    const form = await post(
+      { kind: 'compare', siteId: w.site.id, checkId: w.site.second, previousCheckId: w.site.first },
+      true,
+    );
+    expect(sentTo(form)).toEqual([303, '/reports', 'report_made_page']);
+    expect(lineOf(form)).toBe('The report is made. Open it from its row below.');
+    expect(lineOf(form)).not.toContain('Download');
+  });
+
   it('400, a request that is not one of the kinds: the notice for a request not understood', async () => {
     as(w.owner);
     const before = await countReports();
@@ -577,7 +596,7 @@ describe('POST /api/reports: the answer', () => {
     as(w.owner);
     const before = await countReports();
     const res = await post({ kind: 'audit_pdf', siteId: w.site.id, checkId: w.site.first }, true);
-    expect([res.status, res.headers.get('location')]).toEqual([303, '/reports']);
+    expect([res.status, res.headers.get('location')]).toEqual([303, '/reports?notice=report_made']);
     expect(await countReports()).toBe(before + 1);
     expect(h.bucket.objects.size).toBe(1);
   });
@@ -608,7 +627,10 @@ describe('POST /api/reports: the answer', () => {
       storage_path: reportPath(w.accountId, body.reportId, 'pdf'),
     });
     const form = await post({ kind: 'audit_pdf', siteId: w.site.id, checkId: w.site.first }, true);
-    expect([form.status, form.headers.get('location')]).toEqual([303, '/reports']);
+    expect([form.status, form.headers.get('location')]).toEqual([
+      303,
+      '/reports?notice=report_failed',
+    ]);
     expect(h.events).toEqual([]);
   });
 
