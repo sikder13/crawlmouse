@@ -13,6 +13,7 @@ import { ContentScreen } from '../../../../components/v2/screens/segment/Content
 import { NoJsScreen } from '../../../../components/v2/screens/segment/NoJsScreen';
 import { SignalsScreen } from '../../../../components/v2/screens/segment/SignalsScreen';
 import { StructureScreen } from '../../../../components/v2/screens/segment/StructureScreen';
+import { sessionTheme } from '../../../../lib/v2/account/session-theme';
 import { findCheck } from '../../../../lib/v2/fixtures';
 import { supportMailto } from '../../../../lib/v2/support/mailto';
 import { emailDeveloperAction } from '../../../../lib/v2/view/account-actions';
@@ -70,7 +71,13 @@ export function SegmentBody({ read, segment }: { read: ReadyCheck; segment: Segm
 }
 
 export async function SegmentPage({ id, segment }: { id: string; segment: SegmentKey }) {
-  return <SegmentBody read={await readyAudit(id)} segment={segment} />;
+  const read = await readyAudit(id);
+  return (
+    <>
+      {await sessionTheme()}
+      <SegmentBody read={read} segment={segment} />
+    </>
+  );
 }
 
 /**
@@ -145,7 +152,12 @@ export async function FixPage({
   const read = await readyAudit(id);
   const found = fixOf(read, fixId);
   if (!found) notFound();
-  return <FixBody read={read} found={found} notice={notice} />;
+  return (
+    <>
+      {await sessionTheme()}
+      <FixBody read={read} found={found} notice={notice} />
+    </>
+  );
 }
 
 /** The link map of a ready check in `scope`; the hubs scope draws the stored drawing. */
@@ -184,5 +196,11 @@ export function MapBody({ read, scope }: { read: ReadyCheck; scope: 'hubs' | 'al
 }
 
 export async function MapPage({ id, scope }: { id: string; scope: 'hubs' | 'all' }) {
-  return <MapBody read={await readyAudit(id)} scope={scope} />;
+  const read = await readyAudit(id);
+  return (
+    <>
+      {await sessionTheme()}
+      <MapBody read={read} scope={scope} />
+    </>
+  );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { sessionTheme } from '@/lib/v2/account/session-theme';
 import { readAudit } from '../_lib/access';
 import { CheckPage } from '../_lib/CheckPage';
 import { auditHrefs } from '../_lib/hrefs';
@@ -21,5 +22,5 @@ export default async function AuditOverviewPage({ params }: { params: Params }) 
   if (!checksPublicEnabled()) return notFound();
   const read = await readAudit((await params).id);
   if (read === null) notFound();
-  return <CheckPage read={read} />;
+  return <CheckPage read={read} theme={await sessionTheme()} />;
 }

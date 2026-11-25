@@ -6,6 +6,7 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId } from '@/lib/v2/account/route';
+import { sessionTheme } from '@/lib/v2/account/session-theme';
 import { memberProof, pageCapture } from '@/lib/v2/reports/share-proof';
 import { supabaseShareFiles } from '@/lib/v2/reports/share-store';
 import { proofView } from '@/lib/v2/view/proof';
@@ -41,5 +42,10 @@ export default async function ReportProofPage({ params }: { params: Promise<{ id
   await (
     await pageCapture()
   )('proof_viewed', { accountId: proof.accountId, userId: user.id }, { via: 'account' });
-  return <ProofScreen data={proofView(proof.doc)} />;
+  return (
+    <>
+      {await sessionTheme()}
+      <ProofScreen data={proofView(proof.doc)} />
+    </>
+  );
 }
