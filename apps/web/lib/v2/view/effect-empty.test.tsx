@@ -42,11 +42,14 @@ describe('a fix with no effect to name', () => {
 
   it('the segment draws no empty effect, and no row ends on a separator', () => {
     const d = unmeasured();
-    const markup = renderToStaticMarkup(
-      <ContentScreen data={contentView(d, CHECK, { plan: 'pro', asFirstSeen: true })} />,
-    );
-    expect(markup).not.toMatch(EMPTY_POINTS);
-    expect(markup).not.toMatch(/· <\/span>|·\s*<\/span>/);
+    for (const plan of ['pro', 'free'] as const) {
+      const data = contentView(d, CHECK, { plan, asFirstSeen: true });
+      // On Free the locked fixes are Pro rows; the vector reaches them.
+      if (plan === 'free') expect(data.fixes.pro.length).toBeGreaterThan(0);
+      const markup = renderToStaticMarkup(<ContentScreen data={data} />);
+      expect(markup).not.toMatch(EMPTY_POINTS);
+      expect(markup).not.toMatch(/· <\/span>|·\s*<\/span>/);
+    }
   });
 
   it('the fix before it names the next fix with no trailing separator (review #8)', () => {
