@@ -514,7 +514,10 @@ export function siteView(
     ended && ended !== result && ended.status === 'failed' ? 'latest check failed' : null,
     ...v.inFlight.filter((f) => f.siteId === site.id).map((f) => `check ${f.status}`),
     nextAt ? `next ${nextAt}` : null,
-    result.coverage ? `${count(result.coverage.pages_crawled)} pages` : null,
+    // A check that stopped short says so beside its page count (D-07); its cause is not named.
+    result.coverage
+      ? `${count(result.coverage.pages_crawled)} pages${result.status === 'partial' ? ', partial check' : ''}`
+      : null,
     fixLine,
   ]
     .filter(Boolean)
@@ -687,7 +690,9 @@ export function siteView(
         {
           label: 'Page cap',
           value: `${count(v.account.limits.pages_per_audit)} on ${PLAN_NAMES[v.tier]}${
-            result.coverage ? ` · ${count(result.coverage.pages_crawled)} crawled` : ''
+            result.coverage
+              ? ` · ${count(result.coverage.pages_crawled)} crawled${result.status === 'partial' ? ', partial check' : ''}`
+              : ''
           }`,
           mono: false,
           muted: false,

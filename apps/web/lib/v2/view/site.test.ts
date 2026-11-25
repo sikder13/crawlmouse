@@ -24,6 +24,23 @@ describe('a score’s move', () => {
   });
 });
 
+describe('Site page, a partial latest check (QA dashboard walk D-07)', () => {
+  it('says "partial check" beside the pages crawled, in the header and the page-cap row', () => {
+    const copy = structuredClone(bad);
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000006')!.status = 'partial';
+    const p = siteView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER);
+    expect(p.header.line).toContain(' · 214 pages, partial check · ');
+    expect(p.settings.rows.find((r) => r.label === 'Page cap')!.value).toBe(
+      '2,000 on Pro · 214 crawled, partial check',
+    );
+    // A finished check says neither.
+    const f = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER);
+    expect(f.settings.rows.find((r) => r.label === 'Page cap')!.value).toBe(
+      '2,000 on Pro · 214 crawled',
+    );
+  });
+});
+
 describe('Site page, example-outfitter.com at as_of', () => {
   const v = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER);
 
