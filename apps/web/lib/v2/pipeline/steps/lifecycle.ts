@@ -23,7 +23,9 @@ import { iso, pathOf } from './stored';
 
 const NOTHING_YET = { pagesCrawled: 0, linksFound: 0, discovered: null, waitingSince: null };
 
-export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'discover' | 'fail'> {
+export function lifecycleSteps(
+  deps: StepDeps,
+): Pick<CheckSteps, 'claim' | 'discover' | 'fail' | 'requeue'> {
   return {
     /**
      * CRAWL_PAUSED first (v1's rule, Q12), then `claim_check`. `at` is this attempt's time; the first
@@ -59,6 +61,11 @@ export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'disc
     },
 
     fail: (event, reason) => failCheck(deps.store, event.checkId, reason),
+
+    /** F-260: the check queued again for its one retry, by the run that claimed it. */
+    requeue: async (event, runId) => ({
+      requeued: await deps.store.requeue(event.checkId, runId, iso(deps.now())),
+    }),
   };
 }
 
