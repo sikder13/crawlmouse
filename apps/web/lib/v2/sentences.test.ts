@@ -450,9 +450,20 @@ describe('a withheld AI readability grade says what was measured', () => {
     expect(aiWithheldSummary(c, 3)).toContain(
       'It tested crawler access for three of the four scored crawlers and AI signals. Its access score rests on at least two of those crawlers.',
     );
-    // None tested: "none of the four", not "zero of".
-    expect(aiWithheldSummary(c, 0)).toMatch(
-      /It tested crawler access for none of the four scored crawlers and AI signals\.$/,
+    // None tested: the access clause is left out, never "none of the four" or "zero of".
+    expect(aiWithheldSummary(c, 0)).toMatch(/ It tested AI signals\.$/);
+    // Two scored, both tested: "both", not "all two".
+    const two = structuredClone(c);
+    let kept = 0;
+    two.crawlers.forEach((x) => (x.scored = x.scored && kept++ < 2));
+    expect(aiWithheldSummary(two, 2)).toMatch(
+      /It tested crawler access for both scored crawlers and AI signals\.$/,
+    );
+    // A stored count over the tested one says nothing more: no "rests on three of those".
+    const over = structuredClone(c);
+    over.ai_readability!.scored_from_fewer_crawlers = 3;
+    expect(aiWithheldSummary(over, 2)).toMatch(
+      /It tested crawler access for two of the four scored crawlers and AI signals\.$/,
     );
     // One scored crawler, tested: "the one", not "all one".
     const one = structuredClone(c);

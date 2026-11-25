@@ -377,25 +377,32 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   // crawler with a verdict may not have counted: the grade stores that number only when it is one;
   // otherwise it is at least I4's two, and a stored check cannot say more.
   const from = ai.scored_from_fewer_crawlers;
-  // "all four", "three of the four", "none of the four"; with one scored crawler, "the one".
+  // "all four", "both", "three of the four"; with one scored crawler, "the one". None tested: the
+  // access clause is left out (below), never "none of the one scored crawler".
   const testedOf =
     measured >= scored
       ? scored === 1
         ? 'the one scored crawler'
-        : `all ${numberWord(scored)} scored crawlers`
-      : measured === 0
-        ? `none of the ${numberWord(scored)} scored ${plural(scored, 'crawler', 'crawlers')}`
-        : `${numberWord(measured)} of the ${numberWord(scored)} scored crawlers`;
+        : scored === 2
+          ? 'both scored crawlers'
+          : `all ${numberWord(scored)} scored crawlers`
+      : `${numberWord(measured)} of the ${numberWord(scored)} scored crawlers`;
   const restsOn = from === null ? `at least ${numberWord(I4_MEASURED_CRAWLERS)}` : numberWord(from);
   const tested = [
-    accessPart.score === null ? null : `crawler access for ${testedOf}`,
+    accessPart.score === null || measured === 0 ? null : `crawler access for ${testedOf}`,
     quotable.score === null ? null : 'content',
     signals.score === null ? null : 'AI signals',
   ].filter((x): x is string => x !== null);
   const testedSentence =
     missing.length && tested.length
       ? `It tested ${listOf(tested)}.${
-          accessPart.score === null || (from === null && measured <= I4_MEASURED_CRAWLERS)
+          // Said only where it tells more than the tested count: not with one scored crawler, none
+          // tested, a stored count over the tested one, or "at least two" of two.
+          accessPart.score === null ||
+          measured === 0 ||
+          scored === 1 ||
+          (from !== null && from > measured) ||
+          (from === null && measured <= I4_MEASURED_CRAWLERS)
             ? ''
             : ` Its access score rests on ${restsOn} of those crawlers.`
         }`
