@@ -663,6 +663,13 @@
     },
     {
       "kind": "metadata",
+      "path": "app/audit/[id]/links/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's links tab (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/links/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
       "path": "app/audit/[id]/map/not-found.tsx",
       "ruling": "keep",
       "reason": "404 of a v2 check's map tab (F-127): re-exports the overview's, so a private result and a missing id read alike",

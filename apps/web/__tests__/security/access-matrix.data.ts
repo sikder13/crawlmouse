@@ -1665,6 +1665,7 @@ const ENTRIES: readonly Spec[] = [
       'changes',
       'content',
       'fix/[fixId]',
+      'links',
       'map',
       'nojs',
       'overview',

@@ -23,8 +23,9 @@ import { type FixHrefs } from './fix';
 import type { MapDrawing } from './map';
 import { openFixes, type FixPlan } from './free-fixes';
 import { keptUntilOf } from './result';
+import { missingLabel, missingUrls } from './segment/broken';
 import { sectionFixes } from './segment/fixes';
-import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, type SegmentLink } from './segment/frame';
+import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, segmentTab, type SegmentLink } from './segment/frame';
 import { drawingOf } from './segment/structure';
 import type { ViewDataset } from '../fixtures';
 
@@ -60,6 +61,8 @@ export interface MapNodeView {
   parent: string | null;
   /** The link the line stands for was made by JavaScript (drawn dashed). */
   js: boolean;
+  /** `missingLabel`: for a page that answered 404 or 410, which has no depth; else null. */
+  missing: string | null;
 }
 
 export interface PillView {
@@ -118,7 +121,7 @@ export interface LinkMapView {
     section: { title: string; href: string };
     keptUntil: string | null;
     keepHref: string;
-    tabs: (SegmentLink & { current: boolean })[];
+    tabs: (SegmentLink & { current: boolean; added?: boolean })[];
     back: SegmentLink;
     next: SegmentLink;
   };
@@ -154,6 +157,9 @@ const pathOf = (url: string) => {
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
+/** What the map says of a missing page; segment/broken.ts's, which the Links and pages rows read. */
+export { missingLabel };
+
 /** "0.4%" for a small share, "18%" otherwise. */
 const share = (s: number) => (s < 0.01 ? `${(s * 100).toFixed(1)}%` : `${percent(s)}%`);
 
@@ -179,10 +185,13 @@ function detailsOf(
   // A page whose links were not all read has no count of its links out (its links_out is 0 when none
   // was read, the links found so far when the read stopped early), so none is shown.
   const linksOut = page.links_read ? page.links_out : null;
+  const missing = missingLabel(page);
   const pills: PillView[] = [
-    page.depth === null
-      ? { state: 'neutral', label: page.is_orphan ? 'orphan' : 'no link path' }
-      : { state: 'neutral', label: `depth ${page.depth}` },
+    missing !== null
+      ? { state: 'bad', label: missing }
+      : page.depth === null
+        ? { state: 'neutral', label: page.is_orphan ? 'orphan' : 'no link path' }
+        : { state: 'neutral', label: `depth ${page.depth}` },
   ];
   if (page.js_only) pills.push({ state: 'warn', label: 'JavaScript-only' });
   if (page.without_js) {
@@ -215,7 +224,7 @@ function detailsOf(
   }));
   return {
     path: pathOf(page.url),
-    depth: page.depth,
+    depth: missing === null ? page.depth : null,
     pills,
     facts: [
       { label: 'Links in', value: count(page.links_in) },
@@ -412,15 +421,17 @@ export function linkMapView(
     const at = drawing.positions[n.id];
     if (!at) throw new Error(`The drawing has no position for ${n.id}`);
     const r = record(n.id);
+    const missing = r ? missingLabel(r) : null;
     return {
       path: pathOf(n.id),
       kind: n.kind,
-      depth: r ? r.depth : n.depth,
+      depth: missing !== null ? null : r ? r.depth : n.depth,
       x: round(at.x),
       y: round(at.y),
       r: nodeRadius(n),
       parent: n.parent ? pathOf(n.parent) : null,
       js: n.via === 'javascript',
+      missing,
     };
   });
   const details: Record<string, PageDetails> = {};
@@ -449,7 +460,17 @@ export function linkMapView(
 
   const isGenerated = drawnScope === 'generated';
   const linkCount = isGenerated ? nodes.filter((n) => n.parent).length : s.internal_links;
-  const pageCount = isGenerated ? nodes.length : crawled;
+  // Pages that answered 404 or 410 are counted apart: they are links to pages that are not there.
+  // They are counted where they answered (segment/broken.ts `missingUrls`, which the Links and pages
+  // view counts by too), so a URL redirecting to a missing page the record also holds at the same
+  // spelling is one missing page, not two (a server answering 404 at both /gone and /gone/ gives two). The pages are counted the same way, the pages crawled less the missing URLs, so
+  // "P pages, M missing" adds up to the pages crawled.
+  const missingCount = isGenerated ? 0 : missingUrls(records).length;
+  // The missing pages are only those of the record: when it holds fewer pages than were crawled, the
+  // count is said of the pages checked, so it does not read as the site's.
+  const missingScope =
+    records.length < crawled ? ` among the ${count(records.length)} checked` : '';
+  const pageCount = isGenerated ? nodes.length : crawled - missingCount;
   const drawnOf = (pred: (n: MapNodeView) => boolean) => nodes.filter(pred).map((n) => n.path);
   const filter = (
     key: MapFilter['key'],
@@ -501,11 +522,7 @@ export function linkMapView(
       keepHref: kept === null ? '#' : '#keep',
       tabs: [
         { label: 'Overview', href: hrefs.overview, current: false },
-        ...SEGMENT_KEYS.map((k) => ({
-          label: SEGMENTS[k].tab,
-          href: hrefs.segment(k),
-          current: k === 'structure',
-        })),
+        ...SEGMENT_KEYS.map((k) => segmentTab(k, hrefs.segment(k), k === 'structure')),
       ],
       back: { label: `Back: ${SEGMENTS.structure.backName}`, href: hrefs.segment('structure') },
       next: {
@@ -515,7 +532,7 @@ export function linkMapView(
     },
     title: noneServed
       ? 'No page was served.'
-      : `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
+      : `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${missingCount ? `${count(missingCount)} missing${missingScope}, ` : ''}${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
     caption: noneServed
       ? `${count(records.length)} ${plural(records.length, 'page', 'pages')} answered, none served, so there is no link map.`
       : noLinkRead

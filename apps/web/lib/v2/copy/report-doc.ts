@@ -43,6 +43,18 @@ export const REPORT_DOC_COPY = {
   status: 'Status',
   where: 'Where',
 
+  /** The broken links and page basics section, and its tables. */
+  links: 'Broken links and page basics',
+  brokenLinks: 'Broken links',
+  redirects: 'Redirects',
+  missingPage: 'Missing page',
+  linkedFrom: 'Linked from',
+  requestedAs: 'Requested as',
+  hops: 'Hops',
+  endsAt: 'Ends at',
+  page: 'Page',
+  sharedText: 'Shared text',
+
   /** A before-and-after pair, and the facts under a change. */
   before: 'Before',
   after: 'After',

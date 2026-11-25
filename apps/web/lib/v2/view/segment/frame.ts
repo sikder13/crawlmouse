@@ -8,6 +8,7 @@ import { SCREEN_SIGNALS, screenSignals } from '../screen-signals';
 import { findCheck, siteOf } from '../../fixtures';
 import { dayTimeUtc, percent } from '../../format';
 import { keptUntilOf } from '../result';
+import { linksFacts } from './links-facts';
 import type { ViewDataset } from '../../fixtures';
 import type { FixPlan } from '../free-fixes';
 
@@ -15,6 +16,7 @@ export const SEGMENT_KEYS = [
   'access',
   'nojs',
   'structure',
+  'links',
   'content',
   'signals',
   'changes',
@@ -28,7 +30,7 @@ export interface SegmentMeta {
   title: string;
   /** How the back link that leads to it names it (the locked pages differ from both above). */
   backName: string;
-  /** The fixes this section lists; Signals and Changes add none (FACTS B5). */
+  /** The fixes this section lists; Links and pages, Signals and Changes add none (FACTS B5). */
   section: FixSection | null;
 }
 
@@ -51,6 +53,12 @@ export const SEGMENTS: Record<SegmentKey, SegmentMeta> = {
     backName: 'Site structure',
     section: 'structure',
   },
+  links: {
+    tab: 'Links and pages',
+    title: 'Links and pages',
+    backName: 'Links and pages',
+    section: null,
+  },
   content: {
     tab: 'Content',
     title: 'Content an answer engine can quote',
@@ -65,6 +73,20 @@ export const SEGMENTS: Record<SegmentKey, SegmentMeta> = {
   },
   changes: { tab: 'Changes', title: 'Changes', backName: 'Changes', section: null },
 };
+
+/**
+ * The segments the locked screens do not have: Links and pages came after the lock (row 5), so its
+ * tab and its door are marked as additions where they render (`data-v2-addition`).
+ */
+export const ADDED_SEGMENTS: readonly SegmentKey[] = ['links'];
+
+/** The tab of segment `k`, as each page with the section tabs lists it. */
+export const segmentTab = (k: SegmentKey, href: string, current: boolean) => ({
+  label: SEGMENTS[k].tab,
+  href,
+  current,
+  ...(ADDED_SEGMENTS.includes(k) ? { added: true } : {}),
+});
 
 /** Where the tabs and the back and next links go. Previews pass their routes; the default is "#". */
 export interface SegmentHrefs {
@@ -108,7 +130,7 @@ export interface SegmentFrame {
   title: string;
   /** "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it. */
   keptUntil: string | null;
-  tabs: (SegmentLink & { current: boolean })[];
+  tabs: (SegmentLink & { current: boolean; added?: boolean })[];
   back: SegmentLink;
   next: SegmentLink;
   /** Where an ask that needs an account goes: the keep bar, while there is one. */
@@ -116,8 +138,11 @@ export interface SegmentFrame {
 }
 
 /** A section's own figure, as its next link shows it; null when the section has none. */
-function figureOf(check: Check, key: SegmentKey): string | null {
+function figureOf(d: ViewDataset, check: Check, key: SegmentKey): string | null {
   switch (key) {
+    case 'links':
+      // The door's pill, so the tab and the door cannot disagree.
+      return linksFacts(d, check).pill.label;
     case 'nojs':
       return check.without_js ? `${percent(check.without_js.site_text_share)}%` : 'not measured';
     case 'structure': {
@@ -151,7 +176,7 @@ export function segmentFrame(
   const prev = SEGMENT_KEYS[at - 1];
   const next = SEGMENT_KEYS[at + 1];
   const keptUntil = keptUntilOf(d, check, asFirstSeen);
-  const nextFigure = next ? figureOf(check, next) : null;
+  const nextFigure = next ? figureOf(d, check, next) : null;
   return {
     key,
     domain: siteOf(d, check).host,
@@ -160,11 +185,7 @@ export function segmentFrame(
     keepHref: keptUntil === null ? '#' : '#keep',
     tabs: [
       { label: 'Overview', href: hrefs.overview, current: false },
-      ...SEGMENT_KEYS.map((k) => ({
-        label: SEGMENTS[k].tab,
-        href: hrefs.segment(k),
-        current: k === key,
-      })),
+      ...SEGMENT_KEYS.map((k) => segmentTab(k, hrefs.segment(k), k === key)),
     ],
     back: prev
       ? { label: `Back: ${SEGMENTS[prev].backName}`, href: hrefs.segment(prev) }
