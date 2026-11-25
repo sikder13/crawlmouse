@@ -15,7 +15,7 @@ import {
 } from '../../../../../../packages/engine/fixtures/v2/build/recorded';
 import { WorkerError } from '../../../worker-client/types';
 import { putJson } from '../evidence';
-import { CRAWL_CEILING_S } from '../limits';
+import { CRAWL_CEILING_S, MIN_BATCH_S } from '../limits';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import { batchSteps, stagePages } from './batches';
@@ -320,11 +320,16 @@ describe('post (finding 2)', () => {
   });
 
   it('cuts max_seconds to what the crawl ceiling leaves, and posts nothing under the minimum', async () => {
+    // F-247: a crawl batch may run to the ceiling; its poll grace and poll fall in the access slice.
     const s = await setup();
     s.clock.now = T0 + (CRAWL_CEILING_S - 200) * 1000;
-    expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({ max_seconds: 200 - 90 });
-    s.clock.now = T0 + (CRAWL_CEILING_S - 149) * 1000;
-    expect(await s.steps.post(EVENT, { kind: 'crawl', batch: 2, stage: null }, SO)).toEqual({
+    expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({ max_seconds: 200 });
+    s.clock.now = T0 + (CRAWL_CEILING_S - MIN_BATCH_S) * 1000;
+    expect(await s.steps.post(EVENT, { kind: 'crawl', batch: 2, stage: null }, SO)).toMatchObject({
+      max_seconds: MIN_BATCH_S,
+    });
+    s.clock.now = T0 + (CRAWL_CEILING_S - MIN_BATCH_S + 1) * 1000;
+    expect(await s.steps.post(EVENT, { kind: 'crawl', batch: 3, stage: null }, SO)).toEqual({
       status: 'none',
       why: 'no_time',
     });
@@ -358,20 +363,42 @@ describe('stagePages', () => {
     picked_for: 'homepage' as const,
   };
   it('plans stage 2 only when stage 1 found it needed', () => {
-    expect(stagePages({ stage1: [page], stage2_needed: false, stage2: [] }, 2)).toEqual({
+    expect(stagePages({ stage1: [page], stage2_needed: false, stage2: [] }, 2, new Map())).toEqual({
       none: 'not_needed',
     });
-    expect(stagePages({ stage1: [page], stage2_needed: null, stage2: [] }, 2)).toEqual({
+    expect(stagePages({ stage1: [page], stage2_needed: null, stage2: [] }, 2, new Map())).toEqual({
       none: 'not_needed',
     });
-    expect(stagePages({ stage1: [page], stage2_needed: true, stage2: [] }, 2)).toEqual({
+    expect(stagePages({ stage1: [page], stage2_needed: true, stage2: [] }, 2, new Map())).toEqual({
       none: 'done',
     });
     expect(
-      stagePages({ stage1: [page], stage2_needed: true, stage2: [{ ...page, stage: 2 }] }, 2),
+      stagePages(
+        { stage1: [page], stage2_needed: true, stage2: [{ ...page, stage: 2 }] },
+        2,
+        new Map(),
+      ),
     ).toEqual({ kind: 'access', pages: [{ url: page.url, template_key: '/' }] });
-    expect(stagePages({ stage1: [], stage2_needed: null, stage2: [] }, 1)).toEqual({
+    expect(stagePages({ stage1: [], stage2_needed: null, stage2: [] }, 1, new Map())).toEqual({
       none: 'done',
+    });
+  });
+});
+
+describe('stagePages: the address an access test asks (F-252)', () => {
+  it('asks a page where the crawl found it answering, not at its canonical spelling', () => {
+    const page = {
+      url: 'https://x.test/about',
+      template_key: '/',
+      stage: 1 as const,
+      picked_for: 'homepage' as const,
+    };
+    const rows = new Map([
+      [page.url, { url: page.url, final_url: 'https://x.test/about/', status_code: 200 }],
+    ]);
+    expect(stagePages({ stage1: [page], stage2_needed: null, stage2: [] }, 1, rows)).toEqual({
+      kind: 'access',
+      pages: [{ url: 'https://x.test/about/', template_key: '/' }],
     });
   });
 });
@@ -428,6 +455,24 @@ describe('read (finding 3)', () => {
       status: 'done',
       result_path: `anon/${SITE_ID}/${CHECK}/batch-1.json.gz`,
     });
+  });
+
+  it('keeps the worker’s request timing on the row, and answers a retry as it answered the read (F-247)', async () => {
+    const recorded = readRecorded('batches');
+    const timing = {
+      requests: 52,
+      fetch_ms_p50: 310,
+      fetch_ms_p90: 640,
+      fetch_ms_max: 1210,
+      fetch_ms_total: 17_400,
+      idle_ms_total: 33_100,
+    };
+    const s = await setup(new Map([[1, { ...renumbered(recorded[0]!, 1), timing }]]));
+    await s.steps.post(EVENT, CRAWL_1, SO);
+    const first = await s.steps.read(EVENT, CRAWL_1, SO);
+    expect(s.batches.get(`${CHECK}:1`)).toMatchObject({ summary: { timing } });
+    expect(first).not.toHaveProperty('timing');
+    expect(await s.steps.read(EVENT, CRAWL_1, SO)).toEqual(first);
   });
 
   it('gives not_found when the worker no longer holds the batch', async () => {

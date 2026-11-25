@@ -7,6 +7,8 @@ export { readBatches, type Batches } from './batches.js';
 export { buildCheck, serialiseBuilt } from './build.js';
 export { DETECTORS_RUN } from './diff.js';
 export {
+  answeredAt,
+  askedAs,
   nextCrawlBatch,
   renderCandidates,
   sample,

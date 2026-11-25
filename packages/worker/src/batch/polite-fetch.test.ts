@@ -5,7 +5,14 @@ import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFetcher, type Fetcher } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
-import { Sites } from '../politeness/sites.js';
+import { FLOOR_GAP_MS } from '../politeness/limiter.js';
+import {
+  BACKOFF_FIRST_MS,
+  MAX_WAIT_MS,
+  RETRIES_ON_429,
+  STOP_AFTER_429S,
+  Sites,
+} from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
 import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js';
 import { Budget, type BudgetLimits } from './budget.js';
@@ -176,13 +183,20 @@ describe('politeFetch: budgets and stops', () => {
     expect(fetcher.calls).toHaveLength(0);
   });
 
-  it('stops requesting a site after its third 429', async () => {
+  it('stops requesting a site once six answers in a row were 429, after waiting and slowing', async () => {
     const clock = new InstantClock();
     const fetcher = fakeFetcher(clock, () => ({ status: 429, body: '' }));
     const ctx = context(fetcher, clock);
-    for (let i = 0; i < 3; i++)
-      await politeFetch(ctx, `https://www.example.com/${i}`, CRAWL, { offSite: 'stop' });
-    const r = await politeFetch(ctx, 'https://example.com/next', CRAWL, { offSite: 'stop' });
+    // Each page is asked for three times: once, then twice more after waiting.
+    for (let i = 0; i < 2; i++)
+      await politeFetch(ctx, `https://www.example.com/${i}`, CRAWL, {
+        offSite: 'stop',
+        retryOn429: true,
+      });
+    const r = await politeFetch(ctx, 'https://example.com/next', CRAWL, {
+      offSite: 'stop',
+      retryOn429: true,
+    });
     expect(r).toMatchObject({
       notRequested: {
         reason: 'site_stopped',
@@ -190,7 +204,216 @@ describe('politeFetch: budgets and stops', () => {
         stop: { reason: 'three_429_responses' },
       },
     });
-    expect(fetcher.calls).toHaveLength(3);
+    expect(fetcher.calls).toHaveLength(STOP_AFTER_429S);
+  });
+});
+
+describe('politeFetch: a site that asks us to slow down (inbox 048)', () => {
+  const page = 'https://example.com/a';
+
+  it('waits out Retry-After and asks for the same page again', async () => {
+    const clock = new InstantClock();
+    let n = 0;
+    const fetcher = fakeFetcher(clock, () =>
+      n++ === 0 ? { status: 429, headers: { 'retry-after': '10' }, body: '' } : { status: 200 },
+    );
+    const r = await politeFetch(context(fetcher, clock), page, CRAWL, {
+      offSite: 'stop',
+      retryOn429: true,
+    });
+    expect(r).toMatchObject({ fetch: { status: 200 } });
+    expect(fetcher.calls.map((c) => c.url)).toEqual([page, page]);
+    expect(fetcher.calls[1]!.at - fetcher.calls[0]!.at).toBeGreaterThanOrEqual(10_000);
+  });
+
+  it('waits an HTTP-date Retry-After out too', async () => {
+    const clock = new InstantClock();
+    let n = 0;
+    const fetcher = fakeFetcher(clock, () =>
+      n++ === 0
+        ? {
+            status: 429,
+            headers: { 'retry-after': new Date(clock.now() + 7_000).toUTCString() },
+            body: '',
+          }
+        : { status: 200 },
+    );
+    await politeFetch(context(fetcher, clock), page, CRAWL, { offSite: 'stop', retryOn429: true });
+    expect(fetcher.calls[1]!.at - fetcher.calls[0]!.at).toBeGreaterThanOrEqual(6_000);
+  });
+
+  it('backs off without Retry-After, and then goes on at half the pace', async () => {
+    const clock = new InstantClock();
+    let n = 0;
+    const fetcher = fakeFetcher(clock, () =>
+      n++ === 0 ? { status: 429, body: '' } : { status: 200 },
+    );
+    const ctx = context(fetcher, clock);
+    await politeFetch(ctx, page, CRAWL, { offSite: 'stop', retryOn429: true });
+    await politeFetch(ctx, 'https://example.com/b', CRAWL, { offSite: 'stop', retryOn429: true });
+    const [first, again, next] = fetcher.calls.map((c) => c.at);
+    expect(again! - first!).toBeGreaterThanOrEqual(BACKOFF_FIRST_MS);
+    expect(next! - again!).toBeGreaterThanOrEqual(2 * FLOOR_GAP_MS);
+  });
+
+  it('waits no longer than MAX_WAIT_MS however long Retry-After asks', async () => {
+    const clock = new InstantClock();
+    let n = 0;
+    const fetcher = fakeFetcher(clock, () =>
+      n++ === 0 ? { status: 429, headers: { 'retry-after': '3600' }, body: '' } : { status: 200 },
+    );
+    await politeFetch(context(fetcher, clock), page, CRAWL, { offSite: 'stop', retryOn429: true });
+    expect(fetcher.calls[1]!.at - fetcher.calls[0]!.at).toBe(MAX_WAIT_MS);
+  });
+
+  it('returns the 429 once the page was asked for three times, without stopping the site', async () => {
+    const clock = new InstantClock();
+    const fetcher = fakeFetcher(clock, () => ({ status: 429, body: '' }));
+    const ctx = context(fetcher, clock);
+    const r = await politeFetch(ctx, page, CRAWL, { offSite: 'stop', retryOn429: true });
+    expect(r).toMatchObject({ fetch: { status: 429 } });
+    expect(fetcher.calls).toHaveLength(1 + RETRIES_ON_429);
+    expect(ctx.sites.stopOf('example.com')).toBeNull();
+  });
+
+  it('starts the run of 429s again after any other answer', async () => {
+    const clock = new InstantClock();
+    // Two 429s, a 200, then 429s: a stop needs STOP_AFTER_429S in a row.
+    const answers = [429, 429, 200, ...Array.from({ length: STOP_AFTER_429S - 1 }, () => 429)];
+    let n = 0;
+    const fetcher = fakeFetcher(clock, () => ({ status: answers[n++] ?? 200, body: '' }));
+    const ctx = context(fetcher, clock);
+    for (let i = 0; i < 3; i++)
+      await politeFetch(ctx, `https://example.com/${i}`, CRAWL, {
+        offSite: 'stop',
+        retryOn429: true,
+      });
+    expect(ctx.sites.stopOf('example.com')).toBeNull();
+  });
+
+  it('crawls the whole of a site that rate-limits after 16 pages and asks for 10 s', async () => {
+    const clock = new InstantClock();
+    let served = 0;
+    let blockedUntil = 0;
+    // The site serves 16 requests, then answers 429 with Retry-After 10 until ten seconds have passed.
+    const fetcher = fakeFetcher(clock, () => {
+      if (clock.now() < blockedUntil)
+        return { status: 429, headers: { 'retry-after': '10' }, body: '' };
+      if (++served % 16 === 0) blockedUntil = clock.now() + 10_000;
+      return { status: 200 };
+    });
+    const ctx = context(fetcher, clock, { ...roomy, max_requests: 1_000 });
+    const statuses: (number | null)[] = [];
+    for (let i = 0; i < 60; i++) {
+      const r = await politeFetch(ctx, `https://example.com/p${i}`, CRAWL, {
+        offSite: 'stop',
+        retryOn429: true,
+      });
+      statuses.push('fetch' in r ? r.fetch.status : null);
+    }
+    expect(statuses.filter((s) => s === 200)).toHaveLength(60);
+    expect(ctx.sites.stopOf('example.com')).toBeNull();
+  });
+
+  it('does not ask again for a request that does not opt in, such as robots.txt', async () => {
+    const clock = new InstantClock();
+    const fetcher = fakeFetcher(clock, () => ({ status: 429, body: '' }));
+    const r = await politeFetch(context(fetcher, clock), page, CRAWL, { offSite: 'stop' });
+    expect(r).toMatchObject({ fetch: { status: 429 } });
+    expect(fetcher.calls).toHaveLength(1);
+  });
+
+  it('leaves the declaration reads out of it: no wait, no retry, no stop', async () => {
+    const clock = new InstantClock();
+    const fetcher = fakeFetcher(clock, () => ({
+      status: 429,
+      headers: { 'retry-after': '10' },
+      body: '',
+    }));
+    const ctx = context(fetcher, clock);
+    for (let i = 0; i < STOP_AFTER_429S; i++)
+      await politeFetch(ctx, `https://example.com/llms${i}.txt`, CRAWL, {
+        offSite: 'stop',
+        countsTowardStop: false,
+      });
+    expect(fetcher.calls).toHaveLength(STOP_AFTER_429S);
+    expect(ctx.sites.stopOf('example.com')).toBeNull();
+  });
+});
+
+describe('politeFetch: a 429 that could not be asked again (review of the back-off)', () => {
+  const page = 'https://example.com/a';
+
+  it('keeps the 429 a page answered when the stop lands on its retry, and says why', async () => {
+    const clock = new InstantClock();
+    const fetcher = fakeFetcher(clock, () => ({ status: 429, body: '' }));
+    const ctx = context(fetcher, clock);
+    for (let i = 1; i < STOP_AFTER_429S; i++) ctx.sites.record429('example.com', '0');
+    const r = await politeFetch(ctx, page, CRAWL, { offSite: 'stop', retryOn429: true });
+    expect(r).toMatchObject({
+      fetch: { status: 429 },
+      cut: { reason: 'site_stopped', stop: { reason: 'three_429_responses' } },
+    });
+    expect(fetcher.calls).toHaveLength(1);
+  });
+
+  it('keeps the 429 when the batch has no time left to wait it out, and does not run past its time', async () => {
+    const clock = new InstantClock();
+    const fetcher = fakeFetcher(clock, () => ({
+      status: 429,
+      headers: { 'retry-after': '60' },
+      body: '',
+    }));
+    const ctx = context(fetcher, clock, { ...roomy, max_seconds: 30 });
+    const start = clock.now();
+    const r = await politeFetch(ctx, page, CRAWL, { offSite: 'stop', retryOn429: true });
+    expect(r).toMatchObject({
+      fetch: { status: 429 },
+      cut: { reason: 'budget', budget: 'seconds' },
+    });
+    const next = await politeFetch(ctx, 'https://example.com/b', CRAWL, { offSite: 'stop' });
+    expect(next).toMatchObject({ notRequested: { reason: 'budget', budget: 'seconds' } });
+    expect(fetcher.calls).toHaveLength(1);
+    expect(clock.now() - start).toBeLessThan(30_000);
+  });
+
+  it('doubles the back-off with each 429 in a row when no Retry-After is sent', async () => {
+    const clock = new InstantClock();
+    const fetcher = fakeFetcher(clock, () => ({ status: 429, body: '' }));
+    await politeFetch(context(fetcher, clock), page, CRAWL, { offSite: 'stop', retryOn429: true });
+    const [a, b, c] = fetcher.calls.map((x) => x.at);
+    expect(b! - a!).toBe(BACKOFF_FIRST_MS);
+    expect(c! - b!).toBe(2 * BACKOFF_FIRST_MS);
+  });
+
+  it('does not end the run of 429s on a request that failed, or on a redirect', async () => {
+    const clock = new InstantClock();
+    const answers: FakeResponse[] = [
+      ...Array.from({ length: STOP_AFTER_429S - 2 }, () => ({ status: 429, body: '' })),
+      { error: 'network' },
+      { status: 302, headers: { location: 'https://example.com/c' }, body: '' },
+      { status: 429, body: '' },
+    ];
+    let n = 0;
+    const fetcher = fakeFetcher(clock, () => answers[n++] ?? { status: 429, body: '' });
+    const ctx = context(fetcher, clock);
+    // STOP_AFTER_429S - 2 pages of 429, one that fails, one whose redirect lands on a 429, and one more 429.
+    for (let i = 0; i < STOP_AFTER_429S + 1; i++) {
+      await politeFetch(ctx, `https://example.com/${i}`, CRAWL, { offSite: 'stop' });
+    }
+    expect(fetcher.calls.map((c) => c.url)).toContain('https://example.com/c');
+    expect(ctx.sites.stopOf('example.com')).toMatchObject({ reason: 'three_429_responses' });
+  });
+
+  it('does not slow the site for a 429 that does not count, such as a declaration read', async () => {
+    const clock = new InstantClock();
+    const fetcher = fakeFetcher(clock, () => ({ status: 429, body: '' }));
+    const ctx = context(fetcher, clock);
+    await politeFetch(ctx, 'https://example.com/llms.txt', CRAWL, {
+      offSite: 'stop',
+      countsTowardStop: false,
+    });
+    expect(ctx.sites.limiter('example.com').gapMs()).toBe(FLOOR_GAP_MS);
   });
 });
 

@@ -1934,14 +1934,15 @@ describe('strict objects', () => {
     expect(CheckSchema.safeParse({ ...finished(), extra: 1 }).success).toBe(false);
   });
 
-  it('drops a __proto__ key carried in JSON, so a parsed record never holds one', () => {
-    // zod 4 strips an own "__proto__" key rather than rejecting it; the contract test guards the
-    // fixtures themselves. This pins the behaviour the parsed output relies on.
+  it('rejects a __proto__ key carried in JSON, so a parsed record never holds one', () => {
+    // From zod 4.5.0 a strict object rejects an own "__proto__" key as unrecognized, as it does a
+    // constructor key below; 4.4 stripped it. The contract test guards the fixtures themselves.
     const json = JSON.stringify(finished()).replace(/^\{/, '{"__proto__":{"status":"failed"},');
     const result = CheckSchema.safeParse(JSON.parse(json));
-    expect(result.success).toBe(true);
-    expect(Object.hasOwn(result.data!, '__proto__')).toBe(false);
-    expect(result.data!.status).toBe('finished');
+    expect(result.success).toBe(false);
+    expect(result.error!.issues).toContainEqual(
+      expect.objectContaining({ code: 'unrecognized_keys', keys: ['__proto__'] }),
+    );
   });
 
   it('rejects a constructor key', () => {

@@ -428,6 +428,31 @@ describe('/trial-ended', () => {
     expect(renderToStaticMarkup(el)).toContain('of Pro left');
   });
 
+  it('a link a v2 mint wrote is listed as keeping working', async () => {
+    const db = h.db as PGlite;
+    as(trialing);
+    const before = renderToStaticMarkup(screen(await TrialEndedPage()));
+    expect(before).not.toContain('Public audit link');
+    const { rows } = await db.query<{ id: string; site_id: string }>(
+      `insert into public.checks
+         (site_id, status, trigger, grade_version, started_at, finished_at, failure_reason)
+       select s.id, 'failed', 'manual', '1.0.0', now(), now(), 'crawl_failed'
+         from public.sites s where s.account_id = $1
+        limit 1
+       returning id, site_id`,
+      [trialing.accountId],
+    );
+    await db.query(
+      `insert into public.public_reports (slug, check_id, site_id, account_id, domain)
+       values ('trial-page-link', $1, $2, $3, 'link.example')`,
+      [rows[0]!.id, rows[0]!.site_id, trialing.accountId],
+    );
+    const after = renderToStaticMarkup(screen(await TrialEndedPage()));
+    await db.query(`delete from public.public_reports where slug = 'trial-page-link'`);
+    await db.query(`delete from public.checks where id = $1`, [rows[0]!.id]);
+    expect(after).toContain('Public audit link');
+  });
+
   it('after the trial: back on Free', async () => {
     as(ended);
     const el = screen(await TrialEndedPage());
@@ -474,6 +499,27 @@ describe('a trial with a card whose subscription is set to cancel at its end', (
     expect(html).toContain('The trial is cancelled: it ends on');
     expect(html).not.toMatch(CHARGE);
     expect(html).not.toContain('href="/settings/plan"');
+  });
+});
+
+describe('while paying is kept to one user (V2_BILLING_ONLY_USER)', () => {
+  const checkout = 'action="/api/billing/checkout"';
+
+  it('that user still sees the checkout on Settings › Plan and /trial-ended', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_BILLING_ONLY_USER', shared.id);
+    as(shared);
+    expect(renderToStaticMarkup(screen(await PlanPage(q())))).toContain(checkout);
+    expect(renderToStaticMarkup(screen(await TrialEndedPage()))).toContain(checkout);
+  });
+
+  it('another owner sees none, and does once the window is open to all', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_BILLING_ONLY_USER', shared.id);
+    as(owner);
+    expect(renderToStaticMarkup(screen(await PlanPage(q())))).not.toContain(checkout);
+    vi.stubEnv('V2_BILLING_ONLY_USER', '');
+    expect(renderToStaticMarkup(screen(await PlanPage(q())))).toContain(checkout);
   });
 });
 

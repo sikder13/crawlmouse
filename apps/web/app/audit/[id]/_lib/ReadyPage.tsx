@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { AuditEvent, AuditPageProvider } from '../../../../components/v2/screens/result/AuditPage';
 import { AuditNotice } from '../../../../components/v2/screens/result/ResultStates';
 import { ExplorerScreen } from '../../../../components/v2/screens/map/ExplorerScreen';
+import type { NoticeView } from '../../../../components/v2/screens/account/Notice';
 import { FixScreen } from '../../../../components/v2/screens/fix/FixScreen';
 import { AccessScreen } from '../../../../components/v2/screens/segment/AccessScreen';
 import { ChangesScreen } from '../../../../components/v2/screens/segment/ChangesScreen';
@@ -14,6 +15,7 @@ import { SignalsScreen } from '../../../../components/v2/screens/segment/Signals
 import { StructureScreen } from '../../../../components/v2/screens/segment/StructureScreen';
 import { findCheck } from '../../../../lib/v2/fixtures';
 import { supportMailto } from '../../../../lib/v2/support/mailto';
+import { emailDeveloperAction } from '../../../../lib/v2/view/account-actions';
 import { fixView } from '../../../../lib/v2/view/fix';
 import { isFreeFix } from '../../../../lib/v2/view/free-fixes';
 import { linkMapView } from '../../../../lib/v2/view/link-map';
@@ -73,15 +75,22 @@ export async function SegmentPage({ id, segment }: { id: string; segment: Segmen
 
 /**
  * The fix page's view, and its support link with the fix's ids (CC-33 D5); null when the id names
- * no fix this check's site had by this check.
+ * no fix this check's site had by this check. `developer` is the form that emails the fix: on an
+ * open fix of a kept audit, whose reader `readableCheck` has found to be a member, and only with a
+ * packet, since the mail is the packet.
  */
 export function fixOf(read: ReadyCheck, fixId: string) {
   const fix = read.dataset.fixes.find((f) => f.id === fixId);
   if (!fix) return null;
   const check = findCheck(read.dataset, read.checkId);
   const site = read.dataset.sites.find((s) => s.id === check.site_id);
+  const view = fixView(read.dataset, read.checkId, fixId, viewOptions(read));
   return {
-    view: fixView(read.dataset, read.checkId, fixId, viewOptions(read)),
+    view,
+    developer:
+      view.kind === 'open' && view.packet !== null && view.frame.keptUntil === null
+        ? emailDeveloperAction(fixId, 'Email this fix to my developer', `about: ${view.head.title}`)
+        : null,
     type: fix.type,
     free: isFreeFix(read.dataset, check, fix),
     support: supportMailto({
@@ -100,9 +109,12 @@ export function fixOf(read: ReadyCheck, fixId: string) {
 export function FixBody({
   read,
   found,
+  notice,
 }: {
   read: ReadyCheck;
   found: NonNullable<ReturnType<typeof fixOf>>;
+  /** What the email form did. Shown only with the form: anyone can type a notice into an address. */
+  notice?: NoticeView | null;
 }) {
   const page = auditPage(read.checkId, 'fix');
   return (
@@ -111,16 +123,29 @@ export function FixBody({
         event="fix_opened"
         props={{ type: found.type, free: found.free, check_ref: page.checkRef }}
       />
-      <FixScreen data={found.view} support={found.support} />
+      <FixScreen
+        data={found.view}
+        support={found.support}
+        developer={found.developer}
+        notice={found.developer ? notice : null}
+      />
     </AuditPageProvider>
   );
 }
 
-export async function FixPage({ id, fixId }: { id: string; fixId: string }) {
+export async function FixPage({
+  id,
+  fixId,
+  notice,
+}: {
+  id: string;
+  fixId: string;
+  notice?: NoticeView | null;
+}) {
   const read = await readyAudit(id);
   const found = fixOf(read, fixId);
   if (!found) notFound();
-  return <FixBody read={read} found={found} />;
+  return <FixBody read={read} found={found} notice={notice} />;
 }
 
 /** The link map of a ready check in `scope`; the hubs scope draws the stored drawing. */

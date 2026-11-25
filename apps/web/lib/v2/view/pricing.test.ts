@@ -17,12 +17,17 @@ import {
 const NOW = new Date('2026-11-12T12:00:00Z');
 const ACCOUNT = 'a0000000-0000-4000-8000-00000000000a';
 const AGENCY = 'a0000000-0000-4000-8000-00000000000b';
-const ON: PricingFlags = { accountDoor: true, checksPublic: true, billing: true };
+const ON: PricingFlags = {
+  accountDoor: true,
+  checksPublic: true,
+  billing: true,
+  agencySales: true,
+};
 const FLAGS: PricingFlags[] = [
   ON,
-  { accountDoor: false, checksPublic: true, billing: true },
-  { accountDoor: true, checksPublic: false, billing: true },
-  { accountDoor: false, checksPublic: false, billing: true },
+  { accountDoor: false, checksPublic: true, billing: true, agencySales: true },
+  { accountDoor: true, checksPublic: false, billing: true, agencySales: true },
+  { accountDoor: false, checksPublic: false, billing: true, agencySales: true },
 ];
 
 type Agency = Extract<PricingViewer, { kind: 'signed_in' }>['agency'];
@@ -87,7 +92,7 @@ describe('signed out', () => {
   // the account and starts no trial. Signed in, this page then offers the Pro trial only while
   // V2_CHECKS_PUBLIC serves its route, so Pro's note says which (SEO R2-N1).
   it('with V2_ACCOUNT_DOOR off, Free and Pro go to v1’s sign-in, and no trial is promised there', () => {
-    const off = { accountDoor: false, checksPublic: false, billing: true };
+    const off = { accountDoor: false, checksPublic: false, billing: true, agencySales: true };
     expect(action(out, 'free', 'month', off)).toEqual({
       kind: 'link',
       href: '/login',
@@ -105,7 +110,7 @@ describe('signed out', () => {
   });
 
   it('with V2_ACCOUNT_DOOR off and V2_CHECKS_PUBLIC on, Pro signs in and comes back to the trial', () => {
-    const off = { accountDoor: false, checksPublic: true, billing: true };
+    const off = { accountDoor: false, checksPublic: true, billing: true, agencySales: true };
     expect(action(out, 'pro', 'year', off)).toEqual({
       kind: 'link',
       href: '/login?next=%2Fpricing%3Finterval%3Dyear',
@@ -139,7 +144,12 @@ describe('signed in: the Pro button follows the state machine', () => {
 
   it('with V2_CHECKS_PUBLIC off, the trial’s route is a 404: the paid checkout instead', () => {
     expect(
-      action(signedIn(), 'pro', 'month', { accountDoor: true, checksPublic: false, billing: true }),
+      action(signedIn(), 'pro', 'month', {
+        accountDoor: true,
+        checksPublic: false,
+        billing: true,
+        agencySales: true,
+      }),
     ).toEqual({
       kind: 'form',
       action: '/api/billing/checkout',

@@ -57,6 +57,10 @@ export const REQUIRED_ENV: Readonly<Record<Step, Why>> = {
 /** Read when set, with a working default or a deliberate "off" when unset. */
 export const OPTIONAL_ENV: Why = {
   V2_AGENCY_SALES: 'unset keeps Agency "coming": its checkout and trial refuse with billing on',
+  V2_BILLING_ONLY_USER:
+    "unset opens paying to everyone once V2_BILLING is on; set to the owner's user id, only he can pay (specs/billing-switch-on)",
+  V2_HIDE_FEATURES:
+    'unset shows every feature; names features not yet proven to hide them everywhere (Goal 1 rule 2, lib/feature-switch.ts)',
   ADMIN_SECRET: 'unset, the admin takedown route refuses every request (closed by default)',
   AI_READINESS_EXTRACTION: 'engine switch; unset keeps the default extraction',
   CRAWL_PAUSED: 'the global crawl pause, set only to pause (PROJECT_OVERVIEW §6)',
@@ -71,6 +75,8 @@ export const OPTIONAL_ENV: Why = {
     'unset is CHECK_CONCURRENCY_DEFAULT (16, the worker’s batch slots); any value is clamped to the plan cap',
   INNGEST_ALERT_CONCURRENCY: "unset uses inngest/alerts.ts's default",
   INNGEST_SUMMARY_CONCURRENCY: "unset uses inngest/summary.ts's default",
+  INNGEST_COMPETITOR_CONCURRENCY: "unset uses inngest/competitors.ts's default",
+  INNGEST_SENTINEL_CONCURRENCY: "unset uses inngest/sentinel.ts's default",
   NEXT_PUBLIC_POSTHOG_HOST: 'unset uses the /ingest proxy default',
   SENTRY_AUTH_TOKEN: 'build-time source-map upload; unset ships without source maps',
   SIGNIN_CANARY_TO:

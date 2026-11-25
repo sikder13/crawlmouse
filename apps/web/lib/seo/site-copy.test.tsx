@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The page reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
 import { schemaProblems } from './schema-required';
 import { V2_HOME_DESCRIPTION, V2_HOME_TITLE, v2LlmsDescriptor } from './site-copy';
 import { POSTS } from '../blog/posts';
@@ -18,7 +21,13 @@ vi.mock('../fonts', () => ({
 const fixture = JSON.parse(
   readFileSync(join(__dirname, '__fixtures__', 'flags-off-v1.json'), 'utf8'),
 );
-const ON = { V2_ACCOUNT_DOOR: '1', V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '1', V2_BILLING: '1' };
+const ON = {
+  V2_ACCOUNT_DOOR: '1',
+  V2_PIPELINE: '1',
+  V2_CHECKS_PUBLIC: '1',
+  V2_BILLING: '1',
+  V2_AGENCY_SALES: '1',
+};
 
 describe('/llms.txt is built with the site', () => {
   it('is force-static, so the flags it reads are the build\u2019s', async () => {

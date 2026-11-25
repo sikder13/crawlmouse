@@ -69,6 +69,15 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'so a crawled site cannot supply one',
+    withdrawnIn:
+      'osv-scanner.toml (the minimatch entry, GHSA-g3hv-75wg-m249) and v2r QA findings/osv-left-for-owner.md, CTO inbox 078',
+    truth:
+      'WHATWG URL parsing keeps braces and `*` in a hostname and crawlee builds its glob from the origin ' +
+      'unescaped; what stops a brace hostname today is Node refusing to resolve it, measured on one machine.',
+    allowedIn: [],
+  },
+  {
     text: 'are the noun, not the verb, and are not changed',
     withdrawnIn: 'docs/specs/v2/40-seo-launch.md (D8), CC-40 review round 2',
     truth:
@@ -569,6 +578,14 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     truth:
       'removeSite sets removed_at; the daily expiry deletes the site’s checks and evidence ' +
       'RESTORE_DAYS days later and keeps the site row.',
+    allowedIn: [],
+  },
+  {
+    text: 'A pull request merges only when up to date with `main`',
+    withdrawnIn: 'docs/specs/v2/ci-cost.md (D1), the #174 gate (v2r QA, finding N3)',
+    truth:
+      'The protect-main ruleset (25993587) has strict_required_status_checks_policy false: a branch need ' +
+      'not be up to date with main to merge, so the merge commit a run tested can differ from the one that merges.',
     allowedIn: [],
   },
 ];

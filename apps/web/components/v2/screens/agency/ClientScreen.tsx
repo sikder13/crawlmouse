@@ -72,7 +72,7 @@ export function ClientScreen({
                 key: f.key,
                 cells: [
                   String(f.number),
-                  <span key="t">
+                  <span key="t" className={shared.breakAnywhere}>
                     {f.title}
                     {f.newLabel ? (
                       <>
@@ -82,7 +82,11 @@ export function ClientScreen({
                     ) : null}
                   </span>,
                   f.effect,
-                  f.packet ? <ActionControl key="p" action={f.packet} variant="quiet" /> : null,
+                  f.packet ? (
+                    <span key="p" className={shared.nowrap}>
+                      <ActionControl action={f.packet} variant="quiet" />
+                    </span>
+                  ) : null,
                 ],
               }))}
             />
@@ -112,10 +116,19 @@ export function ClientScreen({
               key: r.label,
               cells: [
                 r.label,
-                <span key="v" className={r.mono ? shared.mono : undefined}>
+                <span
+                  key="v"
+                  className={[shared.breakAnywhere, r.mono ? shared.mono : null]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
                   {r.value}
                 </span>,
-                r.change ? <ActionControl key="c" action={r.change} variant="quiet" /> : null,
+                r.change ? (
+                  <span key="c" className={shared.nowrap}>
+                    <ActionControl action={r.change} variant="quiet" />
+                  </span>
+                ) : null,
               ],
             }))}
           />

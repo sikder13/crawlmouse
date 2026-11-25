@@ -5,12 +5,16 @@ name: CI
 # request, when a pull request is opened, reopened or marked ready (the `pull_request` trigger, those
 # three types only), or when the workflow is dispatched by hand with `visual: true`. On any other push
 # the `changes` job defers it and the `visual` job takes another name, so the required check `visual`
-# is never reported for that commit. docs/specs/v2/ci-cost.md has the rules and their costs.
+# is never reported for that commit. A push whose commit also has a pull_request run (the run that
+# opening a pull request starts) defers it too: that run reports `visual`, so the set runs once per
+# head. docs/specs/v2/ci-cost.md has the rules and their costs.
 #
 # A pull request event runs every job, not only the visual set: a job skipped by a condition reports
 # success, and a skipped twin of a required check on the head commit could stand in for one that
 # failed. It tests the pull request's merge commit, as GitHub checks it out; its checks attach to the
-# head commit. A pull request can merge only up to date with main, where the two trees are the same.
+# head commit. The ruleset does not require a branch to be up to date with main
+# (`strict_required_status_checks_policy: false`), so the merge commit tested can differ from the one
+# that merges when main has moved since the run.
 #
 # The nightly run on main runs everything, the visual set included; a failure is red here, and
 # GitHub emails the user who last edited the schedule.
@@ -32,13 +36,15 @@ permissions:
   contents: read
 
 # A newer run of a branch cancels its older run, and a pull request event its older run (its ref is
-# refs/pull/<n>/merge, so it never cancels a push run). On main each run has its own group, so no main run
-# is cancelled or replaced, not even by a dispatch or the nightly run of the same commit: GitHub also
-# drops a PENDING run when a newer one joins its group, and the Prettier job on main checks only what
-# that push added.
+# refs/pull/<n>/merge, so it never cancels a push run).
+# On main (Goal 1, CTO inbox 075): pushes share one group and never cancel a running run. GitHub keeps
+# one running and one PENDING run per group and drops the older pending one when a newer push joins, so
+# a burst of merges tests the newest commit, not each one. What that costs: an intermediate merge commit
+# is not tested on its own, and the Prettier job on main checks only the files of the push that ran.
+# The nightly run and a dispatch on main keep a group of their own, so a merge never drops them.
 concurrency:
-  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && github.event_name != 'push' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   NEXT_TELEMETRY_DISABLED: '1'
@@ -61,6 +67,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read
     outputs:
       gate: ${{ steps.decide.outputs.gate }}
       visual: ${{ steps.decide.outputs.visual }}
@@ -76,6 +83,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           DISPATCH_VISUAL: ${{ inputs.visual }}
           BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
@@ -102,6 +110,23 @@ jobs:
             exit 0
           else
             echo "${open} open pull request(s) for ${BRANCH}"
+            # Opening a pull request starts a pull_request run on the head this push already runs.
+            # That run reports the required checks, the visual set included, so this push run leaves
+            # the visual set to it instead of running it twice. Nothing is cancelled: a cancelled run's
+            # required jobs report on the same commit and block the merge (PR #125). When the answer
+            # cannot be had, the visual set runs here, as before this rule.
+            if [ "$EVENT" = push ]; then
+              if ! prruns="$(gh api -X GET "repos/$REPO/actions/workflows/ci.yml/runs" -f event=pull_request -f branch="$BRANCH" -f head_sha="$SHA" --jq .total_count)"; then
+                echo "::warning::could not ask GitHub for this commit's pull request runs, so the gate stays open"
+              elif ! [[ "$prruns" =~ ^[0-9]+$ ]]; then
+                echo "::warning::GitHub answered '${prruns}' for this commit's pull request runs, so the gate stays open"
+              elif [ "$prruns" -gt 0 ]; then
+                echo "a pull_request run of ${SHA} reports the visual set: this push run defers it"
+                echo "gate=deferred" >> "$GITHUB_OUTPUT"
+                echo "visual=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
           fi
           echo "gate=open" >> "$GITHUB_OUTPUT"
           if ! base="$(git merge-base origin/main HEAD)"; then
@@ -652,11 +677,12 @@ jobs:
   # passed and set visual=false. Everything else fails: a shard that failed or was cancelled, and
   # shards skipped because `changes` itself failed or was cancelled.
   #
-  # When the gate deferred the visual set the job is renamed, so a push with no open pull request
-  # reports no check named `visual` and the ruleset's requirement stays unmet. Only an explicit
+  # When the gate deferred the visual set the job is renamed, so a push with no open pull request, or
+  # one whose commit has a pull_request run, reports no check named `visual` from this run: the
+  # requirement is met by the pull_request run, or stays unmet. Only an explicit
   # `deferred` renames it: a failed `changes` leaves the name `visual`, and the rule fails it.
   visual:
-    name: "${{ needs.changes.outputs.gate == 'deferred' && 'visual (deferred: no open pull request)' || 'visual' }}"
+    name: "${{ needs.changes.outputs.gate == 'deferred' && 'visual (deferred: not up for merge, or another run reports it)' || 'visual' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: [changes, visual-shard]
@@ -677,7 +703,7 @@ jobs:
           fi
           if [ "$SHARDS" = skipped ] && [ "$CHANGES" = success ] && [ "$VISUAL" = false ]; then
             if [ "$GATE" = deferred ]; then
-              echo "no open pull request, so the shards wait for one; this check is not the required one"
+              echo "the gate deferred the shards (no open pull request, or a pull_request run of this commit runs them); this check is not the required one"
             else
               echo "nothing that can affect rendering changed, so the shards were skipped"
             fi

@@ -14,6 +14,7 @@
  * - The one-pager preview drops the competitor's grade: competitors are stored but not measured.
  */
 import type { CapabilityKey } from '../view/agencies';
+import { capitalise, numberWord, plural } from '../words';
 
 export interface Tagged {
   text: string;
@@ -27,6 +28,9 @@ export const AGENCIES_COPY = {
   title: 'For agencies',
   description: (p: { price: string; sites: number; days: number }) =>
     `Audit a prospect’s site free before the first call. Agency is ${p.price} a month for ${p.sites} client sites, with a ${p.days}-day trial; branded client reports are coming.`,
+  /** The description while the Goal 1 switch hides `agency_white_label` or `agency_domain`. */
+  descriptionUnbranded: (p: { price: string; sites: number; days: number }) =>
+    `Audit a prospect’s site free before the first call. Agency is ${p.price} a month for ${p.sites} client sites, with a ${p.days}-day trial.`,
   /** RC-01: the description while V2_BILLING is off, when the trial cannot be started. */
   descriptionBillingOff: (p: { price: string; sites: number }) =>
     `Audit a prospect’s site free before the first call. Agency is ${p.price} a month for ${p.sites} client sites; the agency trial opens soon.`,
@@ -77,7 +81,9 @@ export const AGENCIES_COPY = {
     label: `Preview · ${SAMPLE_AGENCY.name}, a sample agency`,
     /** Its capabilities: the whole preview is the one-pager on the client report page. */
     capabilities: ['one_pagers', 'client_report_page'],
-    fixesCaption: 'Three fixes, effects estimated',
+    /** The caption over the fixes the preview lists, counting them. */
+    fixesCaption: (n: number) =>
+      `${capitalise(numberWord(n))} ${plural(n, 'fix', 'fixes')}, effects estimated`,
     estimates: 'Effects are estimates from the audit’s formula.',
     footer: (path: string) =>
       `Full audit with evidence, on your client report page: ${path} · Prepared by ${SAMPLE_AGENCY.name}`,

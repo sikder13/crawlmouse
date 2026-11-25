@@ -429,12 +429,14 @@ describe('no registered function can declare a concurrency limit above the plan 
                 // CC-41's ledger writer and backfill.
                 (flag === '1' ? 12 : 5) +
                   (billing === '1' ? 2 : 0) +
-                  // CC-27b's three deletion functions, the mail functions, and CC-31's schedules.
-                  (pub === '1' ? 3 + MAIL_IDS.length + 1 : 0) +
+                  // CC-27b's three deletion functions, the mail functions, CC-31's schedules and
+                  // the no-card trial's clock.
+                  (pub === '1' ? 3 + MAIL_IDS.length + 1 + 1 : 0) +
                   // CC-33's founder functions and their failure handlers, with either flag.
                   (pub === '1' || billing === '1' ? 2 * FOUNDER_IDS.length : 0) +
-                  // CC-28's scheduler tick, and its alert and summary functions.
-                  (pub === '1' && flag === '1' ? 1 + MONITOR_IDS.length : 0),
+                  // CC-28's scheduler tick, and its alert and summary functions; row 23's
+                  // sentinel tick and watch; row 18's competitor audits.
+                  (pub === '1' && flag === '1' ? 1 + MONITOR_IDS.length + 2 + 1 : 0),
               );
               for (const id of MONITOR_IDS)
                 expect(configs.map((c) => c.id).includes(id), id).toBe(pub === '1' && flag === '1');
@@ -448,6 +450,7 @@ describe('no registered function can declare a concurrency limit above the plan 
                 expect(ids.includes(id), id).toBe(pub === '1');
               }
               expect(ids.includes('crawlmouse-crawlmouse.report.schedules')).toBe(pub === '1');
+              expect(ids.includes('crawlmouse-crawlmouse.trial.clock')).toBe(pub === '1');
               for (const id of FOUNDER_IDS) {
                 expect(ids.includes(id), id).toBe(pub === '1' || billing === '1');
                 expect(ids.includes(`${id}-failure`), id).toBe(pub === '1' || billing === '1');

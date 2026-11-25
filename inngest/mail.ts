@@ -27,6 +27,7 @@
  * holds) is thrown on, so Inngest retries the step; any other error is logged by name and the step
  * ends, so a mail failure never turns into a stream of retries of something that will not change.
  */
+import type { Fix } from '@crawlmouse/types/v2';
 import { inngest } from './client';
 
 export const ACCOUNT_MAIL_FN_ID = 'crawlmouse.mail.account';
@@ -64,7 +65,10 @@ export type EmailRequestedData =
 export interface MailHandlers {
   accountEmail(data: EmailRequestedData): Promise<string>;
   checkNotify(checkId: string): Promise<string>;
-  fixToDeveloper(requestId: string): Promise<string>;
+  fixToDeveloper(
+    requestId: string,
+    framework?: NonNullable<Fix['packet']>['framework'],
+  ): Promise<string>;
   checkFinished(checkId: string): Promise<string>;
   /** Invitation `seq` of the seat `seatId` (`seats.invite_seq`). */
   seatInvite(seatId: string, seq: number): Promise<string>;
@@ -135,7 +139,9 @@ export function createFixToDeveloperFn(handlers: () => MailHandlers) {
     { event: 'fix.email_developer_requested' },
     async ({ event, step }) =>
       step.run('send', () =>
-        guarded(FIX_TO_DEVELOPER_FN_ID, () => handlers().fixToDeveloper(event.data.requestId)),
+        guarded(FIX_TO_DEVELOPER_FN_ID, () =>
+          handlers().fixToDeveloper(event.data.requestId, event.data.framework),
+        ),
       ),
   );
 }

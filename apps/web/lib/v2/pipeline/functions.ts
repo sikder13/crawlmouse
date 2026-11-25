@@ -41,13 +41,15 @@ import { createExpireAnonymousChecksFn } from '../../../../../inngest/check-expi
 import { createCheckReaperFn } from '../../../../../inngest/check-reaper';
 import { createLedgerBackfillFn, createLedgerWriteFn } from '../../../../../inngest/ledger';
 import { checksPublicEnabled, pipelineEnabled } from '../../auth/flags';
-import { billingFunctions } from '../../billing/inngest-functions';
+import { billingFunctions, trialClockFunctions } from '../../billing/inngest-functions';
 import { deletionFunctions } from '../account/deletion-ports';
 import { scheduleFunctions } from '../monitor/schedule';
 import { mailFunctions } from '../mail/functions';
 import { reportScheduleFunctions } from '../agency/schedules-wiring';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { monitorFunctions } from '../monitor/functions';
+import { competitorFunctions } from '../competitors/functions';
+import { sentinelFunctions } from '../monitor/sentinel-functions';
 import { opsFunctions } from '../ops/functions';
 import { ledgerWorkFromEnv } from '../ledger/functions';
 import { putLedgerDraft } from '../ledger/store';
@@ -123,6 +125,8 @@ export function inngestFunctions(
   // CC-03's trial and past-due functions, with V2_BILLING=1 only; none, and the nightly reconcile
   // left as v1's step, with it unset (lib/billing/inngest-functions.ts).
   const billing = billingFunctions(env);
+  // The no-card trial's reminder and end, with V2_CHECKS_PUBLIC=1 whether or not billing is on.
+  const trialClock = checksPublicEnabled(env) ? trialClockFunctions(env) : [];
   // CC-27b's deletion functions, with V2_CHECKS_PUBLIC=1 only (lib/v2/account/deletion-ports.ts).
   const deletion = checksPublicEnabled(env) ? deletionFunctions(env) : [];
   // The mail functions, the check_finished listener and CC-29's contact purge, with
@@ -133,7 +137,8 @@ export function inngestFunctions(
   // CC-33's founder notices, with V2_BILLING=1 or V2_CHECKS_PUBLIC=1, and its sign-in canary on
   // SIGNIN_CANARY_TO alone (lib/v2/ops/functions.ts).
   const ops = opsFunctions(env);
-  if (!pipelineEnabled(env)) return [...v1, ...billing, ...deletion, ...mail, ...reports, ...ops];
+  if (!pipelineEnabled(env))
+    return [...v1, ...billing, ...trialClock, ...deletion, ...mail, ...reports, ...ops];
   // Built when a function runs, not when the route loads, so a missing variable cannot keep the
   // route from registering v1's functions.
   return [
@@ -154,12 +159,18 @@ export function inngestFunctions(
     createLedgerWriteFn(() => ledgerWorkFromEnv(env)),
     createLedgerBackfillFn(() => ledgerWorkFromEnv(env)),
     ...billing,
+    ...trialClock,
     ...deletion,
     ...mail,
     // CC-28's scheduler tick, with V2_CHECKS_PUBLIC=1 as well (lib/v2/monitor/schedule.ts).
     ...(checksPublicEnabled(env) ? scheduleFunctions(env) : []),
     // CC-28's alerts and weekly summary, with V2_CHECKS_PUBLIC=1 as well (lib/v2/monitor/functions.ts).
     ...(checksPublicEnabled(env) ? monitorFunctions(env) : []),
+    // Row 18's competitor audits, with V2_CHECKS_PUBLIC=1 as well (lib/v2/competitors/functions.ts).
+    ...(checksPublicEnabled(env) ? competitorFunctions(env) : []),
+    // Row 23's daily sentinel, its hourly tick and its per-site watch, with V2_CHECKS_PUBLIC=1 as
+    // well (lib/v2/monitor/sentinel-functions.ts).
+    ...(checksPublicEnabled(env) ? sentinelFunctions(env) : []),
     ...reports,
     ...ops,
   ];

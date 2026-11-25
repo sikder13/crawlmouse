@@ -10,7 +10,7 @@
 import { instant, type Change, type Site } from '@crawlmouse/types/v2';
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { checksPublicEnabled } from '../../auth/flags';
-import { billingV2Enabled } from '../../billing/flags';
+import { billingOpenTo } from '../../billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES, type Tier } from '../../entitlement-v2';
 import { ACCOUNT_COPY as COPY } from '../copy/account';
@@ -138,13 +138,16 @@ export type PlanPlace = 'rail' | 'page';
 
 /**
  * Whether an account page may offer the plan's checkout (F-108). Off on a deployment that serves the
- * account pages with V2_BILLING off, where the checkout answers raw JSON. With V2_CHECKS_PUBLIC off
- * no live account page renders, so the design previews keep the offer they were approved with.
+ * account pages with V2_BILLING off, where the checkout answers raw JSON, and while paying is kept
+ * to one user (`V2_BILLING_ONLY_USER`) for anyone but `userId` when it is that user. With
+ * V2_CHECKS_PUBLIC off no live account page renders, so the design previews keep the offer they were
+ * approved with.
  */
 export function checkoutOpen(
   env: Readonly<Record<string, string | undefined>> = process.env,
+  userId: string | null = null,
 ): boolean {
-  return !checksPublicEnabled(env) || billingV2Enabled(env);
+  return !checksPublicEnabled(env) || billingOpenTo(userId, env);
 }
 
 function trialCard(
@@ -208,8 +211,10 @@ function trialCard(
             primarySite(v).host,
             freeSchedule,
             primaries - 1,
-            // Nothing sends the reminder while paid plans are closed, so it is not promised.
-            reminderDue || !billingOpen ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
+            // The mail goes to the owner, unless they turned it off.
+            reminderDue || !owner || !a.email_prefs.trial_reminder
+              ? null
+              : TRIAL_REMINDER_DAYS_BEFORE_END,
             billingOpen,
             oldestPaused,
           )}`;
@@ -338,7 +343,8 @@ function rail(v: AccountView, current: RailLabel | null): NavItemView[] {
     ...n,
     count:
       n.label === 'Sites'
-        ? String(v.d.sites.length)
+        ? // A staging copy holds no slot, so it is not counted (F-097).
+          String(primarySites(v).length)
         : n.label === 'Clients'
           ? count(primarySites(v).length)
           : n.label === 'Changes' && fresh

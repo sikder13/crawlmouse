@@ -61,6 +61,7 @@ beforeEach(() => {
   h.after = [];
   vi.stubEnv('V2_BILLING', '1');
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+  vi.stubEnv('V2_AGENCY_SALES', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -95,6 +96,14 @@ describe('/v2-pricing', () => {
     expect(html).toContain('Every audit is free. Pay when you want it watched.');
     expect(html).toContain('$190');
     expect(html).toContain('href="/agency-trial?interval=year"');
+  });
+
+  it('passes the Goal 1 switch (V2_HIDE_FEATURES) to the view, read per request', async () => {
+    expect(renderToStaticMarkup(await render())).toMatch(/competitor/i);
+    vi.stubEnv('V2_HIDE_FEATURES', 'competitors');
+    const html = renderToStaticMarkup(await render());
+    expect(html).not.toMatch(/competitor/i);
+    expect(html).toContain('Every audit is free. Pay when you want it watched.');
   });
 
   // Q24/Q31: the buttons follow the flags of the routes they reach, read per request. The header's
@@ -132,6 +141,21 @@ describe('/v2-pricing', () => {
     expect(html).toContain('Every audit is free. Pay when you want it watched.');
     expect(html).not.toMatch(/api\/billing\/(?:checkout|portal)|agency-trial/);
   });
+
+  // F-251: billing open to everyone, Agency sales closed. The checkout refuses Agency, so the page
+  // must not sell it; Pro is sold as normal.
+  it.each(['', '0'])(
+    'with V2_AGENCY_SALES=%j, the page offers no Agency trial and Pro still sells',
+    async (sales) => {
+      vi.stubEnv('V2_AGENCY_SALES', sales);
+      const html = renderToStaticMarkup(await render({ interval: 'year' }));
+      expect(html).not.toContain('agency-trial');
+      expect(html).not.toMatch(/day trial, card required|Card on file|Agency trial/i);
+      // Pro's own button: its trial, through v1's sign-in (the account door is off here).
+      expect(html).toContain('href="/login?next=%2Fpricing%3Finterval%3Dyear"');
+      expect(html).toContain('$190');
+    },
+  );
 
   it.each([
     ['DE', null, false],
