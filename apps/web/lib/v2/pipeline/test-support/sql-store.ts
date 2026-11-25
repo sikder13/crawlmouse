@@ -171,6 +171,18 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       return r as unknown as RequestSite;
     },
 
+    async accountClock(accountId) {
+      const r = await one(
+        `select jsonb_build_object('state', state, 'tier', tier, 'past_due_tier', past_due_tier,
+                                   'past_due_since', past_due_since, 'trial_variant', trial_variant,
+                                   'trial_ends_at', trial_ends_at) as row
+           from public.accounts where id = $1`,
+        [accountId],
+      );
+      if (!r) throw new Error(`sql store: no account ${accountId}`);
+      return clockFromAccountRow(r);
+    },
+
     async previousGraded(siteId, checkId): Promise<CheckSide | null> {
       const r = await one(
         `select to_jsonb(c) as row from public.checks c

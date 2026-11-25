@@ -19,8 +19,8 @@ import { isFailureReason, type FailureReason } from '../../../../../inngest/chec
 import type { ReapedCheck } from '../../../../../inngest/check-reaper';
 import { checkFromRow, diffInputsFromRow, fixEventFromRow, fixFromRow, siteFromRow } from './rows';
 import type { CrawlBatchRow, CrawlBatchStatus } from './types';
-import { effectiveTier, type Tier } from '../../entitlement-v2';
-import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow } from './load-for';
+import { effectiveTier, type EntitlementClock, type Tier } from '../../entitlement-v2';
+import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow, readAccountClock } from './load-for';
 
 export type ClaimOutcome = 'claimed' | 'site_busy' | 'gone';
 
@@ -92,6 +92,11 @@ export interface PipelineStore {
   check(checkId: string): Promise<Check>;
   site(siteId: string): Promise<Site>;
   requestSite(siteId: string): Promise<RequestSite>;
+  /**
+   * The entitlement clock of the account `accountId`, which sets a check's page cap (page-cap.ts). Every
+   * store `requestCheck` runs on must read it: there is no default to fall back to.
+   */
+  accountClock(accountId: string): Promise<EntitlementClock>;
   /**
    * The diff's baseline: the site's other finished or partial check that finished last, with its diff
    * inputs. By `finished_at`, not queue order: claims are not in queue order (correctness 4). Its id
@@ -306,6 +311,10 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
           .eq('id', siteId)
           .single(),
       );
+    },
+
+    async accountClock(accountId) {
+      return readAccountClock(sb, accountId);
     },
 
     async previousGraded(siteId, checkId) {

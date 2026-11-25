@@ -26,7 +26,7 @@ import { whiteLabelBrandName } from './report-brand';
  * row included (pinned in `app/r/[slug]/page.v2-row.test.tsx`), and a refused audit cannot be minted
  * at all — but it was LOADED: the fallbacks would have started printing
  * a fabricated verdict the moment anyone loosened the gone check, onto a card that is public,
- * permanent, and cached for an hour at a URL other people paste. So the invariant is made structural
+ * permanent, and cached at a URL other people paste. So the invariant is made structural
  * here rather than left resting on a gate two modules away.
  */
 export type OgReportModel =

@@ -43,6 +43,8 @@ export interface StepDeps {
     /** The durable budget for one check; production wires it (render-budget.ts). */
     dailyFor?: (checkId: string) => DailyBudget;
     inFlight: number;
+    /** Left out in production, so the engine's admission (DNS, the SSRF rule) decides. */
+    admit?: RenderInput['admit'];
   };
   discover: DiscoverDeps;
 }

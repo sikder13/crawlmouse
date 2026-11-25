@@ -13,12 +13,14 @@ import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tab
 import {
   CHUNK_BYTES,
   chunked,
+  edgePieces,
   pageVantage,
   persistBuiltCheck,
   persistCalls,
   supabasePersistDb,
 } from './persist';
-import { pglitePersistDb, seedRunningCheck } from './test-support/pglite';
+import { loadCheck } from './load';
+import { pgliteCheckReader, pglitePersistDb, seedRunningCheck } from './test-support/pglite';
 import type { PageVantage, PersistDb, PersistInput } from './types';
 
 /**
@@ -54,36 +56,69 @@ const site = () => recordedBuild().site;
 const checkOf = (b: BuiltCheck = built) => ({ ...recordedBuild().check, id: b.check.id });
 
 /** A PersistDb that records what it was sent, stages answering `staged`, the last call `answer`. */
+const LINEAGE = 'f0000000-0000-4000-8000-000000000330';
+
 function recording(answer: unknown = { written: true, counts: {} }, staged: unknown = true) {
   const sent: unknown[] = [];
   const stages: [string, string, number, readonly unknown[]][] = [];
+  /** Every call, in order: `stage`, `target`, `edges`, `persist`. */
+  const order: string[] = [];
+  const pieces: (readonly Record<string, unknown>[])[] = [];
   const db: PersistDb = {
     async stageCheckRows(checkId, collection, chunk, rows) {
+      order.push('stage');
       stages.push([checkId, collection, chunk, rows]);
       return staged;
     },
     async persistBuiltCheck(payload) {
+      order.push('persist');
       sent.push(payload);
       return answer;
     },
+    async edgeTarget() {
+      order.push('target');
+      return { lineageId: LINEAGE, checkMonth: '2026-11-01' };
+    },
+    async insertEdges(rows) {
+      order.push('edges');
+      pieces.push(rows);
+    },
   };
-  return { db, sent, stages };
+  return { db, sent, stages, order, pieces };
 }
 
 describe('persistBuiltCheck: what it sends', () => {
   it('every row the builder made: the bulk rows staged in order, each page with its crawl row’s vantage, the rest in the last call', async () => {
-    const { db, sent, stages } = recording({ written: true, counts: { page_results: 60 } });
+    const { db, sent, stages, order, pieces } = recording({
+      written: true,
+      counts: { page_results: 60, link_edges: 0 },
+    });
     const outcome = await persistBuiltCheck(db, inputOf());
-    expect(outcome).toEqual({ written: true, counts: { page_results: 60 }, verified: [] });
+    // The edge count is the edges written before the call, which moved none (F-330).
+    expect(outcome).toEqual({
+      written: true,
+      counts: { page_results: 60, link_edges: built.link_edges.length },
+      verified: [],
+    });
     const stagedRows = (collection: string) =>
       stages.filter(([, c]) => c === collection).flatMap(([, , , rows]) => rows);
     expect(stages.every(([id]) => id === built.check.id)).toBe(true);
     expect(stagedRows('page_results')).toEqual(
       built.page_results.map((page) => ({ ...page, ...vantage.get(page.url) })),
     );
-    expect(stagedRows('link_edges')).toEqual(built.link_edges);
+    // F-330: no edge is staged; every edge is written, in order, with the check's month and its
+    // fetching lineage, before the last call.
+    expect(stagedRows('link_edges')).toEqual([]);
+    expect(pieces.flat()).toEqual(
+      built.link_edges.map((e) => ({ ...e, check_month: '2026-11-01', lineage_id: LINEAGE })),
+    );
+    expect(order.filter((o) => o !== 'stage')).toEqual([
+      'target',
+      ...pieces.map(() => 'edges'),
+      'persist',
+    ]);
     expect(stagedRows('access_tests')).toEqual(built.access_tests);
-    for (const collection of ['page_results', 'link_edges', 'access_tests'])
+    for (const collection of ['page_results', 'access_tests'])
       expect(stages.filter(([, c]) => c === collection).map(([, , n]) => n)).toEqual([
         ...Array(stages.filter(([, c]) => c === collection).length).keys(),
       ]);
@@ -93,7 +128,7 @@ describe('persistBuiltCheck: what it sends', () => {
     const chunks = (collection: string) => stages.filter(([, c]) => c === collection).length;
     expect(p.staged).toEqual({
       page_results: { chunks: chunks('page_results'), rows: built.page_results.length },
-      link_edges: { chunks: chunks('link_edges'), rows: built.link_edges.length },
+      link_edges: { chunks: 0, rows: 0 },
       access_tests: { chunks: chunks('access_tests'), rows: built.access_tests.length },
     });
     // The recorded access tests are more than one chunk's worth.
@@ -335,6 +370,75 @@ describe('supabasePersistDb', () => {
     });
     await expect(supabasePersistDb(sb).persistBuiltCheck({})).rejects.toThrow(/55000.*not running/);
   });
+
+  /** A client that records each call as the query builder chain made it, and answers `answers`. */
+  const chained = (answers: Record<string, unknown>) => {
+    const calls: string[] = [];
+    const chain = (label: string): unknown =>
+      new Proxy(
+        {},
+        {
+          get(_t, key) {
+            if (key === 'then') {
+              const data = answers[label.split(' ')[0]!] ?? null;
+              return (resolve: (v: unknown) => void) => resolve({ data, error: null });
+            }
+            return (...args: unknown[]) =>
+              chain(`${label} ${String(key)}(${JSON.stringify(args)})`);
+          },
+        },
+      );
+    const sb = {
+      from: (table: string) => {
+        calls.push(`from ${table}`);
+        return chain(table);
+      },
+      rpc: async (fn: string, args: unknown) => {
+        calls.push(`rpc ${fn} ${JSON.stringify(args)}`);
+        return { data: null, error: null };
+      },
+    } as unknown as SupabaseClient;
+    return { sb, calls };
+  };
+
+  // F-330: the production port's edge calls.
+  it('edgeTarget reads the check’s month, makes its partitions, then ensures and reads the lineage', async () => {
+    const { sb, calls } = chained({
+      checks: [{ check_month: '2026-11-01' }],
+      measurement_lineages: [{ id: LINEAGE }],
+    });
+    const lineage = built.lineages.fetching;
+    expect(await supabasePersistDb(sb).edgeTarget(built.check.id, lineage)).toEqual({
+      lineageId: LINEAGE,
+      checkMonth: '2026-11-01',
+    });
+    expect(calls).toEqual([
+      'from checks',
+      `rpc v2_premake_month_partitions ${JSON.stringify({ p_from: '2026-11-01', p_through: '2026-11-01' })}`,
+      'from measurement_lineages',
+      'from measurement_lineages',
+    ]);
+  });
+
+  it('insertEdges writes one piece as an insert that skips a row already written', async () => {
+    const seen: unknown[][] = [];
+    const sb = {
+      from: (table: string) => ({
+        upsert: async (rows: unknown, opts: unknown) => {
+          seen.push([table, rows, opts]);
+          return { data: null, error: null };
+        },
+      }),
+    } as unknown as SupabaseClient;
+    await supabasePersistDb(sb).insertEdges([{ a: 1 }]);
+    expect(seen).toEqual([
+      [
+        'link_edges',
+        [{ a: 1 }],
+        { onConflict: 'check_id,from_hash,to_hash,check_month', ignoreDuplicates: true },
+      ],
+    ]);
+  });
 });
 
 // ─── On the database ──────────────────────────────────────────────────────────────────────────────
@@ -545,12 +649,29 @@ describe('persist_built_check, through persistBuiltCheck', () => {
   it('refuses, in the RPC, a staged row naming another check', async () => {
     await seedRunningCheck(db, site(), checkOf());
     const calls = persistCalls(inputOf());
-    const edges = calls.stages.find((st) => st.collection === 'link_edges')!;
-    (edges.rows[3] as { check_id: string }).check_id = randomUUID();
+    const tests = calls.stages.find((st) => st.collection === 'access_tests')!;
+    (tests.rows[3] as { check_id: string }).check_id = randomUUID();
     await stageAll(calls);
     await expect(pglitePersistDb(db).persistBuiltCheck(calls.payload)).rejects.toThrow(
       /another check or site/,
     );
+  });
+
+  // F-330: the edges are written by row before the RPC, so the app refuses one naming another check,
+  // before any call.
+  it('refuses an edge naming another check before any call', async () => {
+    await seedRunningCheck(db, site(), checkOf());
+    const input = inputOf();
+    const edges = [...input.built.link_edges];
+    edges[3] = { ...edges[3]!, check_id: randomUUID() };
+    await expect(
+      persistBuiltCheck(pglitePersistDb(db), {
+        ...input,
+        built: { ...input.built, link_edges: edges },
+      }),
+    ).rejects.toThrow(/an edge names check/);
+    expect(await count('link_edges')).toBe(0);
+    expect(await staged()).toEqual([]);
   });
 
   it('the finished write leaves no staging behind', async () => {
@@ -590,11 +711,12 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     await seedRunningCheck(db, site(), checkOf());
     const calls = persistCalls(inputOf());
     await stageAll(calls);
-    await pglitePersistDb(db).stageCheckRows(calls.checkId, 'link_edges', 1, []);
+    // Link edges are stated as 0 chunks (F-330): any staged edge chunk is beyond it.
+    await pglitePersistDb(db).stageCheckRows(calls.checkId, 'link_edges', 0, []);
     await expect(pglitePersistDb(db).persistBuiltCheck(calls.payload)).rejects.toThrow(
-      /the staged link_edges are not chunks 0 to 0/,
+      /the staged link_edges are not chunks 0 to -1/,
     );
-    expect(await count('link_edges')).toBe(0);
+    expect(await count('page_results')).toBe(0);
   });
 
   it('refuses when the staged rows are not the stated number, and writes nothing', async () => {
@@ -629,6 +751,70 @@ describe('persist_built_check, through persistBuiltCheck', () => {
         .sort((a, b) => a.collection.localeCompare(b.collection) || a.chunk - b.chunk),
     );
     await pglitePersistDb(db).persistBuiltCheck(calls.payload);
+    expect(await count('access_tests')).toBe(built.access_tests.length);
+  });
+
+  // F-330: the edges, in pieces before the RPC.
+  it('writes every edge once, in pieces before the check is finished, and again changes nothing', async () => {
+    await seedRunningCheck(db, site(), checkOf());
+    const pdb = pglitePersistDb(db);
+    const calls = persistCalls(inputOf());
+    const { lineageId, checkMonth } = await pdb.edgeTarget(calls.checkId, calls.fetching);
+    const small = edgePieces(inputOf().built.link_edges as never, 7);
+    expect(small.length).toBeGreaterThan(2);
+    for (const piece of small) {
+      await pdb.insertEdges(
+        piece.map((e) => ({ ...e, check_month: checkMonth, lineage_id: lineageId })),
+      );
+      // A retried piece writes nothing more.
+      await pdb.insertEdges(
+        piece.map((e) => ({ ...e, check_month: checkMonth, lineage_id: lineageId })),
+      );
+    }
+    expect(await count('link_edges')).toBe(built.link_edges.length);
+    const { rows: still } = await db.query<{ status: string }>(
+      `select status from public.checks where id = $1`,
+      [built.check.id],
+    );
+    expect(still[0]!.status).toBe('running');
+    // The whole persist again, as a retried step does: no edge twice, and the check finished.
+    const outcome = await persistBuiltCheck(pdb, inputOf());
+    expect(outcome.written).toBe(true);
+    expect(outcome.counts.link_edges).toBe(built.link_edges.length);
+    expect(await count('link_edges')).toBe(built.link_edges.length);
+    const { rows: lineages } = await db.query<{ lineage_id: string }>(
+      `select distinct lineage_id from public.link_edges where check_id = $1`,
+      [built.check.id],
+    );
+    const { rows: pages } = await db.query<{ lineage_id: string }>(
+      `select distinct lineage_id from public.page_results where check_id = $1`,
+      [built.check.id],
+    );
+    // The edges name the lineage persist_built_check gave the pages: the same `fetching`.
+    expect(lineages).toEqual(pages);
+  });
+
+  it('a persist that fails after the edges leaves the check running, its edges unread', async () => {
+    await seedRunningCheck(db, site(), checkOf());
+    const pdb = pglitePersistDb(db);
+    const failing = {
+      ...pdb,
+      persistBuiltCheck: async () => {
+        throw new Error('canceling statement due to statement timeout');
+      },
+    };
+    await expect(persistBuiltCheck(failing, inputOf())).rejects.toThrow(/statement timeout/);
+    expect(await count('link_edges')).toBe(built.link_edges.length);
+    const { rows } = await db.query<{ status: string }>(
+      `select status from public.checks where id = $1`,
+      [built.check.id],
+    );
+    expect(rows[0]!.status).toBe('running');
+    await expect(loadCheck(pgliteCheckReader(db), built.check.id)).rejects.toThrow(
+      /only a finished or partial check is read back/,
+    );
+    // The retried step then finishes it, with each edge once.
+    expect((await persistBuiltCheck(pdb, inputOf())).written).toBe(true);
     expect(await count('link_edges')).toBe(built.link_edges.length);
   });
 
@@ -895,12 +1081,15 @@ describe('a built check at the page cap (Q11)', () => {
     const calls = persistCalls(input);
     const size = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
     // What one request would have carried: every row in a single body (supabase-js sends {"p": …}).
-    const bulk = Object.fromEntries(
-      ['page_results', 'link_edges', 'access_tests'].map((c) => [
-        c,
-        calls.stages.filter((st) => st.collection === c).flatMap((st) => st.rows),
-      ]),
-    );
+    const bulk = {
+      ...Object.fromEntries(
+        ['page_results', 'access_tests'].map((c) => [
+          c,
+          calls.stages.filter((st) => st.collection === c).flatMap((st) => st.rows),
+        ]),
+      ),
+      link_edges: calls.edges.flat(),
+    };
     const rest: Record<string, unknown> = { ...calls.payload };
     delete rest.staged;
     const single = size({ p: { ...rest, ...bulk } });
@@ -912,6 +1101,8 @@ describe('a built check at the page cap (Q11)', () => {
         p_rows: st.rows,
       }),
     );
+    // F-330: each edge piece is its own request, the rows as the body.
+    const edgeBodies = calls.edges.map((piece) => size(piece));
     const finishing = size({ p: calls.payload });
 
     await seedRunningCheck(capDb, site(), checkOf());
@@ -931,7 +1122,14 @@ describe('a built check at the page cap (Q11)', () => {
         finishingMs = performance.now() - t;
         return answer;
       },
+      edgeTarget: (...args) => pdb.edgeTarget(...args),
+      async insertEdges(rows) {
+        const t = performance.now();
+        await pdb.insertEdges(rows);
+        edgesMs += performance.now() - t;
+      },
     };
+    let edgesMs = 0;
     const outcome = await persistBuiltCheck(timed, input);
     expect(outcome.counts).toMatchObject({
       page_results: 500,
@@ -946,13 +1144,15 @@ describe('a built check at the page cap (Q11)', () => {
           .join(', ')}`,
         `Q11 staged: ${calls.stages.length} chunks, the largest request ${mib(Math.max(...stageBodies))}, staging ${Math.round(stagingMs)} ms in PGlite`,
         `Q11 finishing request ${mib(finishing)}, persist_built_check ${Math.round(finishingMs)} ms in PGlite`,
+        `F-330 edges: ${calls.edges.length} pieces, the largest request ${mib(Math.max(...edgeBodies))}, ${Math.round(edgesMs)} ms in PGlite`,
       ].join('\n') + '\n',
     );
     // The owner's bound (rulings.md Q11), on every request the writer makes.
     expect(single, 'anti-vacuity: one request would exceed the bound').toBeGreaterThan(
       2 * 1024 * 1024,
     );
-    for (const bytes of [...stageBodies, finishing]) expect(bytes).toBeLessThan(2 * 1024 * 1024);
+    for (const bytes of [...stageBodies, ...edgeBodies, finishing])
+      expect(bytes).toBeLessThan(2 * 1024 * 1024);
   }, 120_000);
 });
 
@@ -1011,7 +1211,8 @@ const PERSIST_FUNCTIONS = new Set(['persist_built_check', 'stage_check_rows', 'm
 const PERSIST_BODY = [...WRITTEN];
 /** Each file that may write, and the names it writes, in the order the scan finds them in code. */
 const WRITERS: Readonly<Record<string, readonly string[]>> = {
-  [WRITER]: ['stage_check_rows', 'persist_built_check'],
+  // F-330: the edges, in pieces before persist_built_check, with the lineage they name.
+  [WRITER]: ['stage_check_rows', 'persist_built_check', 'measurement_lineages', 'link_edges'],
   [MIGRATION]: PERSIST_BODY,
   'apps/web/lib/v2/account/fixes-store.ts': ['mark_fix_done'],
   'infra/supabase/migrations/20261112000001_v2_026b_sites_fixes.sql': PERSIST_BODY,

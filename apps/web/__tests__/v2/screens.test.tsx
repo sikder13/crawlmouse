@@ -171,7 +171,12 @@ describe('Final-Result, the bad site', () => {
       glyph,
     }));
     expect(want.length).toBeGreaterThan(5);
-    expect(renderedPills(html).map(({ state, glyph }) => ({ state, glyph }))).toEqual(want);
+    // A door the locked screen does not have (the Links and pages door) is an addition, left out.
+    const doc = new JSDOM(`<body>${html}</body>`).window.document;
+    doc.querySelectorAll('[data-v2-addition]').forEach((e) => e.remove());
+    expect(renderedPills(doc.body.innerHTML).map(({ state, glyph }) => ({ state, glyph }))).toEqual(
+      want,
+    );
   });
 
   it('ends with the site footer, after the keep bar, the same footer the shell renders', () => {

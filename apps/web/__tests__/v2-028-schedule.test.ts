@@ -790,6 +790,9 @@ describe('scheduleTickFn over claim_due_sites and release_scheduled_claim (owner
         requestSite: async () => {
           throw new Error('database unavailable');
         },
+        accountClock: async () => {
+          throw new Error('not reached');
+        },
         insertQueued: async () => {
           throw new Error('not reached');
         },

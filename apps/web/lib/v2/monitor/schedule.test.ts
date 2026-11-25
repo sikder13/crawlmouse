@@ -27,6 +27,14 @@ function ports(over: Partial<SchedulePorts> = {}) {
         host: 'shop.example.com',
         next_check_at: '2026-11-16T06:00:00+00:00',
       }),
+      accountClock: async () => ({
+        state: 'free',
+        tier: 'free',
+        pastDueTier: null,
+        pastDueSince: null,
+        trialVariant: null,
+        trialEndsAt: null,
+      }),
       insertQueued: async (row) => {
         if (rows.has(row.id)) return false;
         rows.set(row.id, row);

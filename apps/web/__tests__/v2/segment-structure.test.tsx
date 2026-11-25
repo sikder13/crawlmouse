@@ -43,9 +43,7 @@ describe.each(SEGMENT_VARIANTS)('Site structure, %s', (variant) => {
     const p = primaries(html);
     expect(p).toHaveLength(1);
     expect(p[0]).toMatch(
-      data.fixes.open.length
-        ? />Copy as a prompt for your coding tool$/
-        : />Next: Content an answer engine can quote/,
+      data.fixes.open.length ? />Copy as a prompt for your coding tool$/ : />Next: Links and pages/,
     );
   });
 

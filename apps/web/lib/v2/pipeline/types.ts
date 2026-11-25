@@ -92,6 +92,17 @@ export interface PersistDb {
     rows: readonly unknown[],
   ): Promise<unknown>;
   persistBuiltCheck(payload: unknown): Promise<unknown>;
+  /**
+   * F-330: the id of the check's `fetching` lineage, written first as persist_built_check writes it
+   * (`on conflict do nothing` on its natural key), and the check's `check_month`: what a link edge
+   * row names before persist_built_check runs.
+   */
+  edgeTarget(
+    checkId: string,
+    fetching: unknown,
+  ): Promise<{ lineageId: string; checkMonth: string }>;
+  /** F-330: one piece of a check's link edges; a row already written is skipped, not an error. */
+  insertEdges(rows: readonly Record<string, unknown>[]): Promise<void>;
 }
 
 /** The tables the read-back reads. */
