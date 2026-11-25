@@ -24,6 +24,7 @@ import {
   MIN_BATCH_S,
   PACE,
   QUEUE_WAIT_MAX_S,
+  RENDER_SHARE_S,
   reserveS,
 } from '../limits';
 
@@ -32,6 +33,17 @@ const S = 1000;
 /** The end of the fetching phases: the check's own finish (by its page cap) less its reserve. */
 export const fetchEndsAt = (so: Pick<RunSoFar, 'startedAt' | 'pageCap'>): number =>
   so.startedAt + (finishSFor(so.pageCap) - reserveS(so.pageCap)) * S;
+
+/**
+ * When the render step, started at `stepStart`, must stop rendering: RENDER_SHARE_S after the earlier
+ * of its start and the end of the fetching phases. A retried attempt, or one Inngest started late,
+ * gets only what the share has left, so the steps after render keep the rest of RESERVE_S however
+ * many attempts render takes.
+ */
+export const renderEndsAt = (
+  stepStart: number,
+  so: Pick<RunSoFar, 'startedAt' | 'pageCap'>,
+): number => Math.min(stepStart, fetchEndsAt(so)) + RENDER_SHARE_S * S;
 
 /**
  * The busy time after the first accepted crawl batch that is added back to the crawl's end: what
