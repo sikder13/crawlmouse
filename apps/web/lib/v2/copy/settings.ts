@@ -8,6 +8,7 @@ import type { Addition, CopyChange } from '../copy-registry';
 import { listOf } from '../format';
 import { capitalise, count, numberWord, plural } from '../words';
 import { formatPlanPrice } from './plan-price';
+import { brandLogoAlt } from '../view/brand-card';
 
 /** Evidence older than this is condensed to headers and changed parts (FACTS A6, long form). */
 export const EVIDENCE_CONDENSED_AFTER_DAYS = 90;
@@ -38,30 +39,22 @@ export const SETTINGS_COPY = {
   nameLabel: 'Name',
   namePlaceholder: 'Optional',
   /**
-   * Client reports show the Branding card's name, and this one only while no brand name is set
-   * (V2R register, row 24). `agency`: the account's plan; `brandName`: whether one is set;
-   * `reportsShown`: whether the Goal 1 switch shows white-label reports (`agency_white_label`).
+   * Where the account name is shown today: sign-in links, and the mail that asks a client to confirm
+   * reports and then sends them (`agencyName` in mail/templates/client-report.ts and
+   * report-confirm.ts, read from `accounts.name`). No client report reads the Branding card's name
+   * yet, so no reading says one does (V2R register, row 24). `agency`: the account's plan;
+   * `reportsShown`: whether the Goal 1 switch shows `agency_white_label`.
    */
-  nameHint: ({
-    agency,
-    brandName,
-    reportsShown,
-  }: {
-    agency: boolean;
-    brandName: boolean;
-    reportsShown: boolean;
-  }) =>
+  nameHint: ({ agency, reportsShown }: { agency: boolean; reportsShown: boolean }) =>
     !reportsShown
       ? 'Shown on sign-in links.'
-      : !agency
-        ? 'Shown on sign-in links and, on Agency, on client reports until a brand name is set.'
-        : brandName
-          ? 'Shown on sign-in links. Client reports show the brand name under Branding.'
-          : 'Shown on sign-in links, and on client reports until a brand name is set under Branding.',
+      : agency
+        ? 'Shown on sign-in links and in client-report mail.'
+        : 'Shown on sign-in links and, on Agency, in client-report mail.',
   /** The white-label brand (Goal 1 row 24): the card's fixed words; its limits are parameters. */
   branding: {
     title: 'Branding',
-    sub: 'The name and logo client reports carry.',
+    sub: 'The name and logo for your client reports.',
     nameLabel: 'Brand name',
     logoLabel: 'Logo',
     /** `formats` from the validator's formats, `kb` and `px` from its constants. */
@@ -69,7 +62,7 @@ export const SETTINGS_COPY = {
       `${orList(formats)}, up to ${count(kb)} KB and ${count(px)} pixels a side. Leave it empty to keep the current logo.`,
     currentLogo: 'Current logo',
     noLogo: 'No logo yet',
-    logoAlt: (name: string) => `${name} logo`,
+    logoAlt: brandLogoAlt,
     save: 'Save branding',
     saving: 'Saving…',
     saved: 'Branding saved.',
@@ -81,10 +74,17 @@ export const SETTINGS_COPY = {
       unsupported: (formats: readonly string[]) =>
         `That file is not ${orList(formats, true)} image.`,
       malformed: 'That image could not be read. Export it again and choose the new file.',
-      dimensions: (px: number) => `That logo is over ${count(px)} pixels on a side.`,
+      dimensions: (px: number) =>
+        `That logo must be between 1 and ${count(px)} pixels on each side.`,
       other: 'That logo could not be saved. Choose another image.',
     },
     failed: 'Branding was not saved. Try again in a minute.',
+    signedOut: 'Your session has ended. Sign in again, then save.',
+    signIn: 'Sign in',
+    roleRefused:
+      'Your role on this account cannot set branding. The owner or an account manager can.',
+    planRefused: 'This account’s plan does not include branding.',
+    unavailable: 'Branding is not available right now.',
   },
   signInTitle: 'Sign-in',
   signIn: (minutes: number) =>
@@ -241,6 +241,35 @@ const ZONE =
 const DAYS =
   'FACTS D4 and Q4 (owner ruling): calendar days in the account’s zone, Fri 30 Oct to Sat 7 Nov';
 
+/** The account name's hint as Final-Settings locked it. */
+const NAME_HINT_LOCKED = 'Shown on sign-in links and, on Agency, on client reports.';
+
+/**
+ * Every reading of the name hint that differs from the locked one, rendered from `nameHint` over
+ * each plan and switch state. The locked fixture (a Pro trial, the switch showing) reaches one; the
+ * rest are listed as `otherReading`, which the lock comparison does not apply.
+ */
+export const NAME_HINT_CHANGES: CopyChange[] = (() => {
+  const seen = new Set<string>();
+  const out: CopyChange[] = [];
+  for (const agency of [false, true]) {
+    for (const reportsShown of [true, false]) {
+      const rendered: string = SETTINGS_COPY.nameHint({ agency, reportsShown });
+      if (rendered === NAME_HINT_LOCKED || seen.has(rendered)) continue;
+      seen.add(rendered);
+      out.push({
+        screen: 'settings',
+        kind: 'ruling',
+        locked: NAME_HINT_LOCKED,
+        rendered,
+        source: `V2R register, row 24 (CTO 085): the hint names where the account name is shown today, sign-in links and client-report mail; no client report reads the brand name yet. This reading: ${agency ? 'Agency' : 'not Agency'}, agency_white_label ${reportsShown ? 'shown' : 'hidden'}`,
+        ...(!agency && reportsShown ? {} : { otherReading: true }),
+      });
+    }
+  }
+  return out;
+})();
+
 export const SETTINGS_CHANGES: CopyChange[] = [
   // The rail's trial card: this page carries the plan, so the card leaves its terms and Keep here.
   {
@@ -283,14 +312,7 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     rendered: 'Pro trial, 8 days left',
     source: DAYS,
   },
-  {
-    screen: 'settings',
-    kind: 'ruling',
-    locked: 'Shown on sign-in links and, on Agency, on client reports.',
-    rendered: 'Shown on sign-in links and, on Agency, on client reports until a brand name is set.',
-    source:
-      'V2R register, row 24 (CTO 085): an Agency account sets a brand name under Branding, and client reports show it, falling back to the account name only while none is set',
-  },
+  ...NAME_HINT_CHANGES,
   {
     screen: 'settings',
     kind: 'fixture',

@@ -512,11 +512,7 @@ export function settingsView(
         name: 'name',
         value: a.name ?? '',
         placeholder: COPY.namePlaceholder,
-        hint: COPY.nameHint({
-          agency,
-          brandName: a.branding !== null,
-          reportsShown: features.agency_white_label,
-        }),
+        hint: COPY.nameHint({ agency, reportsShown: features.agency_white_label }),
         readOnly: false,
       },
       signIn: { title: COPY.signInTitle, text: COPY.signIn(AUTH_LINK_MINUTES) },
@@ -675,6 +671,9 @@ export const LOGO_TYPES: Readonly<Record<LogoFormat, { name: string; contentType
   webp: { name: 'WebP', contentType: 'image/webp' },
 };
 
+/** Sign-in for a session that ended, back to Settings after (as Seats sends an invitee back). */
+export const BRAND_SIGN_IN = '/login?next=/settings';
+
 /**
  * The Branding card, or null where the brand route would refuse the reader's save. Each condition is
  * the route's own (app/api/agency/brand/route.ts): the effective tier is Agency with
@@ -723,6 +722,11 @@ export function brandingCard(
       saved: B.saved,
       failed: B.failed,
       rateLimited: B.rateLimited(BRAND_SAVES_PER_HOUR),
+      signedOut: B.signedOut,
+      signIn: { label: B.signIn, href: BRAND_SIGN_IN },
+      roleRefused: B.roleRefused,
+      planRefused: B.planRefused,
+      unavailable: B.unavailable,
       name: BRAND_NAME_RULE,
       logo: {
         empty: B.logoErrors.empty,

@@ -41,6 +41,15 @@ export interface BrandMessages {
   saved: string;
   failed: string;
   rateLimited: string;
+  /** 401 `auth_required`: the session ended; `signIn` is the way back. */
+  signedOut: string;
+  signIn: { label: string; href: string };
+  /** 403 `role_refused`: the reader's seat may not set the brand. */
+  roleRefused: string;
+  /** 403 `upgrade_required`: the account's plan does not include branding. */
+  planRefused: string;
+  /** 404 `not_found`: the route is switched off. */
+  unavailable: string;
   name: string;
   /** One sentence per reason `validateLogo` (and the route's size check) refuses with. */
   logo: Readonly<Record<LogoErr['reason'], string>> & { other: string };
@@ -49,13 +58,25 @@ export interface BrandMessages {
 /** What a save came to: the stored name, or a sentence, tied to its field where it has one. */
 export type BrandOutcome =
   | { ok: true; agencyName: string }
-  | { ok: false; field: 'name' | 'logo' | null; text: string };
+  | {
+      ok: false;
+      field: 'name' | 'logo' | null;
+      text: string;
+      /** A link after the sentence: sign in again, for an ended session. */
+      link?: { label: string; href: string };
+    };
 
-/** The multipart body the route reads: the name, and the logo only when a file was chosen. */
+/** The logo's alternative text, for a brand of this name. */
+export const brandLogoAlt = (name: string) => `${name} logo`;
+
+/**
+ * The multipart body the route reads: the name, and the logo whenever a file was chosen, an empty
+ * one included, so the route's refusal of it (`invalid_logo`, `empty`) reaches the reader.
+ */
 export function brandBody(name: string, logo: File | null): FormData {
   const body = new FormData();
   body.append(BRAND_FIELDS.name, name);
-  if (logo !== null && logo.size > 0) body.append(BRAND_FIELDS.logo, logo);
+  if (logo !== null) body.append(BRAND_FIELDS.logo, logo);
   return body;
 }
 
@@ -79,5 +100,13 @@ export function brandOutcome(status: number, body: unknown, m: BrandMessages): B
   // The whole body over its cap: only a logo can make it so.
   if (status === 413) return { ok: false, field: 'logo', text: m.logo.too_large };
   if (status === 429) return { ok: false, field: null, text: m.rateLimited };
+  if (status === 401) return { ok: false, field: null, text: m.signedOut, link: m.signIn };
+  if (status === 403 && b.code === 'role_refused') {
+    return { ok: false, field: null, text: m.roleRefused };
+  }
+  if (status === 403 && b.code === 'upgrade_required') {
+    return { ok: false, field: null, text: m.planRefused };
+  }
+  if (status === 404) return { ok: false, field: null, text: m.unavailable };
   return { ok: false, field: null, text: m.failed };
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   brandBody,
+  brandLogoAlt,
   brandOutcome,
   type BrandingCardView,
   type BrandOutcome,
@@ -21,6 +22,10 @@ type State = 'idle' | 'sending' | BrandOutcome;
  * Settings' Branding card (Goal 1 row 24): the brand name, the current logo, and a logo file. Save
  * posts both as multipart to the brand route, which decides; its refusal is shown under the field it
  * is about, or under Save. A preview renders without `LiveActions` and posts nothing.
+ *
+ * The form has no `action` and Save stays disabled until the page has hydrated, so nothing can
+ * post the form natively to the JSON route: without JavaScript the reader sees the card and its
+ * current brand, and cannot save.
  */
 export function BrandingCard({ view }: { view: BrandingCardView }) {
   const live = useLive();
@@ -28,6 +33,15 @@ export function BrandingCard({ view }: { view: BrandingCardView }) {
   const [logo, setLogo] = useState(view.logo.current);
   const nameRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  // A logo shown from a chosen file is an object URL: revoked when it is replaced, and on unmount.
+  useEffect(() => {
+    const src = logo?.src;
+    return () => {
+      if (src?.startsWith('blob:')) URL.revokeObjectURL(src);
+    };
+  }, [logo?.src]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -41,9 +55,14 @@ export function BrandingCard({ view }: { view: BrandingCardView }) {
       const outcome = brandOutcome(res.status, body, view.messages);
       if (outcome.ok) {
         if (nameRef.current) nameRef.current.value = outcome.agencyName;
-        if (file !== null && file.size > 0) {
-          setLogo({ src: URL.createObjectURL(file), alt: view.logo.current?.alt ?? file.name });
-        }
+        const alt = brandLogoAlt(outcome.agencyName);
+        setLogo((was) =>
+          file !== null && file.size > 0
+            ? { src: URL.createObjectURL(file), alt }
+            : was === null
+              ? null
+              : { ...was, alt },
+        );
         if (fileRef.current) fileRef.current.value = '';
       }
       setState(outcome);
@@ -61,6 +80,7 @@ export function BrandingCard({ view }: { view: BrandingCardView }) {
   const logoError = errorOn('logo');
   const formLine =
     typeof state !== 'object' ? '' : state.ok ? view.messages.saved : (errorOn(null) ?? '');
+  const formLink = failed?.field === null ? (failed.link ?? null) : null;
   const ids = {
     nameHint: `${view.name.id}-hint`,
     nameError: `${view.name.id}-error`,
@@ -73,15 +93,7 @@ export function BrandingCard({ view }: { view: BrandingCardView }) {
     <div data-v2-addition="">
       <Card as="section" className={shared.panel}>
         <CardHead title={view.title} sub={view.sub} />
-        <form
-          method="post"
-          action={view.href}
-          encType="multipart/form-data"
-          className={styles.form}
-          aria-label={view.title}
-          onSubmit={submit}
-          noValidate
-        >
+        <form className={styles.form} aria-label={view.title} onSubmit={submit} noValidate>
           <div className={field.stack}>
             <label htmlFor={view.name.id} className={field.label}>
               {view.name.label}
@@ -146,12 +158,20 @@ export function BrandingCard({ view }: { view: BrandingCardView }) {
           </div>
 
           <div>
-            <Button type="submit" disabled={state === 'sending'}>
+            <Button type="submit" disabled={!hydrated || state === 'sending'}>
               {state === 'sending' ? view.save.busy : view.save.label}
             </Button>
           </div>
           <p className={styles.formLine} role="status">
             {formLine}
+            {formLink ? (
+              <>
+                {' '}
+                <a href={formLink.href} className={styles.inlineLink}>
+                  {formLink.label}
+                </a>
+              </>
+            ) : null}
           </p>
         </form>
       </Card>

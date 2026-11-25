@@ -18,6 +18,7 @@ import { ALL_SHOWN, type Features } from '../features';
 import { fixture } from '../fixtures';
 import type { SeatRole } from '../account/profile';
 import { LOGO_TYPES, settingsView } from './settings';
+import { COPY_CHANGES } from '../copy-registry';
 
 const NORTHWIND = 'a0000000-0000-4000-8000-0000000000c9';
 const KESTREL = 'a0000000-0000-4000-8000-0000000000ca';
@@ -184,7 +185,7 @@ describe('the card’s rules, read from the code that enforces them', () => {
       `That logo is over ${MAX_LOGO_BYTES / 1024} KB. Choose a smaller file.`,
     );
     expect(card.messages.logo.bad_dimensions).toBe(
-      `That logo is over ${MAX_LOGO_DIMENSION.toLocaleString('en-US')} pixels on a side.`,
+      `That logo must be between 1 and ${MAX_LOGO_DIMENSION.toLocaleString('en-US')} pixels on each side.`,
     );
     expect(card.messages.rateLimited).toBe(
       'Branding can be saved five times an hour. Try again in an hour.',
@@ -192,26 +193,68 @@ describe('the card’s rules, read from the code that enforces them', () => {
   });
 });
 
+describe('a zero-size image', () => {
+  it('is refused as bad_dimensions, and the card’s sentence is true of it', () => {
+    // A PNG header 0 pixels wide and 16 high.
+    const zeroWide = Uint8Array.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0,
+      0, 0, 0, 0, 16,
+    ]);
+    const v = validateLogo(zeroWide);
+    expect(v.ok ? null : v.reason).toBe('bad_dimensions');
+    const card = agencyView('owner').branding!;
+    expect(card.messages.logo.bad_dimensions).toBe(
+      'That logo must be between 1 and 4,096 pixels on each side.',
+    );
+    expect(card.messages.logo.bad_dimensions).not.toMatch(/\bover\b/);
+  });
+});
+
 describe('the account name’s hint (V2R register row 24)', () => {
   const hint = (v: ReturnType<typeof settingsView>) => v.account.name.hint;
+  const bad = fixture('bad-site');
+  const pro = (features: Features) =>
+    settingsView(bad, { accountId: BAD, now: bad.as_of }, { features });
 
-  it('on Pro, says client reports show it on Agency until a brand name is set', () => {
+  it('on Pro, names sign-in links and, on Agency, client-report mail', () => {
     expect(hint(settingsPreview('home'))).toBe(
-      'Shown on sign-in links and, on Agency, on client reports until a brand name is set.',
+      'Shown on sign-in links and, on Agency, in client-report mail.',
     );
   });
 
-  it('on Agency with a brand name, says client reports show the brand name instead', () => {
-    expect(hint(agencyView('owner'))).toBe(
-      'Shown on sign-in links. Client reports show the brand name under Branding.',
+  it('on Agency, names sign-in links and client-report mail, with a brand set or not', () => {
+    expect(hint(agencyView('owner'))).toBe('Shown on sign-in links and in client-report mail.');
+    expect(hint(agencyView('owner', ALL_SHOWN, KESTREL))).toBe(
+      'Shown on sign-in links and in client-report mail.',
     );
   });
 
-  it('with agency_white_label hidden, names no client report', () => {
+  it('with agency_white_label hidden, names sign-in links only', () => {
     expect(hint(agencyView('owner', HIDDEN))).toBe('Shown on sign-in links.');
-    const bad = fixture('bad-site');
-    expect(hint(settingsView(bad, { accountId: BAD, now: bad.as_of }, { features: HIDDEN }))).toBe(
-      'Shown on sign-in links.',
+    expect(hint(pro(HIDDEN))).toBe('Shown on sign-in links.');
+  });
+
+  it('never says a client report shows the brand name, which no report reads yet', () => {
+    for (const v of [agencyView('owner'), agencyView('owner', HIDDEN), pro(ALL_SHOWN), pro(HIDDEN)])
+      expect(hint(v)).not.toMatch(/brand name|on client reports/);
+    expect(agencyView('owner').branding!.sub).toBe('The name and logo for your client reports.');
+  });
+
+  it('registers every reading that differs from the locked hint, as a V2R ruling', () => {
+    const readings = new Set(
+      [agencyView('owner'), agencyView('owner', HIDDEN), pro(ALL_SHOWN), pro(HIDDEN)].map(hint),
     );
+    const registered = COPY_CHANGES.filter(
+      (c) => c.locked === 'Shown on sign-in links and, on Agency, on client reports.',
+    );
+    expect(new Set(registered.map((c) => c.rendered))).toEqual(readings);
+    for (const c of registered) {
+      expect(c.kind).toBe('ruling');
+      expect(c.source).toMatch(/^V2R register, row 24 \(CTO 085\)/);
+    }
+    // Only the reading the locked fixture renders (Pro, switch shown) is applied to the lock.
+    expect(registered.filter((c) => !c.otherReading).map((c) => c.rendered)).toEqual([
+      'Shown on sign-in links and, on Agency, in client-report mail.',
+    ]);
   });
 });
