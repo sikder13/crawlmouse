@@ -127,3 +127,55 @@ describe('a re-check whose only change is a letter-held grade row (review #1)', 
     expect(read(true)).toEqual(without);
   });
 });
+
+describe('a grade row where one letter held and another moved (QA N1, CTO ruling)', () => {
+  const MIXED = '90000000-0000-4000-8000-0000000000f3';
+  function mixed() {
+    const d = structuredClone(fixture('bad-site'));
+    const moved = d.changes.find((c) => c.id === LETTER_MOVED)!;
+    d.changes = d.changes.filter((c) => c.id !== LETTER_MOVED);
+    d.changes.push({
+      ...moved,
+      id: MIXED,
+      summary: 'Technical SEO A → A (90 → 91); AI readability D → F (41 → 22)',
+      grade_deltas: [
+        { grade: 'technical_seo', from_score: 90, to_score: 91, from_grade: 'A', to_grade: 'A' },
+        { grade: 'ai_readability', from_score: 41, to_score: 22, from_grade: 'D', to_grade: 'F' },
+      ],
+    });
+    return { d, check: moved.check_id };
+  }
+
+  it('the log and the tab print only the letter that moved', () => {
+    const { d, check } = mixed();
+    const viewer = { accountId: ACCOUNT, now: d.as_of };
+    const log = changesLogView(d, viewer, {}, '/changes').rows.find((r) => r.key === MIXED)!;
+    expect(log.summary).toBe('AI readability D → F (41 → 22)');
+    const tab = changesView(d, check, {});
+    if (tab.state !== 'changes') throw new Error(`segment state ${tab.state}`);
+    expect(tab.rows.find((r) => r.key === MIXED)!.summary).toBe('AI readability D → F (41 → 22)');
+  });
+
+  it('an alert mail’s row and the Alerts page name only the letter that moved', async () => {
+    const { rowText } = await import('../mail/templates/alert');
+    const { onlyMoved } = await import('./listed-changes');
+    const row = mixed().d.changes.find((c) => c.id === MIXED)!;
+    expect(rowText(row).line).toBe('AI readability D → F (41 → 22)');
+    expect(onlyMoved(row).grade_deltas.map((g) => g.grade)).toEqual(['ai_readability']);
+    const { alertsView } = await import('./alerts');
+    const { d } = mixed();
+    const page = JSON.stringify(alertsView(d, { accountId: ACCOUNT, now: d.as_of }));
+    expect(page).toContain('AI readability D 41 → F 22');
+    expect(page).not.toContain('A 90 → A 91');
+    // A row where every letter moved keeps the engine's own words.
+    const both = { ...row, grade_deltas: [row.grade_deltas[1]!], summary: 'kept as written' };
+    expect(onlyMoved(both).summary).toBe('kept as written');
+  });
+
+  it('the dashboard names no held letter', async () => {
+    const { dashboardView } = await import('./dashboard');
+    const { d } = mixed();
+    const text = JSON.stringify(dashboardView(d, { accountId: ACCOUNT, now: d.as_of }));
+    expect(text).not.toContain('A → A');
+  });
+});

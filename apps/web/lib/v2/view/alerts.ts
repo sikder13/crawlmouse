@@ -5,6 +5,7 @@
  * change-note preference (the field Settings shows) and its Slack integration; the rules are the
  * account's `alert_rules`. Every count a sentence states is the length of a list built here.
  */
+import { onlyMoved } from './listed-changes';
 import { instant, type Change, type Verdict } from '@crawlmouse/types/v2';
 import { ALERTS_SENDER } from '../../auth/constants';
 import { ALERTS_COPY as COPY, ALERT_PILLS, GRADE_SHORT } from '../copy/alerts';
@@ -130,7 +131,9 @@ export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
     return crawler ? [crawler.verdict] : [];
   };
 
-  const what = (c: Change): string => {
+  const what = (row: Change): string => {
+    // Only the letters that moved (CTO ruling on QA N1).
+    const c = onlyMoved(row);
     const check = findCheck(v.d, c.check_id);
     const host = siteOfCheck(c.check_id).host;
     const pages =
