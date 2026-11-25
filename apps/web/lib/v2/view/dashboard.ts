@@ -52,6 +52,7 @@ import {
   readRuns,
   scheduleCell,
   seoOf,
+  weekdayAmbiguous,
   whenAgo,
   zoneOf,
   type GradeCell,
@@ -297,21 +298,8 @@ const newestResult = (v: AccountView) =>
  * read as another check, when the earlier one is a week or more before now or falls on the same
  * weekday as the latest result; then its date ("Fri 23 Oct").
  */
-/**
- * A weekday names the earlier check only when it cannot mean another: the check is under a week
- * before now, and the newest result (when it is a different check) fell on another weekday.
- */
-export function weekdayAmbiguous(
-  prev: string,
-  newest: string | null,
-  now: string,
-  zone: string,
-): boolean {
-  return (
-    calendarDays(prev, now, zone) >= 7 ||
-    (newest !== null && weekday(newest, zone) === weekday(prev, zone))
-  );
-}
+/** Moved beside the other check helpers, so the site page shares it (F-302). */
+export { weekdayAmbiguous };
 
 function sinceName(
   v: AccountView,

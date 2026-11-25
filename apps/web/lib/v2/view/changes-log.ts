@@ -19,7 +19,7 @@ import {
   type Viewer,
 } from './account';
 import { accountShellView, newChanges, type ShellView } from './account-shell';
-import { rowOf, type ChangeRowView } from './segment/changes';
+import { lettersUnmoved, rowOf, type ChangeRowView } from './segment/changes';
 
 const DAY_MS = 86_400_000;
 
@@ -137,7 +137,7 @@ export function changesLogView(
   );
   const hostOf = new Map(sites.map((s) => [s.id, s.host]));
   const siteOfCheck = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
-  const all = logEntries(accountChanges(v));
+  const all = logEntries(accountChanges(v).filter((c) => !lettersUnmoved(c)));
   const site = query.site && hostOf.has(query.site) ? query.site : null;
   const kind = KIND_ORDER.find((k) => k === query.kind) ?? null;
   // The kinds the account's changes hold, and the one asked for even when none has it yet.

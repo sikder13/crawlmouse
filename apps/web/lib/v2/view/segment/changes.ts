@@ -160,6 +160,16 @@ function causeOf(c: Change): string {
     : `First observed at this check. What we found: ${text}.`;
 }
 
+/**
+ * A grade row in which no letter moved ("Technical SEO A → A (90 → 91)"): the engine writes it for a
+ * move of a point or more within a letter, and it is not listed as a change (F-302).
+ */
+export const lettersUnmoved = (c: Change): boolean =>
+  c.subject === 'grade' &&
+  c.kind === 'changed' &&
+  c.grade_deltas.length > 0 &&
+  c.grade_deltas.every((g) => g.from_grade === g.to_grade);
+
 /** The pill of an `opened` row for a fix that was done and is found again (F-296). */
 export const FOUND_AGAIN = 'found again';
 
@@ -311,7 +321,7 @@ export function changesView(
   }
 
   const rows = d.changes
-    .filter((c) => c.check_id === check.id)
+    .filter((c) => c.check_id === check.id && !lettersUnmoved(c))
     .map((c) => rowOf(c, check, at, d.fix_events));
   const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);

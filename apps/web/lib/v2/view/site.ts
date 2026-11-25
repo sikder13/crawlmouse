@@ -52,6 +52,7 @@ import {
   nextCheck,
   scheduleCell,
   seoOf,
+  sinceDay,
   whenAgo,
   zoneOf,
 } from './checks';
@@ -217,7 +218,7 @@ function checksLine(checks: readonly Check[], site: Site, zone: string): string 
   return parts.join(', ');
 }
 
-function seoCard(c: Check, prev: Check | null, zone: string): GradeCardView {
+function seoCard(c: Check, prev: Check | null, zone: string, now: string): GradeCardView {
   const g = seoOf(c);
   const was = prev ? seoOf(prev) : null;
   const t = c.technical_seo;
@@ -233,14 +234,16 @@ function seoCard(c: Check, prev: Check | null, zone: string): GradeCardView {
     score: g?.score ?? null,
     tone: g?.tone ?? 'default',
     move:
-      g && was ? `${move(was.score, g.score)} since ${weekday(prev!.finished_at!, zone)}` : null,
+      g && was
+        ? `${move(was.score, g.score)} since ${sinceDay(prev!.finished_at!, c.finished_at!, now, zone)}`
+        : null,
     parts: parts.length ? parts.join(' · ') : null,
     withheld: g ? null : 'Technical SEO was not graded at this check.',
     verdicts: [],
   };
 }
 
-function aiCard(c: Check, prev: Check | null, zone: string): GradeCardView {
+function aiCard(c: Check, prev: Check | null, zone: string, now: string): GradeCardView {
   const g = aiOf(c);
   const was = prev ? aiOf(prev) : null;
   const { blocked, of, verdicts } = blockedOf(c);
@@ -256,7 +259,9 @@ function aiCard(c: Check, prev: Check | null, zone: string): GradeCardView {
     score: g?.score ?? null,
     tone: g?.tone ?? 'default',
     move:
-      g && was ? `${move(was.score, g.score)} since ${weekday(prev!.finished_at!, zone)}` : null,
+      g && was
+        ? `${move(was.score, g.score)} since ${sinceDay(prev!.finished_at!, c.finished_at!, now, zone)}`
+        : null,
     parts: parts.join(' · '),
     withheld: c.ai_readability?.withheld
       ? aiWithheldSummary(c, scoredCrawlersMeasured(c.crawlers))
@@ -612,7 +617,7 @@ export function siteView(
     grades: {
       title: `Grades, ${numberWord(shown.length)} ${plural(shown.length, 'check', 'checks')}`,
       sub: checksLine(shown, site, zone),
-      cards: [seoCard(result, prev, zone), aiCard(result, prev, zone)],
+      cards: [seoCard(result, prev, zone, v.now), aiCard(result, prev, zone, v.now)],
       actions: v.gates.exports
         ? [
             // A link, not a request: the Reports page's compare card names the two checks, and says
