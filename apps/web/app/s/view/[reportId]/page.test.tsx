@@ -24,7 +24,7 @@ const h = vi.hoisted(() => ({
   db: null as unknown as PGlite,
   user: null as { id: string; email: string } | null,
   cookies: new Map<string, string>(),
-  objects: new Map<string, string>(),
+  objects: new Map<string, string | Uint8Array>(),
   downloads: [] as string[],
   capture: vi.fn(async (..._a: unknown[]) => undefined),
   /** Each rate-limit call's key and bound, and whether the address is past its bound. */
@@ -75,7 +75,10 @@ vi.mock('@/lib/supabase/admin', () => ({
             const body = h.objects.get(path);
             return body === undefined
               ? { data: null, error: { message: 'not found' } }
-              : { data: new Blob([body]), error: null };
+              : {
+                  data: new Blob([typeof body === 'string' ? body : new Uint8Array(body)]),
+                  error: null,
+                };
           },
         }),
       },
@@ -331,6 +334,65 @@ describe('/s/view/[reportId]', () => {
       referrer: 'no-referrer',
     });
     expect(dynamic).toBe('force-dynamic');
+  });
+});
+
+describe('/s/view/[reportId]: the agency stamped on a shared report (white-label)', () => {
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  /** A proof page stored with `brand` stamped on it, and its link's token in the cookie. */
+  async function brandedPage(w: World, brand: { name: string; logoPath: string | null }) {
+    const id = await report(
+      w.owner.accountId,
+      (await keptSite(h.db, w.owner.accountId)).id,
+      'html',
+    );
+    h.objects.set(`${w.owner.accountId}/${id}.doc.json`, JSON.stringify({ brand, ...DOC }));
+    h.cookies.set('cm_share', await link(w, id));
+    return id;
+  }
+
+  it('shows the agency’s name, and its logo as a data: address of the stored bytes', async () => {
+    const w = await world();
+    const logoPath = `agency/${w.owner.accountId}/0123456789abcdef.png`;
+    h.objects.set(logoPath, new Uint8Array(PNG));
+    const html = await sharedPage(await brandedPage(w, { name: 'Northwind Digital', logoPath }));
+    expect(html).toContain('data-proof-brand=""');
+    expect(html).toContain('Northwind Digital');
+    expect(html).toContain(`src="data:image/png;base64,${PNG.toString('base64')}"`);
+    expect(html.indexOf('Northwind Digital')).toBeLessThan(html.indexOf(DOC.title));
+  });
+
+  it('shows the name alone, and reads nothing, for a logo path that is not the report’s account’s', async () => {
+    const w = await world();
+    const other = `agency/${randomUUID()}/0123456789abcdef.png`;
+    h.objects.set(other, new Uint8Array(PNG));
+    const id = await brandedPage(w, { name: 'Northwind Digital', logoPath: other });
+    h.downloads.length = 0;
+    const html = await sharedPage(id);
+    expect(html).toContain('Northwind Digital');
+    expect(html).not.toContain('<img');
+    expect(h.downloads.some((d) => d.includes(other))).toBe(false);
+  });
+
+  it('shows the name alone for stored bytes that are not a logo', async () => {
+    const w = await world();
+    const logoPath = `agency/${w.owner.accountId}/0123456789abcdef.png`;
+    h.objects.set(logoPath, '<svg onload="alert(1)"/>');
+    const html = await sharedPage(await brandedPage(w, { name: 'Northwind Digital', logoPath }));
+    expect(html).toContain('Northwind Digital');
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('svg');
+  });
+
+  it('draws a report with no brand exactly as before: no header of an agency', async () => {
+    const w = await world();
+    h.cookies.set('cm_share', await link(w, w.proof));
+    const html = await sharedPage(w.proof);
+    expect(html).not.toContain('data-proof-brand');
+    expect(html).not.toContain('<img');
   });
 });
 

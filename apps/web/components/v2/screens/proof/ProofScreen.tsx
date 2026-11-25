@@ -12,11 +12,30 @@ import styles from './ProofScreen.module.css';
  * and no orange element. A before-and-after pair is two columns, one under the other on a phone.
  * Built from the design system's pieces: no locked artboard draws this page.
  */
-export function ProofScreen({ data }: { data: ProofView }) {
+/**
+ * The agency a shared report is from (Goal 1 row 24, white-label): its name, and its logo as a
+ * `data:` address the page made from the stored bytes, or null. Omitted for a report with no brand,
+ * which then draws exactly as before.
+ */
+export interface ProofBrand {
+  name: string;
+  logoSrc: string | null;
+}
+
+export function ProofScreen({ data, brand }: { data: ProofView; brand?: ProofBrand }) {
   return (
     <div className={shell.shell} data-v2-shell="" data-v2-proof="">
       <main className={`${layout.wrap} ${styles.main}`}>
         <header className={styles.head}>
+          {brand ? (
+            <div className={styles.brand} data-proof-brand="">
+              {brand.logoSrc ? (
+                // A data: address of bytes checked at read: no remote image, so next/image adds nothing.
+                <img className={styles.brandLogo} src={brand.logoSrc} alt="" />
+              ) : null}
+              <p className={styles.brandName}>{brand.name}</p>
+            </div>
+          ) : null}
           <Heading level={1} size="l">
             {data.title}
           </Heading>
