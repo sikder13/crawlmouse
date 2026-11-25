@@ -20,6 +20,7 @@
 import { NonRetriableError } from 'inngest';
 import { inngest } from './client';
 import { checkConcurrencyLimit } from './concurrency';
+import { FULL_RENDER_WAIT_S, fullRenderRequestedEventId } from './full-render-time';
 import {
   CheckFailure,
   checkFailedEventId,
@@ -72,13 +73,14 @@ export const PACE = {
   /** Discovery's bound on reading robots.txt and the sitemaps (DISCOVER_S in the app's limits). */
   discoverS: 60,
   /**
-   * The run's finish timeout: 88 minutes (5,260 s), the plan of the largest page cap (2,000 pages,
-   * inbox 079). Its parts: every claim wait (300 s), discovery (60 s), the wait budget
+   * The run's finish timeout: 7,420 s (about 124 minutes). It is the plan of the largest page cap,
+   * 5,260 s (2,000 pages, inbox 079), plus row 17's wait for a full render, FULL_RENDER_WAIT_S (2,160 s).
+   * The plan's parts: every claim wait (300 s), discovery (60 s), the wait budget
    * (QUEUE_WAIT_MAX_S, 900 s), the crawl (3,400 s), the access slice (300 s) and the reserve (300 s). It is one setting on the
    * function, so it is the largest cap's; a smaller check keeps its own plan inside it
    * (`finishSFor` in the app's limits). steps/time.test.ts recomputes it from those constants.
    */
-  finishS: 5260,
+  finishS: 7420,
   /**
    * Crawl batches per check: 44, so a check reaches the largest page cap (2,000, FACTS) with up to
    * four batches short of 50 URLs. The first batch of a site with no sitemap is its home page alone,
@@ -151,6 +153,8 @@ export interface RunSoFar {
   waitingSince: number | null;
   /** What discovery found that a visitor can read; null until discovery has ended. */
   discovered: { sitemap_urls: number; robots_txt: RobotsStatus | null } | null;
+  /** Row 17: the check's full render merged, so the build reads it (`render-full`). Absent: no. */
+  fullRendered?: boolean;
 }
 
 /** What discovery's robots.txt request answered (the engine's RobotsStatus, RobotsTxtState). */
@@ -198,7 +202,15 @@ export type ReadOutput =
   | { status: 'running' }
   /** Read on a stale signal, and the worker says this batch failed: as a failed poll. */
   | { status: 'failed' };
-export type RenderOutput = { rendered: number; not_rendered: number };
+export type RenderOutput = {
+  rendered: number;
+  not_rendered: number;
+  /**
+   * Row 17: the check took one of its account's full renders (the render step decides, so a check
+   * without one runs no extra step). Absent: no.
+   */
+  full_render?: boolean;
+};
 export type BuildOutput = { status: 'finished' | 'partial'; pages: number; fixes: number };
 export type PersistOutput = { written: boolean };
 /**
@@ -247,11 +259,17 @@ export interface CheckStepTools {
     id: string,
     opts: { event: 'check.batch.ended'; timeout: string; if: string },
   ): Promise<{ data: CheckBatchEnded } | null>;
+  /** Row 17: the full render's end (full-render.ts), or null at the timeout. */
+  waitForFullRender?(
+    id: string,
+    opts: { event: 'check.render-full.done'; timeout: string; if: string },
+  ): Promise<{ data: { checkId: string; merged: boolean } } | null>;
   sendEvent(
     id: string,
     payload:
       | { id: string; name: 'check.finished'; data: CheckFinished }
       | { id: string; name: 'check.failed'; data: CheckFailed }
+      | { id: string; name: 'check.render-full.requested'; data: CheckRequested }
       | { id: string; name: 'check.requested'; data: CheckRequested },
   ): Promise<unknown>;
 }
@@ -507,7 +525,22 @@ export async function runCheck(
   }
 
   // ── render, build, persist, finalize, emit ──
-  await run('render', () => steps.render(data, soFar()));
+  const rendered = await run('render', () => steps.render(data, soFar()));
+  // Row 17: a check that took one of its account's full renders asks for it and waits for its end.
+  // The build reads it only when it merged; at the timeout the check builds from its sample.
+  if (rendered.full_render === true && step.waitForFullRender) {
+    await step.sendEvent('full-render', {
+      id: fullRenderRequestedEventId(data.checkId),
+      name: 'check.render-full.requested',
+      data,
+    });
+    const done = await step.waitForFullRender('full-render-done', {
+      event: 'check.render-full.done',
+      timeout: `${FULL_RENDER_WAIT_S}s`,
+      if: 'event.data.checkId == async.data.checkId',
+    });
+    so.fullRendered = done?.data.merged === true;
+  }
   const built = await failingAs('build_failed', () =>
     run('build', () => steps.build(data, soFar())),
   );
@@ -592,6 +625,7 @@ export function createCheckFn(
             run: <T>(id: string, fn: () => Promise<T>) => step.run(id, fn) as Promise<T>,
             sleep: (id, ms) => step.sleep(id, ms),
             waitForEvent: (id, opts) => step.waitForEvent(id, opts),
+            waitForFullRender: (id, opts) => step.waitForEvent(id, opts),
             sendEvent: (id, payload) => step.sendEvent(id, payload),
           },
         },

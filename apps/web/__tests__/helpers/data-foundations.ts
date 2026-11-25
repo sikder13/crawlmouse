@@ -24,6 +24,7 @@ export const DERIVED_TABLES = [
   'fix_events',
   'frontier',
   'frontier_politeness',
+  'full_render_uses',
   'public_reports',
   'render_reservations',
   'usage_events',

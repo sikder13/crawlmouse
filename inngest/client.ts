@@ -70,6 +70,10 @@ type Events = {
   'check.finished': { data: CheckFinished };
   'check.failed': { data: CheckFailed };
   'check.cancel.requested': { data: CheckCancelRequested };
+  // Row 17: a check that took one of its account's full renders asks for it (full-render.ts), and
+  // the full render says when it has merged, or rendered nothing. Names the check only.
+  'check.render-full.requested': { data: CheckRequested };
+  'check.render-full.done': { data: { checkId: string; merged: boolean } };
   // A visitor asked to be told when a check ends (CC-22b). CC-28's mailer handles it; the address
   // stays in checks.notify_email and is not in the event.
   'check.notify_requested': { data: CheckNotifyRequested };

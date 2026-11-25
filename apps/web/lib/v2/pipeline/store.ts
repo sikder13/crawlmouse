@@ -19,8 +19,8 @@ import { isFailureReason, type FailureReason } from '../../../../../inngest/chec
 import type { ReapedCheck } from '../../../../../inngest/check-reaper';
 import { checkFromRow, diffInputsFromRow, fixEventFromRow, fixFromRow, siteFromRow } from './rows';
 import type { CrawlBatchRow, CrawlBatchStatus } from './types';
-import type { EntitlementClock } from '../../entitlement-v2';
-import { readAccountClock } from './load-for';
+import { effectiveTier, type EntitlementClock, type Tier } from '../../entitlement-v2';
+import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow, readAccountClock } from './load-for';
 
 export type ClaimOutcome = 'claimed' | 'site_busy' | 'gone';
 
@@ -66,6 +66,12 @@ export interface PipelineStore {
    * retried call); false when it had ended otherwise.
    */
   fail(checkId: string | null, reason: FailureReason, runId: string | null): Promise<boolean>;
+  /** Row 17: an account's plan at `nowMs`, as its entitlement clock gives it (`effectiveTier`). */
+  planOf(accountId: string, nowMs: number): Promise<Tier>;
+  /** Row 17: `take_full_render`; true when the check has one of the month's full renders. */
+  takeFullRender(accountId: string, checkId: string, limit: number): Promise<boolean>;
+  /** Row 17: `give_back_full_render`, for a full render that rendered no page. */
+  giveBackFullRender(accountId: string, checkId: string): Promise<void>;
   /**
    * F-260: a check running under `runId` back to queued, as `checks`' constraints require of a queued
    * check (no start, no progress, no run), with its heartbeat at `at` so the reaper counts from now.
@@ -174,6 +180,34 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
         await sb.rpc('fail_check', { p_check: checkId, p_reason: reason, p_run: runId }),
       );
       return out === true;
+    },
+
+    async planOf(accountId, nowMs) {
+      const row = must<Row | null>(
+        'account plan',
+        await sb.from('accounts').select(ACCOUNT_CLOCK_COLUMNS).eq('id', accountId).maybeSingle(),
+      );
+      if (!row) throw new Error(`pipeline store: account ${accountId} not found`);
+      return effectiveTier(clockFromAccountRow(row), new Date(nowMs));
+    },
+
+    async takeFullRender(accountId, checkId, limit) {
+      const out = must(
+        'take_full_render',
+        await sb.rpc('take_full_render', {
+          p_account: accountId,
+          p_check: checkId,
+          p_limit: limit,
+        }),
+      );
+      return out === true;
+    },
+
+    async giveBackFullRender(accountId, checkId) {
+      must(
+        'give_back_full_render',
+        await sb.rpc('give_back_full_render', { p_account: accountId, p_check: checkId }),
+      );
     },
 
     async reap(cutoff) {

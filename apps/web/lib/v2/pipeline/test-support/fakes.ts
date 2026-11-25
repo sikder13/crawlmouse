@@ -5,6 +5,7 @@
  * WorkerClient that serves batch results the test hands it. PGlite runs the real statements
  * (sql-store.ts); these keep the step tests to the step's own logic.
  */
+import type { Tier } from '../../../entitlement-v2';
 import type { Check, Fix, FixEvent, Site } from '@crawlmouse/types/v2';
 import type { FailureReason } from '../../../../../../inngest/check-events';
 import {
@@ -66,6 +67,9 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
   );
   const batches = new Map<string, CrawlBatchRow>();
   const key = (c: string, n: number) => `${c}:${n}`;
+  /** Row 17: each account's plan (Free when unset), and the checks that took a full render. */
+  const tiers = new Map<string, Tier>();
+  const fullRenders = new Map<string, Set<string>>();
   const fixes: Fix[] = [];
   const events: FixEvent[] = [];
   const end = (r: CheckRow, reason: FailureReason) =>
@@ -110,6 +114,20 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
       end(r, reason);
       release(r.id);
       return true;
+    },
+    async planOf(accountId) {
+      return tiers.get(accountId) ?? 'free';
+    },
+    async takeFullRender(accountId, checkId, limit) {
+      const used = fullRenders.get(accountId) ?? new Set<string>();
+      fullRenders.set(accountId, used);
+      if (used.has(checkId)) return true;
+      if (limit <= 0 || used.size >= limit) return false;
+      used.add(checkId);
+      return true;
+    },
+    async giveBackFullRender(accountId, checkId) {
+      fullRenders.get(accountId)?.delete(checkId);
     },
     async requeue(checkId, runId, at) {
       const r = rows.get(checkId);
@@ -214,7 +232,7 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
       return true;
     },
   };
-  return { store, rows, batches };
+  return { store, rows, batches, tiers, fullRenders };
 }
 
 /**

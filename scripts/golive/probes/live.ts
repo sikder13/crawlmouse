@@ -60,6 +60,7 @@ export const CHECK_INPUTS = [
   'apps/web/lib/billing/prices.ts',
   'inngest/check.ts',
   'inngest/check-events.ts',
+  'inngest/full-render-time.ts',
   'inngest/client.ts',
   'inngest/concurrency.ts',
   '.github/workflows/worker-staging.yml',

@@ -160,7 +160,7 @@ const ROWS: readonly RowInput[] = [
     file: 'inngest/check.ts',
     id: 'crawlmouse.check.run',
     onFailure: true,
-    callSites: 14,
+    callSites: 16,
     registration: 'V2_PIPELINE',
     trigger: 'check.requested',
     steps: 0,
@@ -175,7 +175,20 @@ const ROWS: readonly RowInput[] = [
     trigger: 'inngest/function.cancelled (checkFn)',
     steps: 2,
     stepsHow: 'fail, emit-failed',
-    stepAt: [648, 650],
+    stepAt: [682, 684],
+  },
+  {
+    // Row 17: one run per full render a Pro or Agency account takes (10 or 30 a month), not per
+    // check. A 2,000-page full render: plan, 80 chunks of 25 pages, merge, done.
+    file: 'inngest/full-render.ts',
+    id: 'crawlmouse.check.render-full',
+    onFailure: true,
+    callSites: 8,
+    registration: 'V2_PIPELINE',
+    trigger: 'check.render-full.requested',
+    steps: 83,
+    stepsHow: 'plan, a chunk per 25 pages (80 at 2,000), merge, done',
+    stepAt: [72, 89, 93, 94],
   },
   {
     file: 'inngest/check-reaper.ts',

@@ -11,6 +11,7 @@ export {
   askedAs,
   nextCrawlBatch,
   readBatches,
+  fullRenderCandidates,
   renderCandidates,
   sample,
   serialiseBuilt,
@@ -44,6 +45,13 @@ export type { CheckSide } from './diff/types.js';
 export { stableId } from './diff/ids.js';
 export { GRADE_VERSION } from './grade/weights.js';
 export { renderCheck, inFlightFromEnv } from './render/run.js';
+export {
+  FULL_RENDER_CHUNK_PAGES,
+  FULL_RENDER_MAX_BROWSER_MS,
+  FULL_RENDER_PAGE_RESERVE_MS,
+  fullRenderPlan,
+  mergeFullRender,
+} from './render/full.js';
 export type { RenderOutcome } from './render/run.js';
 export { clientFromEnv, REQUEST_TIMEOUT_MS } from './render/client.js';
 export { capsFromEnv } from './render/budget.js';

@@ -1,4 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+import { runFullRender } from '../../../../../../inngest/full-render';
+import {
+  fakeClient,
+  memoryDailyBudget,
+  type ReplyFixture,
+} from '../../../../../../packages/engine/src/v2/render/fakes';
+import { servedSite } from '../../../../../../packages/engine/fixtures/v2/build/site/serve';
+import { CLIENT_RENDERED } from '../../../../../../packages/engine/fixtures/v2/build/site/site';
 import { GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
 import type { AccessBatchResult, BatchResult, CrawlBatchResult } from '@crawlmouse/types/v2';
 import { runCheck, type CheckStepTools } from '../../../../../../inngest/check';
@@ -18,12 +26,15 @@ import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import { AFTER_RENDER_MIN_S, RENDER_SHARE_S, RESERVE_S } from '../limits';
 import { REQUEST_TIMEOUT_MS } from '@crawlmouse/engine/v2/pipeline';
+import { readRendered } from '../../../../../../packages/engine/src/v2/render/page';
 import { RENDER_STEP_MS } from './deps';
-import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
+import { NO_DAILY_BUDGET, checkSteps, fullRenderSteps, type StepDeps } from './index';
 import type { WorkerClient } from '../../../worker-client/types';
 
 // persist.ts and checkMap are workstreams A's and D's: stand-ins here, so this test is about the
 // steps and the orchestration. The persist stand-in records what the persist step hands it.
+// The full render's take reads the hide switch, which is server-only.
+vi.mock('server-only', () => ({}));
 const persisted = vi.hoisted(() => [] as unknown[]);
 vi.mock('../persist', () => ({
   pageVantage: (pages: { url: string; outcome: string; identity_sent: string }[]) =>
@@ -460,6 +471,193 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
         .filter((p) => p.outcome === 'fetched').length,
     );
     expect(row.inngest_run_id).toBe('run-1');
+  });
+});
+
+const ACCOUNT = 'b0000000-0000-4000-8000-0000000000ac';
+
+/** The built site's own HTML, as generate.ts replies with it; the guides' rendered side filled in. */
+function builtSiteReplies(): ReplyFixture[] {
+  const site = servedSite({ linkRedirectTarget: false });
+  return [...site.pages.keys()].map((path) => {
+    const html = site.pages.get(path)!.body;
+    const rendered = (CLIENT_RENDERED as readonly string[]).includes(path)
+      ? site.renderedGuide(path)
+      : html;
+    return {
+      provenance: 'built-site',
+      url: path === '/' ? HOST : `${HOST}${path}`,
+      static: { html, browser_ms: 1200 },
+      rendered: { html: rendered, browser_ms: 2400 },
+    };
+  });
+}
+
+/**
+ * Row 17 end to end: a Pro account's check on the recorded site takes a full render, the full-render
+ * function runs its plan, chunks and merge through the real step bodies, and the build reads it. The
+ * Browser Run client is the engine's fake over the site's own HTML, the daily budget a memory one.
+ */
+async function runWithFullRender(opts: {
+  tier: 'free' | 'pro';
+  hide?: string;
+  failFullRender?: boolean;
+}) {
+  persisted.length = 0;
+  const clock = { now: T0 };
+  const iso = () => new Date(clock.now).toISOString();
+  const results = recordedFromOne();
+  const { worker: plain } = fakeWorker(results);
+  // The worker's reader (questions/042), reading as the worker does; it records each page it read,
+  // so a page read anywhere else is seen.
+  const readUrls = new Set<string>();
+  const worker: WorkerClient = {
+    ...plain,
+    measureRendered: async (staticHtml, renderedHtml, pageUrl) => {
+      readUrls.add(pageUrl);
+      return readRendered(staticHtml, renderedHtml, pageUrl);
+    },
+  };
+  const memory = memoryStore(
+    { ...recordedInput().site, account_id: ACCOUNT },
+    [
+      {
+        ...queuedCheck(CHECK, SITE_ID, '2026-11-05T02:29:58.000Z', GRADE_VERSION),
+        trigger: 'manual',
+      },
+    ],
+    iso,
+  );
+  memory.tiers.set(ACCOUNT, opts.tier);
+  const evidence = memoryEvidenceStore();
+  let nonces = 0;
+  const deps: StepDeps = {
+    store: memory.store,
+    evidence,
+    persistDb: UNUSED_DB,
+    worker: () => worker,
+    now: () => clock.now,
+    nonce: () => `nonce-${String(++nonces).padStart(16, '0')}`,
+    env: { VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40), V2_HIDE_FEATURES: opts.hide },
+    render: {
+      client: fakeClient(builtSiteReplies()),
+      caps: { perCheckMs: 3_600_000, perDayMs: 36_000_000 },
+      daily: memoryDailyBudget(),
+      inFlight: 2,
+      // The fixture's host is not resolved: every page is admitted, as the engine's render tests do.
+      admit: async () => {},
+    } as StepDeps['render'],
+    discover: { fetch: (async () => ({})) as never, userAgent: 'UA', now: () => clock.now },
+  };
+  const steps = checkSteps(deps);
+  steps.discover = async () => {
+    await putJson(evidence, `${ACCOUNT}/${SITE_ID}/${CHECK}/seeds.json.gz`, seedsOf(HOST));
+    return {
+      seeds: seedsOf(HOST).length,
+      sitemap_urls: seedsOf(HOST).length - 1,
+      robots_txt: 'found',
+      at: clock.now,
+    };
+  };
+  const event: CheckRequested = { ...EVENT, accountId: ACCOUNT, trigger: 'manual' };
+  const ids: string[] = [];
+  let done: { data: { checkId: string; merged: boolean } } | null = null;
+  const fullIds: string[] = [];
+  const tools: CheckStepTools = {
+    run: async (id, fn) => {
+      ids.push(id);
+      return JSON.parse(JSON.stringify(await fn()));
+    },
+    sleep: async (id, ms) => {
+      ids.push(id);
+      clock.now += ms;
+    },
+    sendEvent: async (id, payload) => {
+      ids.push(id);
+      if (payload.name !== 'check.render-full.requested') return;
+      // The full-render function, run here as Inngest would run it on the event.
+      const full = fullRenderSteps(deps);
+      try {
+        if (opts.failFullRender) throw new Error('the full render failed');
+        await runFullRender(
+          {
+            event: { data: payload.data },
+            step: {
+              run: async (sid, fn) => {
+                fullIds.push(sid);
+                return JSON.parse(JSON.stringify(await fn()));
+              },
+              sendEvent: async (_sid, p) => {
+                done = { data: p.data };
+              },
+            },
+          },
+          full,
+        );
+      } catch {
+        // Its failure handler: the use back, and the check told at once.
+        await memory.store.giveBackFullRender(ACCOUNT, CHECK);
+        done = { data: { checkId: CHECK, merged: false } };
+      }
+    },
+    waitForFullRender: async (id) => {
+      ids.push(id);
+      return done;
+    },
+  };
+  const result = await runCheck({ event: { data: event }, step: tools, runId: 'run-1' }, steps);
+  return { result, ids, fullIds, memory, evidence, readUrls };
+}
+
+const measured = () => {
+  const input = persisted[0] as { built: { page_results: { without_js: unknown }[] } };
+  return input.built.page_results.filter((p) => p.without_js !== null).length;
+};
+
+describe('row 17: a full render, end to end', () => {
+  it('a Pro check takes one, renders every renderable page, and the build reads it', async () => {
+    const { result, ids, fullIds, memory, evidence, readUrls } = await runWithFullRender({
+      tier: 'pro',
+    });
+    expect(result.status === 'finished' || result.status === 'partial').toBe(true);
+    expect(ids).toEqual(
+      expect.arrayContaining(['render', 'full-render', 'full-render-done', 'build']),
+    );
+    expect(ids.indexOf('full-render-done')).toBeLessThan(ids.indexOf('build'));
+    expect(fullIds).toEqual(['plan', 'chunk-0', 'chunk-1', 'merge']);
+    expect([...memory.fullRenders.get(ACCOUNT)!]).toEqual([CHECK]);
+    // 53 of the site's 54 renderable content pages measured (one renders nothing: render/full.test.ts),
+    // and the sample's 2 empty-root pages, which are thin, not content: 55, as the full outcome holds.
+    expect(measured()).toBe(55);
+    const full = (await getJson(
+      evidence,
+      `${ACCOUNT}/${SITE_ID}/${CHECK}/render-full.json.gz`,
+    )) as { full: boolean; pages: { url: string; rendered: boolean }[] };
+    expect(full.full).toBe(true);
+    expect(full.pages.filter((p) => p.rendered).length).toBe(55);
+    // Every rendered page, the full render's chunks' included, was read by the worker's reader
+    // (questions/042), none on the step's own thread.
+    for (const p of full.pages.filter((q) => q.rendered)) expect(readUrls.has(p.url)).toBe(true);
+  });
+
+  it('a Free check takes none, runs no extra step, and keeps the sample', async () => {
+    const { ids, memory } = await runWithFullRender({ tier: 'free' });
+    expect(ids).not.toContain('full-render');
+    expect(memory.fullRenders.get(ACCOUNT)).toBeUndefined();
+    expect(measured()).toBeLessThan(53);
+  });
+
+  it('takes none while rendering is hidden (V2_HIDE_FEATURES), so no grade differs by plan', async () => {
+    const { ids, memory } = await runWithFullRender({ tier: 'pro', hide: 'rendering' });
+    expect(ids).not.toContain('full-render');
+    expect(memory.fullRenders.get(ACCOUNT)).toBeUndefined();
+  });
+
+  it('a full render that fails gives the use back, and the check builds from its sample', async () => {
+    const { result, memory } = await runWithFullRender({ tier: 'pro', failFullRender: true });
+    expect(result.status === 'finished' || result.status === 'partial').toBe(true);
+    expect(memory.fullRenders.get(ACCOUNT)?.size ?? 0).toBe(0);
+    expect(measured()).toBeLessThan(53);
   });
 });
 

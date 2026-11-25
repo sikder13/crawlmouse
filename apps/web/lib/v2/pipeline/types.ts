@@ -149,7 +149,15 @@ export interface EvidenceOwner {
   checkId: string;
 }
 
-export type EvidenceName = `batch-${number}` | 'seeds' | 'render' | 'built' | 'map';
+export type EvidenceName =
+  | `batch-${number}`
+  | 'seeds'
+  | 'render'
+  // Row 17: a full render's outcome, and its work while it runs (steps/full-render.ts).
+  | 'render-full'
+  | 'render-full-progress'
+  | 'built'
+  | 'map';
 
 /** `{account_id|anon}/{site_id}/{check_id}/{name}.json.gz`, inside EVIDENCE_BUCKET. */
 export const evidencePath = (owner: EvidenceOwner, name: EvidenceName): string =>

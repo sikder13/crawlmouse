@@ -48,6 +48,7 @@ import { scheduleFunctions } from '../monitor/schedule';
 import { mailFunctions } from '../mail/functions';
 import { reportScheduleFunctions } from '../agency/schedules-wiring';
 import { workerClientFromEnv } from '../../worker-client/client';
+import { createFullRenderFn } from '../../../../../inngest/full-render';
 import { monitorFunctions } from '../monitor/functions';
 import { competitorFunctions } from '../competitors/functions';
 import { sentinelFunctions } from '../monitor/sentinel-functions';
@@ -63,6 +64,7 @@ import { supabasePersistDb } from './persist';
 import {
   checkSteps,
   failCancelled,
+  fullRenderSteps,
   failCheck,
   NO_DAILY_BUDGET,
   reapStalled,
@@ -155,6 +157,14 @@ export function inngestFunctions(
       env,
     ),
     createCheckCancelledFn((run) => failCancelled(wiring.store(env), run)),
+    // Row 17: a check's full render, which the check function asks for and waits on.
+    createFullRenderFn(
+      () => fullRenderSteps(stepDeps(env, wiring.stores(env))),
+      async (event) => {
+        if (event.accountId !== null)
+          await wiring.store(env).giveBackFullRender(event.accountId, event.checkId);
+      },
+    ),
     createCheckReaperFn(() => reapStalled(wiring.store(env), Date.now)),
     createExpireAnonymousChecksFn({
       expireUnkept: () => expireUnkept(wiring.expiry(env)),

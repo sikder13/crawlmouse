@@ -237,6 +237,8 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
     case 'check_ledger_drafts':
       await needCheck();
       return ROWS.check_ledger_drafts(check);
+    case 'full_render_uses':
+      return ROWS.full_render_uses(world.accountId, randomUUID(), '2026-11-01');
     case 'render_budget_days':
       return ROWS.render_budget_days(
         new Date(Date.UTC(2021, 0, ++renderBudgetDay)).toISOString().slice(0, 10),
@@ -355,6 +357,8 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   qa_accounts: null,
   account_attribution: null,
   check_ledger_drafts: null,
+  // V2R A2, row 17: service only.
+  full_render_uses: null,
   // V2R A2's daily render budget: service only.
   render_budget_days: null,
   render_reservations: null,
@@ -433,6 +437,8 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   // and the writer reads and deletes it.
   if (table === 'account_attribution') expectedTable.service_role = 'ar';
   if (table === 'check_ledger_drafts') expectedTable.service_role = 'ard';
+  // V2R A2, row 17: its functions take and give back a use; the service reads the count.
+  if (table === 'full_render_uses') expectedTable.service_role = 'ard';
   // V2R A2: the render budget's functions run as the service role; a day's row is never deleted.
   if (table === 'render_budget_days') expectedTable.service_role = 'arw';
   if (table === 'render_reservations') expectedTable.service_role = 'arwd';

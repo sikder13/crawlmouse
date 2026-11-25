@@ -5,7 +5,6 @@
  * strings), and go through the same converters.
  */
 import type { CheckSide } from '@crawlmouse/engine/v2/pipeline';
-import { clockFromAccountRow } from '../load-for';
 import type { ReapedCheck } from '../../../../../../inngest/check-reaper';
 import { checkFromRow, fixEventFromRow, fixFromRow, siteFromRow } from '../rows';
 import {
@@ -18,6 +17,14 @@ import {
   type RequestSite,
 } from '../store';
 import type { CrawlBatchRow } from '../types';
+import { effectiveTier } from '../../../entitlement-v2';
+import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow } from '../load-for';
+
+/** A row as PostgREST gives it: timestamps as ISO strings, as clockFromAccountRow reads them. */
+const asJsonRow = (row: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k, v instanceof Date ? v.toISOString() : v]),
+  );
 
 /** What the store needs of a connection: PGlite, or a transaction of one, satisfies it. */
 export interface SqlDb {
@@ -48,6 +55,30 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
         [checkId, reason, runId],
       );
       return r[0]!.moved === true;
+    },
+
+    async planOf(accountId, nowMs) {
+      const { rows: r } = await db.query<Record<string, unknown>>(
+        `select ${ACCOUNT_CLOCK_COLUMNS} from public.accounts where id = $1::uuid`,
+        [accountId],
+      );
+      if (!r[0]) throw new Error(`sql store: account ${accountId} not found`);
+      return effectiveTier(clockFromAccountRow(asJsonRow(r[0])), new Date(nowMs));
+    },
+
+    async takeFullRender(accountId, checkId, limit) {
+      const { rows: r } = await db.query<{ ok: boolean }>(
+        `select public.take_full_render($1::uuid, $2::uuid, $3) as ok`,
+        [accountId, checkId, limit],
+      );
+      return r[0]!.ok === true;
+    },
+
+    async giveBackFullRender(accountId, checkId) {
+      await db.query(`select public.give_back_full_render($1::uuid, $2::uuid)`, [
+        accountId,
+        checkId,
+      ]);
     },
 
     async requeue(checkId, runId, at) {

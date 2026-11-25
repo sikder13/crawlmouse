@@ -35,6 +35,7 @@ import { getJson, putJson } from '../evidence';
 import { pageVantage, persistBuiltCheck, readOfFixes } from '../persist';
 import type { FixRead, PageVantage } from '../types';
 import type { StepDeps } from './deps';
+import { takeFullRender } from './full-render';
 import { renderEndsAt } from './time';
 import {
   assembledSoFar,
@@ -97,10 +98,16 @@ export function finishSteps(
       });
       await putJson(deps.evidence, pathOf(event, 'render'), outcome);
       const rendered = outcome.pages.filter((p) => p.rendered).length;
-      return { rendered, not_rendered: outcome.pages.length - rendered };
+      // Row 17: decided here, after the sample is stored, so a check without one runs no extra step.
+      const full = await takeFullRender(deps, event);
+      return {
+        rendered,
+        not_rendered: outcome.pages.length - rendered,
+        ...(full && { full_render: true }),
+      };
     },
 
-    async build(event) {
+    async build(event, so) {
       const sha = deps.env.VERCEL_GIT_COMMIT_SHA?.trim() ?? '';
       if (!SHA.test(sha)) throw new CheckFailure('build_failed');
       const check = await deps.store.check(event.checkId);
@@ -121,7 +128,11 @@ export function finishSteps(
       const [previous, fixes, render] = await Promise.all([
         deps.store.previousGraded(event.siteId, event.checkId),
         deps.store.fixes(event.siteId),
-        getJson(deps.evidence, pathOf(event, 'render')) as Promise<RenderOutcome>,
+        // Row 17: the full render when it merged; the sampled render otherwise.
+        getJson(
+          deps.evidence,
+          pathOf(event, so?.fullRendered === true ? 'render-full' : 'render'),
+        ) as Promise<RenderOutcome>,
       ]);
       const events = await deps.store.fixEvents(fixes.map((f) => f.id));
       const now = iso(deps.now());

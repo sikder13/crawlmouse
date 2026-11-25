@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FULL_RENDER_FN_ID } from '../../../../../inngest/full-render';
 import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -259,6 +260,7 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
     ).toEqual([
       `crawlmouse-${CHECK_FN_ID}`,
       `crawlmouse-${CHECK_CANCELLED_FN_ID}`,
+      `crawlmouse-${FULL_RENDER_FN_ID}`,
       `crawlmouse-${CHECK_REAPER_FN_ID}`,
       `crawlmouse-${CHECK_EXPIRY_FN_ID}`,
       `crawlmouse-${LEDGER_WRITE_FN_ID}`,
@@ -447,9 +449,10 @@ describe('no registered function can declare a concurrency limit above the plan 
               vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
               const configs = configsOf(fresh.inngestFunctions(process.env));
               expect(configs.length).toBe(
-                // v1's five; with V2_PIPELINE the check's four, checkFn's failure handler and
-                // CC-41's ledger writer and backfill.
-                (flag === '1' ? 12 : 5) +
+                // v1's five; with V2_PIPELINE the check's four, checkFn's failure handler,
+                // CC-41's ledger writer and backfill, and row 17's full render and its failure
+                // handler.
+                (flag === '1' ? 14 : 5) +
                   (billing === '1' ? 2 : 0) +
                   // CC-27b's three deletion functions, the mail functions, CC-31's schedules and
                   // the no-card trial's clock.

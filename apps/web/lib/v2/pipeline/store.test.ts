@@ -215,6 +215,44 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
         },
       ],
     },
+    planOf: {
+      answers: [
+        ok({
+          state: 'active',
+          tier: 'pro',
+          past_due_tier: null,
+          past_due_since: null,
+          trial_variant: null,
+          trial_ends_at: null,
+        }),
+      ],
+      call: (s) => s.planOf(C, 0),
+      calls: [
+        {
+          root: ['from', 'accounts'],
+          chain: [
+            [
+              'select',
+              ['state, tier, past_due_tier, past_due_since, trial_variant, trial_ends_at'],
+            ],
+            ['eq', ['id', C]],
+            ['maybeSingle', []],
+          ],
+        },
+      ],
+    },
+    takeFullRender: {
+      answers: [ok(true)],
+      call: (s) => s.takeFullRender(C, S, 10),
+      calls: [
+        { root: ['rpc', 'take_full_render', { p_account: C, p_check: S, p_limit: 10 }], chain: [] },
+      ],
+    },
+    giveBackFullRender: {
+      answers: [ok(null)],
+      call: (s) => s.giveBackFullRender(C, S),
+      calls: [{ root: ['rpc', 'give_back_full_render', { p_account: C, p_check: S }], chain: [] }],
+    },
     requeue: {
       answers: [ok([{ id: C }])],
       call: (s) => s.requeue(C, 'run-1', 'T'),

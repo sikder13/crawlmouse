@@ -435,6 +435,12 @@ export const ROWS = {
     landing_path: '/blog/x',
     first_seen_at: T0,
   }),
+  // V2R A2, row 17: a full render an account took this month; service only.
+  full_render_uses: (accountId: string, checkId: string, month: string): Row => ({
+    account_id: accountId,
+    month,
+    check_id: checkId,
+  }),
   // V2R A2: a day's committed browser time, and one render phase's reservation; service only. They
   // name no account: the budget is the whole product's.
   render_budget_days: (day: string): Row => ({ day, committed_ms: 100 }),
@@ -603,6 +609,8 @@ export const TABLES_033: readonly NewTable[] = ['operators', 'operator_actions',
 export const TABLES_038: readonly NewTable[] = ['qa_accounts'];
 /** The public tables CC-41's migration creates. */
 export const TABLES_041: readonly NewTable[] = ['account_attribution', 'check_ledger_drafts'];
+/** The public tables V2R A2's full-render migration creates (row 17). */
+export const TABLES_FULL_RENDER: readonly NewTable[] = ['full_render_uses'];
 /** The public tables V2R A2's render budget migration creates. */
 export const TABLES_RENDER_BUDGET: readonly NewTable[] = [
   'render_budget_days',
@@ -621,6 +629,7 @@ export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
       !TABLES_033.includes(t) &&
       !TABLES_038.includes(t) &&
       !TABLES_041.includes(t) &&
+      !TABLES_FULL_RENDER.includes(t) &&
       !TABLES_RENDER_BUDGET.includes(t),
   )
   .sort();
@@ -699,6 +708,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.account_attribution')::text as t`,
   );
   const with041 = ft[0]!.t !== null;
+  // Nor, migrated before V2R A2's full-render migration, full_render_uses.
+  const { rows: fr } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.full_render_uses')::text as t`,
+  );
+  const withFullRender = fr[0]!.t !== null;
   const { rows: rb } = await db.query<{ t: string | null }>(
     `select to_regclass('public.render_reservations')::text as t`,
   );
@@ -938,6 +952,15 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       'account_attribution',
       ROWS.account_attribution(accountId),
       { account_id: accountId },
+      'account',
+    );
+  }
+  if (withFullRender) {
+    const usedBy = randomUUID();
+    await put(
+      'full_render_uses',
+      ROWS.full_render_uses(accountId, usedBy, '2026-11-01'),
+      { account_id: accountId, month: '2026-11-01', check_id: usedBy },
       'account',
     );
   }

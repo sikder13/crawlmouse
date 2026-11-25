@@ -169,13 +169,14 @@ describe('the expected Inngest function counts', () => {
     // Independent truth: apps/web/lib/v2/pipeline/functions.test.ts asserts the synced configs are
     // (V2_PIPELINE ? 12 : 5) + …, because auditFn and checkFn each declare onFailure, and
     // notes/cc-03/PR.md:180 lists v1's five: audit, audit-failure, stripe-reconcile,
-    // stripe-reconcile-manual, audits-ttl-cleanup. After steps 1–5: 5, 12, 12, 38, 40 (CC-31 added
+    // stripe-reconcile-manual, audits-ttl-cleanup. After steps 1–5: 5, 14, 14, 40, 42 (CC-31 added
     // three mail functions and the report schedules with V2_CHECKS_PUBLIC; CC-33 adds its three
     // founder functions, each with a failure handler, with V2_CHECKS_PUBLIC or V2_BILLING: six;
     // CC-41 adds the ledger's writer and backfill with V2_PIPELINE: two; the trial clock is one
     // more with V2_CHECKS_PUBLIC; row 23's sentinel tick and watch two more, and row 18's
-    // competitor audits one more, with both).
-    expect(STEPS.map(syncedFunctionCount)).toEqual([5, 12, 12, 38, 40]);
+    // competitor audits one more, with both; row 17's full render and its failure handler two more
+    // with V2_PIPELINE).
+    expect(STEPS.map(syncedFunctionCount)).toEqual([5, 14, 14, 40, 42]);
   });
 });
 

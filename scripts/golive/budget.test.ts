@@ -81,7 +81,8 @@ describe('the function rows against the code', () => {
       const declared = count(code(readFileSync(join(ROOT, file), 'utf8')), ON_FAILURE);
       expect(FUNCTIONS.filter((f) => f.file === file && f.onFailure).length, file).toBe(declared);
     }
-    // Independent of the regex: inngest/audit.ts:411, inngest/check.ts:551 and CC-33's three in
+    // Independent of the regex: inngest/audit.ts:411, inngest/check.ts:551, row 17's
+    // inngest/full-render.ts and CC-33's three in
     // inngest/founder.ts (66, 92, 105) declare it, nothing else.
     expect(
       FUNCTIONS.filter((f) => f.onFailure)
@@ -89,6 +90,7 @@ describe('the function rows against the code', () => {
         .sort(),
     ).toEqual([
       'crawlmouse.audit',
+      'crawlmouse.check.render-full',
       'crawlmouse.check.run',
       'crawlmouse.founder.digest',
       'crawlmouse.founder.entitlement',
@@ -148,7 +150,8 @@ describe('the function rows against the code', () => {
   const HAND: Record<string, number> = {
     'inngest/audit.ts': 5, // 357 361 376 378 386
     'inngest/billing.ts': 5, // 65 77 95 116 120
-    'inngest/check.ts': 16, // 293 297 305 367 411 420 475 516 581 582 592 593 594 595 648 650
+    'inngest/check.ts': 18, // 311 315 323 385 429 438 493 532 549 614 615 625 626 627 628 629 682 684
+    'inngest/full-render.ts': 8, // 72 89 93 94 121 122 135 136 (row 17)
     'inngest/check-reaper.ts': 1, // 39
     'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113

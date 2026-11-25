@@ -22,6 +22,8 @@ v2_tables(rel) as (
     ('public.site_fixes'), ('public.sites'), ('public.slack_sends'), ('public.subscriptions'), ('public.trial_ledger'),
     ('public.usage_events'), ('public.account_attribution'), ('public.check_ledger_drafts'),
     ('public.founder_notices'),
+    -- Row 17's full renders a month: no client role holds anything on it.
+    ('public.full_render_uses'),
     -- The daily render budget: no client role holds anything on either.
     ('public.render_budget_days'), ('public.render_reservations')
 ),

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NonRetriableError } from 'inngest';
 import { inngest } from './client';
 import { CheckFailure, failureReasonOf, type CheckRequested } from './check-events';
+import { FULL_RENDER_WAIT_S } from './full-render-time';
 import {
   CHECK_FN_ID,
   FIRST_ACCEPT_BY_S,
@@ -79,6 +80,8 @@ interface Script {
   poll?: (at: BatchAt, n: number) => PollOutput['status'] | PollOutput;
   post?: (at: BatchAt, n: number) => PostOutput | undefined;
   read?: (at: BatchAt) => ReadOutput | undefined;
+  /** Row 17: whether the check takes a full render; false when unset. */
+  fullRender?: boolean;
   /** What `requeue` answers; true when unset. */
   requeued?: boolean;
 }
@@ -127,7 +130,11 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
       failed.push(`${at.kind}:${at.batch}`);
       return {};
     },
-    render: async () => ({ rendered: 0, not_rendered: 0 }),
+    render: async () => ({
+      rendered: 0,
+      not_rendered: 0,
+      ...(script.fullRender && { full_render: true }),
+    }),
     build: async () => ({ status: 'finished', pages: 100, fixes: 3 }),
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
@@ -830,6 +837,78 @@ function configOf(fn: unknown) {
   });
 }
 
+// Row 17: a check that took a full render asks for it, waits for its end, and builds from it when it
+// merged; at the timeout it builds from its sample.
+describe('runCheck: a full render (row 17)', () => {
+  async function withFullRender(done: { data: { checkId: string; merged: boolean } } | null) {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock, { fullRender: true });
+    const builtWith: RunSoFar[] = [];
+    const build = fake.steps.build;
+    fake.steps.build = async (e, so) => {
+      builtWith.push(so);
+      return build(e, so);
+    };
+    const waits: { id: string; opts: unknown }[] = [];
+    const result = await runCheck(
+      {
+        event: { data: EVENT },
+        step: {
+          ...step.tools,
+          waitForFullRender: async (id, opts) => {
+            step.ids.push(id);
+            waits.push({ id, opts });
+            return done;
+          },
+        },
+        runId: 'run-1',
+      },
+      fake.steps,
+    );
+    return { result, ids: step.ids, events: step.events, waits, builtWith };
+  }
+
+  it('asks for it after the render step, waits for its end, and builds from it when it merged', async () => {
+    const r = await withFullRender({ data: { checkId: EVENT.checkId, merged: true } });
+    expect(r.result).toEqual({ status: 'finished' });
+    const at = r.ids.indexOf('render');
+    expect(r.ids.slice(at, at + 4)).toEqual(['render', 'full-render', 'full-render-done', 'build']);
+    expect(r.events.find((e) => e.id === 'full-render')).toEqual({
+      id: 'full-render',
+      payload: {
+        id: `check-render-full:${EVENT.checkId}`,
+        name: 'check.render-full.requested',
+        data: { ...EVENT, ...SITE_OF_EVENT },
+      },
+    });
+    expect(r.waits).toEqual([
+      {
+        id: 'full-render-done',
+        opts: {
+          event: 'check.render-full.done',
+          timeout: `${FULL_RENDER_WAIT_S}s`,
+          if: 'event.data.checkId == async.data.checkId',
+        },
+      },
+    ]);
+    expect(r.builtWith[0]!.fullRendered).toBe(true);
+  });
+
+  it('builds from the sample when the full render did not merge, or the wait timed out', async () => {
+    for (const done of [{ data: { checkId: EVENT.checkId, merged: false } }, null]) {
+      const r = await withFullRender(done);
+      expect(r.result).toEqual({ status: 'finished' });
+      expect(r.builtWith[0]!.fullRendered).toBe(false);
+    }
+  });
+
+  it('asks for none when the render step did not take one', async () => {
+    const { ids } = await drive();
+    expect(ids).not.toContain('full-render');
+  });
+});
+
 describe('createCheckFn (D3)', () => {
   const noSteps = () => fakeSteps({ now: T0 }).steps;
   const noFail = async () => ({ failed: false }) as const;
@@ -840,10 +919,10 @@ describe('createCheckFn (D3)', () => {
       id: `${inngest.id}-${CHECK_FN_ID}`,
       triggers: [{ event: 'check.requested' }],
       concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: 16 }],
-      timeouts: { finish: '5260s' },
+      timeouts: { finish: '7420s' },
       cancel: [{ event: 'check.cancel.requested', if: 'event.data.checkId == async.data.checkId' }],
     });
-    expect(PACE.finishS).toBe(5260);
+    expect(PACE.finishS).toBe(7420);
     // F-260: no function idempotency, so a check's retry run can start (one event id a retry).
     expect(main!.idempotency).toBeUndefined();
     expect(main!.rateLimit).toBeUndefined();

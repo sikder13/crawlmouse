@@ -57,11 +57,12 @@ describe("golive:check's Inngest functions per step", () => {
 // owner's checklist printed before that change, so a purge registered as a new function (in the
 // route and the table together) fails here.
 // The functions added since are the trial clock, row 23's sentinel tick and watch, and row 18's
-// competitor audits, all at step 4 (both flags they need are on from there).
+// competitor audits, all at step 4 (both flags they need are on from there), and row 17's full
+// render and its failure handler, from step 2 (V2_PIPELINE).
 describe('the function counts per step, as before CC-GL D2', () => {
   it('are unchanged but for the functions added since', () => {
     expect(functionCountsByStep()).toBe(
-      'after step 1: 5; after step 2: 12; after step 3: 12; after step 4: 38; after step 5: 40',
+      'after step 1: 5; after step 2: 14; after step 3: 14; after step 4: 40; after step 5: 42',
     );
   });
 });

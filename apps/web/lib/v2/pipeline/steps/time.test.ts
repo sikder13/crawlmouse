@@ -24,6 +24,7 @@ import {
   finishSFor,
   reserveS,
 } from '../limits';
+import { FULL_RENDER_WAIT_S } from '../../../../../../inngest/full-render';
 import { addBackMs, batchSeconds, fetchEndsAt, phaseEndsAt, renderEndsAt, tailOf } from './time';
 
 const S = 1000;
@@ -72,8 +73,10 @@ describe('the time plan by page cap (2,000 pages)', () => {
     expect((PACE.maxCrawlBatches - 4) * 50).toBeGreaterThanOrEqual(MAX_PAGE_CAP);
   });
 
-  it('the run’s finish timeout is the largest cap’s, so no check is cut short by it', () => {
-    expect(PACE.finishS).toBe(finishSFor(MAX_PAGE_CAP));
+  it('the run’s finish timeout is the largest cap’s plus a full render’s wait, so no check is cut short by it', () => {
+    // Row 17: a check with a full render waits for it after its own plan's fetching.
+    expect(PACE.finishS).toBe(finishSFor(MAX_PAGE_CAP) + FULL_RENDER_WAIT_S);
+    expect(FULL_RENDER_WAIT_S).toBe(2160);
     // A cap past MAX_PAGE_CAP reads no more pages (PACE.maxCrawlBatches) and plans no longer.
     for (const cap of [500, 1000, 2000, 2001, 100_000])
       expect(finishSFor(cap)).toBeLessThanOrEqual(PACE.finishS);
@@ -569,7 +572,8 @@ const STEP_LIMIT = 1000;
  * at most finishS, so there are at most finishS / LONG_SLEEP_S of them. Each sleep is followed by at
  * most one step (a poll, a post or a claim). Each batch adds at most its first post, two reads, its
  * re-post and its fail; the crawl adds one post that plans nothing; the claim, discover, render,
- * build, persist, finalize, emit, fail and emit-failed are one each.
+ * build, persist, finalize, emit, fail and emit-failed are one each, and row 17's full render adds
+ * three: its take, its request and the wait for its end.
  */
 const longSleepS = (cap: number) => {
   const c = cadenceFor(cap);
@@ -585,7 +589,7 @@ function shortPolls(cap = 500): number {
 function worstCaseSteps(cap = 500): number {
   const batches = PACE.maxCrawlBatches + 2;
   const sleeps = 2 * batches * shortPolls(cap) + Math.floor(finishSFor(cap) / longSleepS(cap));
-  return 2 * sleeps + 5 * batches + 1 + 9;
+  return 2 * sleeps + 5 * batches + 1 + 12;
 }
 
 describe('the step count (finding 18)', () => {

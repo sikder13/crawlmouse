@@ -10,6 +10,7 @@ export {
   answeredAt,
   askedAs,
   nextCrawlBatch,
+  fullRenderCandidates,
   renderCandidates,
   sample,
   type RenderPlan,
