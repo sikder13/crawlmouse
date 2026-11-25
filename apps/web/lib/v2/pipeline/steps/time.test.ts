@@ -19,14 +19,7 @@ import {
   RENDER_SHARE_S,
   RESERVE_S,
 } from '../limits';
-import {
-  addBackMs,
-  batchSeconds,
-  fetchEndsAt,
-  phaseEndsAt,
-  renderEndsAt,
-  tailOf,
-} from './time';
+import { addBackMs, batchSeconds, fetchEndsAt, phaseEndsAt, renderEndsAt, tailOf } from './time';
 
 const S = 1000;
 const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
