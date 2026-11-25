@@ -9,7 +9,7 @@
 import { instant, type Change } from '@crawlmouse/types/v2';
 import { CHANGES_LOG_COPY as COPY } from '../copy/changes-log';
 import { findCheck } from '../fixtures';
-import { dayDate, hourMinute } from '../format';
+import { dayDate, hourMinuteZoned } from '../format';
 import {
   readerRole,
   resultChecks,
@@ -151,9 +151,14 @@ export function changesLogView(
     .filter((e) => kind === null || e.change.kind === kind)
     .filter((e) => from === null || instant(e.change.detected_at) >= from);
 
-  const clock = (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}`;
+  const clock = (ts: string) => `${dayDate(ts, zone)} ${hourMinuteZoned(ts, zone)}`;
   const rows = shown.map(({ change: c, findings }) => ({
-    ...rowOf(c, findCheck(v.d, c.check_id), clock),
+    ...rowOf(
+      c,
+      findCheck(v.d, c.check_id),
+      clock,
+      v.d.checks.find((x) => x.id === c.previous_check_id) ?? null,
+    ),
     ...(findings === null
       ? {}
       : {

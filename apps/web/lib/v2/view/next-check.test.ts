@@ -37,6 +37,55 @@ describe('the dashboard’s header', () => {
     expect(dashboardView(bad, home).header.line).toContain('next weekly check');
   });
 
+  // D-04 (QA's production walk): the header read the first site's next check, six days after the
+  // account's soonest.
+  const LATER = '2026-12-01T11:01:00.000Z';
+  const REDBIRD = '50000000-0000-4000-8000-000000000003';
+  const STAGING = '50000000-0000-4000-8000-000000000005';
+  const SOONER = '2026-11-12T09:15:00.000Z';
+
+  it('names the account’s soonest next check, not the first site’s (D-04)', () => {
+    const line = dashboardView(
+      bad,
+      home,
+      next([
+        [OUTFITTER, LATER],
+        [NAHLTECH, AT],
+        [REDBIRD, '2026-11-20T11:00:00.000Z'],
+      ]),
+    ).header.line;
+    expect(line).toContain('next check Fri 13 Nov around 06:37');
+    expect(line).not.toContain('Tue 1 Dec');
+  });
+
+  it('passes over a paused site, and a staging copy, whatever their columns hold', () => {
+    const d = structuredClone(bad);
+    d.sites.find((s) => s.id === REDBIRD)!.paused = true;
+    const line = dashboardView(
+      d,
+      home,
+      next([
+        [OUTFITTER, LATER],
+        [NAHLTECH, AT],
+        [REDBIRD, SOONER],
+        [STAGING, SOONER],
+      ]),
+    ).header.line;
+    expect(line).toContain('next check Fri 13 Nov around 06:37');
+  });
+
+  it('on Free names only the first site’s: the others wait, unchecked', () => {
+    const line = dashboardView(
+      bad,
+      free,
+      next([
+        [OUTFITTER, LATER],
+        [NAHLTECH, AT],
+      ]),
+    ).header.line;
+    expect(line).toContain('next check Tue 1 Dec around 06:01');
+  });
+
   it('on Free still names the first site’s, which the scheduler runs monthly', () => {
     expect(dashboardView(bad, free, next([[OUTFITTER, AT]])).header.line).toContain(
       'next check Fri 13 Nov around 06:37',
