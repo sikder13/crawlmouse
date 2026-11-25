@@ -72,6 +72,8 @@ export const DASHBOARD_COPY = {
   setupScheduleTitle: 'Weekly check schedule',
   /** The tile's line when it shows the Technical SEO mean: what is withheld, and on how many. */
   withheldOn: (n: number) => `AI readability withheld on ${n} ${plural(n, 'site', 'sites')}`,
+  /** Another reason a site is left out, said the same way: "no finished check yet on 1 site". */
+  reasonOn: (why: string, n: number) => `${why} on ${n} ${plural(n, 'site', 'sites')}`,
   setupLeftTitle: (n: number) =>
     n === 0
       ? 'Everything is set up'
@@ -639,6 +641,14 @@ const HOME: CopyChange[] = [
     rendered: 'Choose the day and hour example-outfitter.com is checked weekly',
     source:
       'V2R register, F-279 (review M6): the schedule line names the site whose schedule it sets, from the data',
+  },
+  {
+    screen: 'dashboard',
+    kind: 'ruling',
+    locked: 'mean of both grades 74',
+    rendered: 'mean of both grades 71',
+    source:
+      'V2R register, F-097 (A1’s rule; review of PR 1): a staging copy holds no slot, so the health mean is over the four primary sites, 569 / 8 = 71.1; the locked 74 averaged in the staging copy',
   },
 ];
 

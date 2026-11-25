@@ -49,11 +49,12 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     );
   });
 
-  it('means both grades over the five sites, 743 / 10 = 74, and moves over the four with a previous result', () => {
-    // now: 79+22 · 84+93 · 74+78 · 73+66 · 86+88 = 743 / 10 = 74.3.
+  it('means both grades over the four sites that hold a slot, 569 / 8 = 71, and moves over the three with a previous result', () => {
+    // The staging copy holds no slot (F-097), so it is neither averaged nor counted (it read 74 with it).
+    // now: 79+22 · 84+93 · 74+78 · 73+66 = 569 / 8 = 71.125 → 71.
     // The move leaves out redbirdaviation.com (74+78 at both), on a new baseline since Thursday:
-    // Thursday 80+41 · 79+93 · 73+66 · 86+88 = 606 / 8 = 75.75 → 76; now 591 / 8 = 73.875 → 74.
-    expect(v.strip!.health.value).toBe('74');
+    // Thursday 80+41 · 79+93 · 73+66 = 432 / 6 = 72; now 79+22 · 84+93 · 73+66 = 417 / 6 = 69.5 → 70.
+    expect(v.strip!.health.value).toBe('71');
     expect(v.strip!.health.delta).toBe('−2 since Thu');
     expect(v.strip!.health.fresh).toBe('1 new');
     expect(v.strip!.health.excluded).toBeNull();
@@ -305,6 +306,38 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     );
   });
 
+  it('says each reason on its own terms beside the Technical SEO mean (review 2)', () => {
+    const copy = structuredClone(bad);
+    // Three primary sites withheld; drivepei.ca has no result (its checks failed).
+    for (const id of ['000000000006', '00000000000c', '000000000016']) {
+      const ai = copy.checks.find((x) => x.id === `c0000000-0000-4000-8000-${id}`)!.ai_readability!;
+      ai.withheld = true;
+      ai.withheld_reasons = ['readable_unmeasured'];
+    }
+    for (const c of copy.checks) {
+      if (c.site_id === '50000000-0000-4000-8000-000000000004') c.status = 'failed';
+    }
+    const h = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).strip!.health;
+    // 79 + 84 + 74 = 237 / 3 = 79.
+    expect(h.seoOnly).toEqual({
+      label: 'Technical SEO, mean of 3 sites · no site has both grades',
+      value: '79',
+    });
+    expect(h.excluded).toBe('AI readability withheld on 3 sites; no finished check yet on 1 site');
+  });
+
+  it('names "since" from a site that holds a slot, never the staging copy (review 3)', () => {
+    const copy = structuredClone(bad);
+    // The first site has one result, so "since" falls back to the others' previous results:
+    // drivepei.ca's Mon 26 Oct 19:11Z, not the staging copy's later Tue 27 Oct 18:13Z.
+    for (const id of [2, 3, 4, 5, 6]) {
+      copy.checks.find((c) => c.id === `c0000000-0000-4000-8000-00000000000${id}`)!.status =
+        'failed';
+    }
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.header.title).toBe("Since Monday's check");
+  });
+
   it('(8) day 0 with every listed row done says so, not "Worth doing while Pro is on"', () => {
     expect(day0().setup!.items.map((i) => i.done)).toEqual([true]);
     expect(day0().setup!.title).toBe('Everything is set up');
@@ -540,10 +573,11 @@ describe('Who builds each account route', () => {
 describe('A site on its first baseline is left out of the health move (owner ruling 2026-11-08)', () => {
   // A copy of bad-site in which redbirdaviation.com's re-graded check (the new baseline, Fri 30 Oct)
   // scores 100 and 100. Worked by hand, earlier moment Thu 29 Oct 12:42Z:
-  //   the four other sites: Thursday 80+41 · 79+93 · 73+66 · 86+88 = 606 / 8 = 75.75 → 76;
-  //                         now      79+22 · 84+93 · 73+66 · 86+88 = 591 / 8 = 73.875 → 74: −2.
-  //   counting redbird too: Thursday 606 + 74+78 = 758 / 10 = 75.8 → 76;
-  //                         now      591 + 100+100 = 791 / 10 = 79.1 → 79: +3, the other sign.
+  // The staging copy holds no slot, so it is in neither mean (F-097).
+  //   the three other sites: Thursday 80+41 · 79+93 · 73+66 = 432 / 6 = 72;
+  //                          now      79+22 · 84+93 · 73+66 = 417 / 6 = 69.5 → 70: −2.
+  //   counting redbird too:  Thursday 432 + 74+78 = 584 / 8 = 73;
+  //                          now      417 + 100+100 = 617 / 8 = 77.125 → 77: +4, the other sign.
   const copy = structuredClone(bad);
   const rebased = copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000016')!;
   rebased.technical_seo!.score = 100;
@@ -555,8 +589,8 @@ describe('A site on its first baseline is left out of the health move (owner rul
     expect(h.fresh).toBe('1 new');
   });
 
-  it('still means every graded site in the value: 791 / 10 = 79', () => {
-    expect(h.value).toBe('79');
+  it('still means every graded primary site in the value: 617 / 8 = 77', () => {
+    expect(h.value).toBe('77');
   });
 });
 

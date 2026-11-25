@@ -304,8 +304,9 @@ const previous = (v: AccountView, siteId: string) => resultChecks(v, siteId).at(
 function sinceCheck(v: AccountView): Check | null {
   const own = previous(v, primarySite(v).id);
   if (own) return own;
+  // Among the sites that hold a slot: a staging copy's check never names "since" (F-097).
   return (
-    v.d.sites
+    primarySites(v)
       .map((s) => previous(v, s.id))
       .filter((c): c is Check => c !== null)
       .sort((a, b) => instant(b.finished_at!) - instant(a.finished_at!))[0] ?? null
@@ -448,19 +449,14 @@ function healthAt(v: AccountView) {
   const values = new Map<string, [number, number]>();
   const left: Record<string, number> = {};
   const leave = (why: string) => (left[why] = (left[why] ?? 0) + 1);
-  // A staging copy holds no slot, so it is not counted among the sites left out (F-097). The mean
-  // itself still reads every site carrying both grades, as it did: what it averages is unchanged.
-  const primary = new Set(primarySites(v).map((s) => s.id));
-  for (const s of v.d.sites) {
+  // Over the sites that hold a slot, as the header counts them: a staging copy is neither averaged
+  // nor counted as left out (F-097, A1's rule).
+  for (const s of primarySites(v)) {
     const c = latest(v, s.id);
-    const counted = primary.has(s.id);
-    if (!c) {
-      if (counted) leave('no finished check yet');
-    } else if (c.ai_readability?.withheld) {
-      if (counted) leave('AI readability withheld');
-    } else if (!bothGrades(c)) {
-      if (counted) leave('Technical SEO not graded');
-    } else values.set(s.id, [seoOf(c)!.score, aiOf(c)!.score]);
+    if (!c) leave('no finished check yet');
+    else if (c.ai_readability?.withheld) leave('AI readability withheld');
+    else if (!bothGrades(c)) leave('Technical SEO not graded');
+    else values.set(s.id, [seoOf(c)!.score, aiOf(c)!.score]);
   }
   return { values, left };
 }
@@ -559,15 +555,19 @@ function health(d: AccountDataset, viewer: Viewer, v: AccountView): HealthView {
           value: String(Math.round(seoScores.reduce((a, b) => a + b, 0) / seoScores.length)),
         }
       : null;
-  // Beside a Technical SEO mean, "N sites excluded" would read as left out of that mean: say instead
-  // what is withheld, and where (minor 1).
-  const withheldOn = now.left['AI readability withheld'] ?? 0;
+  // Beside a Technical SEO mean, "N sites excluded" would read as left out of that mean: each reason
+  // is said on its own terms instead, withheld first ("AI readability withheld on 3 sites; no
+  // finished check yet on 1 site").
+  const onTerms = reasons
+    .map(([why, n]) =>
+      why === 'AI readability withheld' ? COPY.withheldOn(n) : COPY.reasonOn(why, n),
+    )
+    .join('; ');
   return {
     value: value === null ? '—' : String(value),
     delta,
     deltaTone,
-    excluded:
-      seoOnly && withheldOn && reasons.length === 1 ? COPY.withheldOn(withheldOn) : excluded,
+    excluded: seoOnly && reasons.length ? onTerms : excluded,
     fresh,
     seoOnly,
   };
@@ -1008,8 +1008,13 @@ function noSiteView(
               competitorsOffered(v.account.limits.competitors_per_site, features),
               v.account.limits.sites,
               !v.cardOnFile && v.account.renews_at === null,
-              // Slack is named only where the set-up card would offer it (M5, D-16).
-              offered('slack_alerts', 'integrations', false, features),
+              // Slack is named only where the set-up card would offer it (M5, D-16): connected counts.
+              offered(
+                'slack_alerts',
+                'integrations',
+                v.account.integrations.some((i) => i.kind === 'slack' && i.connected),
+                features,
+              ),
             )} ${COPY.noSiteNote}`
           : COPY.noSiteNote,
     },
