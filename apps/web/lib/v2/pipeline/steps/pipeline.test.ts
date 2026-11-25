@@ -26,6 +26,7 @@ import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import { AFTER_RENDER_MIN_S, RENDER_SHARE_S, RESERVE_S } from '../limits';
 import { REQUEST_TIMEOUT_MS } from '@crawlmouse/engine/v2/pipeline';
+import { readRendered } from '../../../../../../packages/engine/src/v2/render/page';
 import { RENDER_STEP_MS } from './deps';
 import { NO_DAILY_BUDGET, checkSteps, fullRenderSteps, type StepDeps } from './index';
 import type { WorkerClient } from '../../../worker-client/types';
@@ -506,7 +507,17 @@ async function runWithFullRender(opts: {
   const clock = { now: T0 };
   const iso = () => new Date(clock.now).toISOString();
   const results = recordedFromOne();
-  const { worker } = fakeWorker(results);
+  const { worker: plain } = fakeWorker(results);
+  // The worker's reader (questions/042), reading as the worker does; it records each page it read,
+  // so a page read anywhere else is seen.
+  const readUrls = new Set<string>();
+  const worker: WorkerClient = {
+    ...plain,
+    measureRendered: async (staticHtml, renderedHtml, pageUrl) => {
+      readUrls.add(pageUrl);
+      return readRendered(staticHtml, renderedHtml, pageUrl);
+    },
+  };
   const memory = memoryStore(
     { ...recordedInput().site, account_id: ACCOUNT },
     [
@@ -595,7 +606,7 @@ async function runWithFullRender(opts: {
     },
   };
   const result = await runCheck({ event: { data: event }, step: tools, runId: 'run-1' }, steps);
-  return { result, ids, fullIds, memory, evidence };
+  return { result, ids, fullIds, memory, evidence, readUrls };
 }
 
 const measured = () => {
@@ -605,7 +616,9 @@ const measured = () => {
 
 describe('row 17: a full render, end to end', () => {
   it('a Pro check takes one, renders every renderable page, and the build reads it', async () => {
-    const { result, ids, fullIds, memory, evidence } = await runWithFullRender({ tier: 'pro' });
+    const { result, ids, fullIds, memory, evidence, readUrls } = await runWithFullRender({
+      tier: 'pro',
+    });
     expect(result.status === 'finished' || result.status === 'partial').toBe(true);
     expect(ids).toEqual(
       expect.arrayContaining(['render', 'full-render', 'full-render-done', 'build']),
@@ -619,9 +632,12 @@ describe('row 17: a full render, end to end', () => {
     const full = (await getJson(
       evidence,
       `${ACCOUNT}/${SITE_ID}/${CHECK}/render-full.json.gz`,
-    )) as { full: boolean; pages: { rendered: boolean }[] };
+    )) as { full: boolean; pages: { url: string; rendered: boolean }[] };
     expect(full.full).toBe(true);
     expect(full.pages.filter((p) => p.rendered).length).toBe(55);
+    // Every rendered page, the full render's chunks' included, was read by the worker's reader
+    // (questions/042), none on the step's own thread.
+    for (const p of full.pages.filter((q) => q.rendered)) expect(readUrls.has(p.url)).toBe(true);
   });
 
   it('a Free check takes none, runs no extra step, and keeps the sample', async () => {

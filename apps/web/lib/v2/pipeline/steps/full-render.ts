@@ -85,6 +85,14 @@ export function fullRenderSteps(deps: StepDeps): FullRenderSteps {
       const pages = progress.plan
         .slice(index * FULL_RENDER_CHUNK_PAGES, (index + 1) * FULL_RENDER_CHUNK_PAGES)
         .map((p) => byUrl.get(p.url)!);
+      // Each page is read on the worker's reader thread, as the sample render reads its pages
+      // (finish.ts `render`, questions/042 design C), never here, where nothing bounds the read.
+      let worker: ReturnType<typeof deps.worker> = null;
+      try {
+        worker = deps.worker();
+      } catch {
+        // A worker client that cannot be built reads no page: each records measure_failed.
+      }
       const { dailyFor, ...render } = deps.render;
       const outcome = await renderCheck({
         candidates: pages,
@@ -97,6 +105,8 @@ export function fullRenderSteps(deps: StepDeps): FullRenderSteps {
         daily: dailyFor?.(event.checkId) ?? render.daily,
         deadlineAt,
         now: deps.now,
+        read: async (staticHtml, renderedHtml, pageUrl) =>
+          (await worker?.measureRendered?.(staticHtml, renderedHtml, pageUrl)) ?? null,
       });
       const held = new Set(progress.done.pages.map((p) => p.url));
       const done = {
