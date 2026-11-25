@@ -47,6 +47,8 @@ export interface Assembled {
   pages: PageResult[];
   /** The links as the worker recorded them: LinkEdge rows, and what the structure detectors read. */
   edges: LinkEdge[];
+  /** Edges the build loader left out to bound memory (F-248); counted in `internal_links`. */
+  edges_dropped: number;
   /** The same links filed under the page they were found on (filing.ts): what the grade reads. */
   filed_edges: LinkEdge[];
   disallowed: DetectorInput['disallowed'];
@@ -250,8 +252,9 @@ export function assemble(
   const landed = new Set(allRows.flatMap((r) => landedOn(r) ?? []));
   const rowUrls = new Set(allRows.map((r) => r.url));
   const crawlable = crawlableSeeds(input.seeds);
+  // Discovered URLs and seeds come in the spelling the site wrote (F-252); rows are canonical.
   const found = [
-    ...crawlableDiscovered(input.seeds, batches.crawl),
+    ...crawlableDiscovered(input.seeds, batches.crawl).map((u) => canonicalizeUrl(u)),
     ...crawlable.map((s) => canonicalizeUrl(s.url)),
   ];
   const unread = [...new Set(found)].filter((u) => !rowUrls.has(u) && !landed.has(u)).sort();
@@ -305,6 +308,7 @@ export function assemble(
     homepage_url: homepage,
     pages,
     edges,
+    edges_dropped: batches.crawl.reduce((n, b) => n + (b.link_edges_dropped ?? 0), 0),
     filed_edges: filed,
     disallowed,
     access_tests,

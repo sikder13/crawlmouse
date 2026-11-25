@@ -25,6 +25,11 @@ export const SKIP = [
   'infra/**',
   'scripts/**',
   'packages/worker/**',
+  // The QA lab: a separate Vercel project (crawlmouse-qa-lab) that the app never imports or serves.
+  'fixtures/qa-lab/**',
+  // The staging journeys: run by hand against staging. Their pure guard specs run in the test job,
+  // which this gate does not decide.
+  'tests/journeys/**',
   'evidence/**',
   '**/*.test.ts',
   '**/*.test.tsx',

@@ -12,6 +12,7 @@ import { seedDefaultAlertRules } from '@/lib/v2/monitor/alert-defaults';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId } from '@/lib/v2/account/route';
 import { readAccount, siteOfCaller } from '@/lib/v2/account/pages';
+import { siteLinkGate } from '@/lib/v2/account/public-links';
 import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { chosenFromRequest, readViewer } from '@/lib/v2/account/viewer';
 import { readerRole, viewAt } from '@/lib/v2/view/account';
@@ -76,8 +77,12 @@ export default async function SitePage({
   // Hidden by the RISK switch (`V2_HIDE_FEATURES=staging_deploys`), as until its migration is applied.
   const secret = featureShown('staging_deploys') ? deployHookSecret() : null;
   const staging = d.sites.find((s) => s.staging_of_site_id === id);
+  const host = d.sites.find((s) => s.id === id)?.host;
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]), {
     allFixes: wantsAllFixes(query),
+    link: host
+      ? await siteLinkGate(supabaseAdmin(), site.accountId, { id, host })
+      : { gate: 'unknown', hiddenCheckIds: [] },
     deployHookUrl:
       staging && secret
         ? `${siteOrigin()}${deployHookPath(staging.id, staging.created_at, secret)}`

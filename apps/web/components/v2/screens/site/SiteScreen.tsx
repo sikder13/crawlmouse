@@ -9,6 +9,7 @@ import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
 import { Notice, type NoticeView } from '../account/Notice';
 import { MarkDone } from './MarkDone';
+import { PublicLinkControl } from './PublicLink';
 import { CardHead } from '../account/parts';
 import { verdictCell } from '../account/verdict-cells';
 import { CopyText } from '../segment/CopyText';
@@ -218,23 +219,33 @@ export function SiteScreen({
               muted: r.muted,
               cells: [
                 r.label,
-                r.secret ? (
-                  // A credential (the deploy hook). `ph-no-capture` is the recorder's class for an
-                  // element it leaves out of a session recording and of autocapture; `data-ph-mask`
-                  // is the selector this project's recorder masks (instrumentation-client.ts).
-                  <span
-                    key="v"
-                    className={[r.mono ? shared.mono : '', 'ph-no-capture'].join(' ').trim()}
-                    data-ph-mask=""
-                  >
-                    {r.value}
+                // A credential (the deploy hook) is left out of session recordings: `ph-no-capture` is
+                // the recorder's class for an element it leaves out of a recording and of autocapture;
+                // `data-ph-mask` is the selector this project's recorder masks (instrumentation-client.ts).
+                <span
+                  key="v"
+                  className={
+                    [
+                      r.mono ? shared.mono : '',
+                      r.publicLink ? styles.linkValue : '',
+                      r.secret ? 'ph-no-capture' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
+                  {...(r.secret ? { 'data-ph-mask': '' } : {})}
+                >
+                  {r.value}
+                </span>,
+                r.publicLink ? (
+                  <span key="a" className={styles.publicLink}>
+                    <PublicLinkControl link={r.publicLink} open={r.action} />
                   </span>
+                ) : r.action ? (
+                  <ActionControl key="a" action={r.action} variant="quiet" />
                 ) : (
-                  <span key="v" className={r.mono ? shared.mono : undefined}>
-                    {r.value}
-                  </span>
+                  ''
                 ),
-                r.action ? <ActionControl key="a" action={r.action} variant="quiet" /> : '',
               ],
             }))}
           />

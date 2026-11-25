@@ -13,8 +13,8 @@
  * gzipped, and its row marked done with a summary of counts and the worker release its rows name. A
  * row already done answers with that summary, without asking the worker.
  */
-import { nextCrawlBatch, sample, type Sample } from '@crawlmouse/engine/v2/pipeline';
-import { BatchResultSchema, type BatchResult } from '@crawlmouse/types/v2';
+import { answeredAt, nextCrawlBatch, sample, type Sample } from '@crawlmouse/engine/v2/pipeline';
+import { BatchResultSchema, BatchTimingSchema, type BatchResult } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import type { BatchAt, CheckSteps, PostOutput, RunSoFar } from '../../../../../../inngest/check';
 import { CheckFailure, type CheckRequested } from '../../../../../../inngest/check-events';
@@ -29,7 +29,7 @@ import { putJson } from '../evidence';
 import { ACCESS_BATCH_BUDGET, CRAWL_BATCH_BUDGET } from '../limits';
 import type { StepDeps } from './deps';
 import { phaseOf, progressOf } from './progress';
-import { batchSeconds, phaseEndsAt } from './time';
+import { batchSeconds, phaseEndsAt, tailOf } from './time';
 import { assembledSoFar, isCrawl, iso, loadResults, loadSeeds, pathOf, releaseOf } from './stored';
 
 /** A post's summary until the batch is read: what was asked and how long it was given. */
@@ -42,6 +42,8 @@ const ReadSummarySchema = z.strictObject({
   access_tests: z.int().min(0),
   partial: z.boolean(),
   release: z.string().nullable(),
+  /** The worker's request timing (F-247); absent from a worker that does not send it yet. */
+  timing: BatchTimingSchema.optional(),
 });
 
 /** The worker did not answer; asking it again may. */
@@ -52,14 +54,24 @@ type Planned =
   | { kind: 'access'; pages: { url: string; template_key: string }[] }
   | { none: Extract<PostOutput, { status: 'none' }>['why'] };
 
-/** An access stage's pages from the sample. */
-export function stagePages(s: Sample, stage: 1 | 2): Planned {
+/**
+ * An access stage's pages from the sample, each asked where the crawl found it answering (F-252,
+ * engine `answeredAt`): the worker keys its rows on the canonical spelling, as the sample names them.
+ */
+export function stagePages(
+  s: Sample,
+  stage: 1 | 2,
+  rows: ReadonlyMap<string, Parameters<typeof answeredAt>[0]>,
+): Planned {
   if (stage === 2 && s.stage2_needed !== true) return { none: 'not_needed' };
   const picked = stage === 1 ? s.stage1 : s.stage2;
   if (picked.length === 0) return { none: 'done' };
   return {
     kind: 'access',
-    pages: picked.map((p) => ({ url: p.url, template_key: p.template_key })),
+    pages: picked.map((p) => {
+      const row = rows.get(p.url);
+      return { url: row ? answeredAt(row) : p.url, template_key: p.template_key };
+    }),
   };
 }
 
@@ -97,7 +109,7 @@ export function batchSteps(
       return urls === null ? { none: 'done' } : { kind: 'crawl', urls };
     }
     const { assembled } = await assembledSoFar(deps, event, seeds, results);
-    return stagePages(sample(assembled), at.stage ?? 1);
+    return stagePages(sample(assembled), at.stage ?? 1, assembled.rows);
   }
 
   /** True when the worker took the batch; otherwise the output the orchestration acts on. */
@@ -151,7 +163,12 @@ export function batchSteps(
     if ('none' in planned) return { status: 'none', why: planned.none };
     const now = deps.now();
     const budget = at.kind === 'crawl' ? CRAWL_BATCH_BUDGET : ACCESS_BATCH_BUDGET;
-    const seconds = batchSeconds(phaseEndsAt(at, so, now), now, budget.max_seconds);
+    const seconds = batchSeconds(
+      phaseEndsAt(at, so, now),
+      now,
+      budget.max_seconds,
+      tailOf(at.kind),
+    );
     if (seconds === null) return { status: 'none', why: 'no_time' };
 
     const nonce = deps.nonce();
@@ -218,7 +235,11 @@ export function batchSteps(
       // hold the batch (restarted on the same release), so the row's summary is the answer.
       const row = await deps.store.batch(event.checkId, at.batch);
       if (row?.status === 'done' && row.result_path !== null) {
-        return { status: 'read', ...ReadSummarySchema.parse(row.summary) };
+        // The same fields a first read returns: the timing stays on the row, for reading back.
+        const { pages, links, access_tests, partial, release } = ReadSummarySchema.parse(
+          row.summary,
+        );
+        return { status: 'read', pages, links, access_tests, partial, release };
       }
       const worker = workerOf();
       const id = batchIdOf(event.checkId, at.batch);
@@ -247,7 +268,7 @@ export function batchSteps(
       await deps.store.endBatch(event.checkId, at.batch, {
         status: 'done',
         finished_at: iso(now),
-        summary: { ...counts, release },
+        summary: { ...counts, release, ...(result.timing && { timing: result.timing }) },
         result_path: path,
       });
       await progress(

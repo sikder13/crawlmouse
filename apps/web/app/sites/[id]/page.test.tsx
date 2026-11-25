@@ -50,6 +50,7 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
 import { parseDeployHook, verifyDeployHook } from '@/lib/v2/account/deploy-hook';
+import { SITE_COPY } from '@/lib/v2/copy/site';
 import { siteOfCaller } from '@/lib/v2/account/pages';
 import { makePaid } from '@/lib/v2/account/sites-test-support';
 import { agencyAccount } from '@/lib/v2/agency/test-support';
@@ -211,6 +212,57 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
         ],
       );
     }
+  });
+
+  it('a taken-down report of this host: the page offers no new public link', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const row = async () => {
+      const page = children(await open(kept));
+      const { data } = page.props as unknown as {
+        data: {
+          settings: { rows: { label: string; publicLink?: { mintCheckId: string | null } }[] };
+        };
+      };
+      return data.settings.rows.find((r) => r.label === 'Public link');
+    };
+    expect((await row())?.publicLink?.mintCheckId).toEqual(expect.any(String));
+    const { rows } = await db.query<{ host: string }>(
+      `select host from public.sites where id = $1`,
+      [kept],
+    );
+    await db.query(
+      `insert into public.public_reports (slug, domain, takedown_requested_at)
+       values ('page-test-down', $1, now())`,
+      [rows[0]!.host],
+    );
+    expect((await row())?.publicLink?.mintCheckId).toBeNull();
+    await db.query(`delete from public.public_reports where slug = 'page-test-down'`);
+  });
+
+  it('the latest check’s own link hidden: the page offers no new one, and says why', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const { rows } = await db.query<{ id: string; account_id: string }>(
+      `select c.id, s.account_id from public.checks c join public.sites s on s.id = c.site_id
+        where c.site_id = $1 and c.status = 'finished' order by c.finished_at desc limit 1`,
+      [kept],
+    );
+    await db.query(
+      `insert into public.public_reports (slug, check_id, site_id, account_id, domain, hidden_at)
+       values ('page-test-hidden', $1, $2, $3, 'hidden-page.example', now())`,
+      [rows[0]!.id, kept, rows[0]!.account_id],
+    );
+    const page = children(await open(kept));
+    await db.query(`delete from public.public_reports where slug = 'page-test-hidden'`);
+    const { data } = page.props as unknown as {
+      data: {
+        settings: {
+          rows: { label: string; value: string; publicLink?: { mintCheckId: string | null } }[];
+        };
+      };
+    };
+    const row = data.settings.rows.find((r) => r.label === 'Public link')!;
+    expect(row.publicLink?.mintCheckId).toBeNull();
+    expect(row.value).toBe(SITE_COPY.publicLink.hiddenLatest);
   });
 
   it('names the next check at the time sites.next_check_at holds (CC-28 D8)', async () => {

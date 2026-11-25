@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
 import { parseReportRequest } from '../reports/generate-request';
+import { siteUrl } from '../../site-url';
+import { SITE_COPY } from '../copy/site';
 import { axisLabels, move } from './checks';
 import type { Viewer } from './account';
 import { siteView } from './site';
@@ -220,5 +222,127 @@ describe('the Grades card’s two buttons (F-107)', () => {
     expect(a.method).toBe('get');
     expect(a.href).toBe('/reports?site=50000000-0000-4000-8000-000000000001');
     expect(a.fields).toEqual({});
+  });
+});
+
+describe('the site’s public link (F-123)', () => {
+  const noLinks = { ...bad, reports: bad.reports.filter((r) => r.kind !== 'public_link') };
+  const owner = bad.seats.find((x) => x.account_id === BAD_ACCOUNT && x.role === 'owner')!;
+  const asRole = (d: typeof bad, role: 'owner' | 'account_manager' | 'developer') => ({
+    ...d,
+    seats: d.seats.map((x) => (x.id === owner.id ? { ...x, role } : x)),
+  });
+  const row = (d: typeof bad, seatId?: string) =>
+    siteView(
+      d,
+      { accountId: BAD_ACCOUNT, now: bad.as_of, ...(seatId ? { seatId } : {}) },
+      OUTFITTER,
+    ).settings.rows.find((r) => r.label === 'Public link');
+  const latest = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER);
+  const latestCheck = bad.checks
+    .filter((c) => c.site_id === OUTFITTER && c.finished_at !== null)
+    .sort((x, y) => Date.parse(y.finished_at!) - Date.parse(x.finished_at!))[0]!;
+
+  it('with none, the owner is offered one for the latest check, and told what it does', () => {
+    const r = row(noLinks)!;
+    expect(r.value).toContain('anyone who has it');
+    expect(r.value).toContain('unlisted');
+    expect(r.value).toContain('told not to index it');
+    expect(r.action).toBeNull();
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: latestCheck.id });
+  });
+
+  it('a developer, who may not publish, has no row when there is no link', () => {
+    expect(row(asRole(noLinks, 'developer'), owner.id)).toBeUndefined();
+  });
+
+  it('a developer sees a link that exists and is offered no new one', () => {
+    const r = row(asRole(bad, 'developer'), owner.id)!;
+    expect(r.publicLink?.url).toBe(siteUrl('/r/example-outfitter-25oct'));
+    expect(r.publicLink?.mintCheckId).toBeNull();
+  });
+
+  it('a link of an earlier check is shown, with a new one offered for the latest', () => {
+    expect(latest.settings.rows.find((r) => r.label === 'Public link')!.publicLink).toEqual({
+      url: siteUrl('/r/example-outfitter-25oct'),
+      mintCheckId: latestCheck.id,
+    });
+  });
+
+  it('a link of the latest check offers no second one, and the newest link is the one shown', () => {
+    const old = bad.reports.find((r) => r.kind === 'public_link')!;
+    const newest = {
+      ...old,
+      id: '60000000-0000-4000-8000-0000000000f1',
+      public_slug: 'newest-link',
+      created_at: latestCheck.finished_at!,
+      covers_check_ids: [latestCheck.id],
+    };
+    const r = row({ ...bad, reports: [...bad.reports, newest] })!;
+    expect(r.publicLink).toEqual({
+      url: siteUrl('/r/newest-link'),
+      mintCheckId: null,
+    });
+  });
+
+  it('after a link is withdrawn, an owner is told so and offered no new one', () => {
+    const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      link: { gate: 'withdrawn', hiddenCheckIds: [] },
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.value).toBe(SITE_COPY.publicLink.withdrawn);
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
+  });
+
+  it('when the check could not be made, it says so and offers none', () => {
+    const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      link: { gate: 'unknown', hiddenCheckIds: [] },
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.value).toBe(SITE_COPY.publicLink.unknown);
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
+  });
+
+  it('after a hide of an earlier check’s link, a new one is offered for the latest', () => {
+    const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      link: { gate: 'open', hiddenCheckIds: ['an-earlier-check'] },
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.value).toBe(SITE_COPY.publicLink.none);
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: latestCheck.id });
+  });
+
+  it('when the latest check’s own link is hidden, it says a later check can have one', () => {
+    const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      link: { gate: 'open', hiddenCheckIds: [latestCheck.id] },
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.value).toBe(SITE_COPY.publicLink.hiddenLatest);
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
+  });
+
+  it('a live link beside a withdrawn one is shown, and no new one is offered', () => {
+    const r = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      link: { gate: 'withdrawn', hiddenCheckIds: [] },
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.publicLink?.url).toContain('/r/example-outfitter-25oct');
+    expect(r.publicLink?.mintCheckId).toBeNull();
+  });
+
+  it('a developer is not told about a withdrawn link', () => {
+    const v = siteView(
+      asRole(noLinks, 'developer'),
+      { accountId: BAD_ACCOUNT, now: bad.as_of, seatId: owner.id },
+      OUTFITTER,
+      undefined,
+      { link: { gate: 'withdrawn', hiddenCheckIds: [] } },
+    );
+    expect(v.settings.rows.find((x) => x.label === 'Public link')).toBeUndefined();
+  });
+
+  it('a partial latest check cannot be published, so none is offered', () => {
+    const partial = {
+      ...noLinks,
+      checks: noLinks.checks.map((c) =>
+        c.id === latestCheck.id ? { ...c, status: 'partial' as const } : c,
+      ),
+    };
+    expect(row(partial)).toBeUndefined();
   });
 });

@@ -153,3 +153,14 @@
     grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }
+
+/* F-237: a crawled URL or an email address has no space to break at, so a cell holding one breaks
+   anywhere rather than pushing the table past its card. */
+.breakAnywhere {
+  overflow-wrap: anywhere;
+}
+
+/* A control that must read whole ("Change", "Get packet"): it takes its width before the text does. */
+.nowrap {
+  white-space: nowrap;
+}

@@ -10,7 +10,14 @@ import styles from './HomeScreen.module.css';
  * The example audit on Home: the crawl screen's own replay, shown at its end. Still: the build
  * plays on the crawl screen, where it is a real crawl's progress (DESIGN-LOCK rule 13).
  */
-export function Stage({ example }: { example: HomeView['example'] }) {
+export function Stage({
+  example,
+  nojs = true,
+}: {
+  example: HomeView['example'];
+  /** False while the Goal 1 switch hides `nojs`: the legend drops "only through JavaScript". */
+  nojs?: boolean;
+}) {
   return (
     <Card className={styles.stage}>
       <MapSvg
@@ -53,10 +60,12 @@ export function Stage({ example }: { example: HomeView['example'] }) {
           <span className={styles.keyDot} />
           reachable
         </span>
-        <span className={layout.row}>
-          <span className={styles.keyTriangle} />
-          only through JavaScript
-        </span>
+        {nojs ? (
+          <span className={layout.row}>
+            <span className={styles.keyTriangle} />
+            only through JavaScript
+          </span>
+        ) : null}
         <span className={layout.row}>
           <span className={styles.keySquare} />
           orphan, no links in

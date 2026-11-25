@@ -3,6 +3,7 @@
  * fixes, its settings and the alert rules that apply to it, all as the viewer's account holds them
  * at `now`.
  */
+import { siteUrl } from '../../site-url';
 import {
   instant,
   scoredCrawlersMeasured,
@@ -113,6 +114,12 @@ export interface FixRowView {
   fixType: Fix['type'];
 }
 
+/** The site's newest public link, and the check a seat that may publish can make one for. */
+export interface SitePublicLink {
+  url: string | null;
+  mintCheckId: string | null;
+}
+
 export interface SiteView {
   header: { title: string; line: string; actions: ActionView[] };
   grades: {
@@ -147,6 +154,8 @@ export interface SiteView {
       action: ActionView | null;
       /** A credential in the value: the screen leaves it out of session recordings. */
       secret?: true;
+      /** The public link row's controls (F-123). */
+      publicLink?: SitePublicLink;
     }[];
   };
   alerts: {
@@ -458,6 +467,17 @@ export function nextCheckLine(
   return `${dayDateOf(at)} around ${hourMinute(at, zoneOf(v))}`;
 }
 
+export interface SiteOptions {
+  allFixes?: boolean;
+  /** Whether a new public link may be offered (`siteLinkGate`). */
+  link?: { gate: 'open' | 'withdrawn' | 'unknown'; hiddenCheckIds: readonly string[] };
+  /**
+   * The staging site's deploy hook address, which the page signs (lib/v2/account/deploy-hook);
+   * null when there is no staging site or no secret to sign it with.
+   */
+  deployHookUrl?: string | null;
+}
+
 export function siteView(
   d: AccountDataset,
   viewer: Viewer,
@@ -465,15 +485,9 @@ export function siteView(
   next?: NextChecks,
   {
     allFixes = false,
+    link = { gate: 'open', hiddenCheckIds: [] },
     deployHookUrl = null,
-  }: {
-    allFixes?: boolean;
-    /**
-     * The staging site's deploy hook address, which the page signs (lib/v2/account/deploy-hook);
-     * null when there is no staging site or no secret to sign it with.
-     */
-    deployHookUrl?: string | null;
-  } = {},
+  }: SiteOptions = {},
 ): SiteView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
@@ -552,12 +566,26 @@ export function siteView(
 
   // ── settings ──
   const staging = v.d.sites.find((s) => s.staging_of_site_id === site.id);
-  const publicLink = v.d.reports.find((r) => r.site_id === site.id && r.kind === 'public_link');
+  // Newest first: a link is a snapshot of one check, and the older ones keep working.
+  const publicLinks = v.d.reports
+    .filter((r) => r.site_id === site.id && r.kind === 'public_link')
+    .sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at));
+  const publicLink = publicLinks[0];
   // The reader edits and removes only when their seat runs sites (owner or account manager).
   const manage = runsSites(v);
   const edit = (label: string, inputs: readonly ActionInput[]) =>
     manage ? action('editSite', label, { id: site.id }, { inputs }) : null;
   const canCompete = v.gates.competitorsPerSite > 0;
+  // Only a finished check mints, and `seat_may('mint_report')` holds for the roles that run sites.
+  const latestHidden = link.hiddenCheckIds.includes(result.id);
+  const mintCheckId =
+    manage &&
+    link.gate === 'open' &&
+    !latestHidden &&
+    result.status === 'finished' &&
+    !publicLinks.some((r) => r.covers_check_ids.includes(result.id))
+      ? result.id
+      : null;
 
   // ── alerts ──
   const siteChecks = new Set(v.d.checks.filter((c) => c.site_id === site.id).map((c) => c.id));
@@ -729,14 +757,28 @@ export function siteView(
                 : []),
             ]
           : []),
-        ...(publicLink?.public_slug
+        ...(publicLink?.public_slug ||
+        mintCheckId ||
+        (manage && (link.gate !== 'open' || latestHidden))
           ? [
               {
                 label: 'Public link',
-                value: `crawlmouse.com/r/${publicLink.public_slug}`,
-                mono: true,
+                value: publicLink?.public_slug
+                  ? `crawlmouse.com/r/${publicLink.public_slug}`
+                  : link.gate !== 'open'
+                    ? SITE_COPY.publicLink[link.gate]
+                    : latestHidden
+                      ? SITE_COPY.publicLink.hiddenLatest
+                      : SITE_COPY.publicLink.none,
+                mono: Boolean(publicLink?.public_slug),
                 muted: false,
-                action: action('publicReport', 'Open', { slug: publicLink.public_slug }),
+                action: publicLink?.public_slug
+                  ? action('publicReport', 'Open', { slug: publicLink.public_slug })
+                  : null,
+                publicLink: {
+                  url: publicLink?.public_slug ? siteUrl(`/r/${publicLink.public_slug}`) : null,
+                  mintCheckId,
+                },
               },
             ]
           : []),
@@ -837,7 +879,7 @@ export function sitePage(
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
-  options: { allFixes?: boolean; deployHookUrl?: string | null } = {},
+  options: SiteOptions = {},
 ): SitePageView {
   const v = viewAt(d, viewer);
   const site = v.d.sites.find((s) => s.id === siteId);

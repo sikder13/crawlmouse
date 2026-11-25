@@ -66,7 +66,9 @@ async function migrated(admin: Sql, name: string, edit?: Edit) {
   );
   await sql.unsafe(shim).simple();
   const files = migrationFiles();
-  const target = edit ? [...files].reverse().find((f) => readMigration(f).includes(edit.lock)) : undefined;
+  const target = edit
+    ? [...files].reverse().find((f) => readMigration(f).includes(edit.lock))
+    : undefined;
   // Refuse to build when the text is not there to edit, or not in the file whose section A this tests.
   if (edit && (target === undefined || target < MIGRATION))
     throw new Error(`the lock to remove is not in ${MIGRATION} or a later migration`);

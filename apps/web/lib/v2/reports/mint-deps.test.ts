@@ -15,7 +15,7 @@ vi.mock('@/lib/v2/pipeline/load', async () => {
   const { fixture: f } = await import('../fixtures');
   return {
     supabaseCheckReader: (sb: unknown) => ({ sb }),
-    loadCheck: async (reader: unknown) => {
+    loadCheckWithHistory: async (reader: unknown) => {
       loaded.reader = reader;
       return f('bad-site');
     },

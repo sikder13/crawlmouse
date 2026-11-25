@@ -7,13 +7,15 @@
  */
 import type { Metadata } from 'next';
 import { accountDoorEnabled, v2PublicPagesEnabled } from '../auth/flags';
-import { billingPublic } from '../billing/flags';
+import { agencySalesOpen, billingPublic } from '../billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY, usd } from '../billing/prices';
 import { DEVELOPERS_COPY } from '../v2/copy/developers';
 import { PRICING_COPY } from '../v2/copy/pricing';
 import { CHECK_COPY, CHECK_QUESTIONS, checkPath } from '../v2/copy/check-pages';
+import { ALL_SHOWN, type Features } from '../v2/features';
 import { HELP_COPY } from '../v2/help/copy';
 import { agenciesView } from '../v2/view/agencies';
+import { checkDescription } from '../v2/view/check-pages';
 import { metadata as v1Pricing } from '../../app/pricing/page';
 import { metadata as v1Developers } from '../../app/developers/page';
 import { metadata as blog } from '../../app/blog/page';
@@ -38,13 +40,21 @@ function fromMetadata(path: string, m: Pick<Metadata, 'title' | 'description'>):
   return [titleOf(m), path, m.description];
 }
 
-export function v2KeyPages(): KeyPage[] {
+/**
+ * `features`: what the Goal 1 switch hides, which `/llms.txt`'s route reads (`shownFeatures()`); the
+ * /agencies and /check lines take the descriptions their pages take under it.
+ */
+export function v2KeyPages(features: Features = ALL_SHOWN): KeyPage[] {
   // RC-01: /pricing and /developers are the v2 pages while either flag is on.
   const v2Served = v2PublicPagesEnabled();
-  const agencies = agenciesView({
-    billing: billingPublic(),
-    accountDoor: accountDoorEnabled(),
-  });
+  const agencies = agenciesView(
+    {
+      billing: billingPublic(),
+      agencySales: agencySalesOpen(),
+      accountDoor: accountDoorEnabled(),
+    },
+    features,
+  );
   return [
     [V2_HOME_TITLE, '/', V2_HOME_DESCRIPTION],
     v2Served
@@ -55,7 +65,7 @@ export function v2KeyPages(): KeyPage[] {
       ? [DEVELOPERS_COPY.navLabel, '/developers', DEVELOPERS_COPY.description]
       : fromMetadata('/developers', v1Developers),
     ...CHECK_QUESTIONS.map(
-      (q): KeyPage => [CHECK_COPY[q].title, checkPath(q), CHECK_COPY[q].description],
+      (q): KeyPage => [CHECK_COPY[q].title, checkPath(q), checkDescription(q, features)],
     ),
     [HELP_COPY.title, '/help', HELP_COPY.description],
     fromMetadata('/ai-readiness-checker', aiReadiness),
@@ -67,13 +77,14 @@ export function v2KeyPages(): KeyPage[] {
 
 /**
  * The plans on sale and their prices, one line, from lib/billing/prices.ts: the plans
- * SoftwareApplication offers (Agency while V2_BILLING sells it).
+ * SoftwareApplication offers. Agency is listed only while it is on sale: billing is public
+ * (`billingPublic`) and Agency sales are open (`agencySalesOpen`, F-251).
  */
 export function plansLine(): string {
   const plans = [
     'Free',
     `Pro ${usd(PRO_MONTHLY)}/month or ${usd(PRO_YEARLY)}/year`,
-    ...(billingPublic()
+    ...(billingPublic() && agencySalesOpen()
       ? [`Agency ${usd(AGENCY_MONTHLY)}/month or ${usd(AGENCY_YEARLY)}/year`]
       : []),
   ];
