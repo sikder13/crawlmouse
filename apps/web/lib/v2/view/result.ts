@@ -470,7 +470,7 @@ function linksDoor(d: ViewDataset, check: Check): DoorView {
     title: 'Broken links and page basics',
     pill: f.pill,
     body: f.body,
-    footer: 'Titles and descriptions as recorded',
+    footer: 'Titles and descriptions as each page serves them',
     coverage: { read: f.coverage },
     href: '#',
     added: true,

@@ -548,7 +548,7 @@ describe('the overview door', () => {
         `${c.sharedDescriptionPages} pages share a meta description with another.`,
     );
     expect(d.coverage).toEqual({ read: `Checked ${c.checked} pages` });
-    expect(d.footer).toBe('Titles and descriptions as recorded');
+    expect(d.footer).toBe('Titles and descriptions as each page serves them');
   });
 
   it('is neutral with no broken page, and names no category the record does not hold', () => {
