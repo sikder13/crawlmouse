@@ -495,6 +495,10 @@ const INVENTORY: [entry: string, why: string][] = [
     "STRING cut on crawled text (a rendered page's `body_excerpt`) in the CC-23 content preview, display-only, never persisted. The cut ends where a `/\\S+/g` match ends: both halves of a surrogate pair are non-space, so a match never ends between them. The page says the excerpt is its first 150 words.",
   ],
   [
+    'apps/web/lib/v2/view/segment/signals.ts :: ? check.competitors.slice(0, allowed).map((c) => competitorOf(check, c, present, false))',
+    "ARRAY slice over the check's competitor snapshots, never persisted: no string is indexed, so no surrogate pair can be split. The competitors the reader's plan compares (GATES[tier].competitorsPerSite).",
+  ],
+  [
     'apps/web/lib/v2/view/segment/fixes.ts :: const named = pro.length <= NAMED_PRO ? pro : pro.slice(0, NAMED_PRO - 1);',
     'ARRAY slice over fix records in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The Pro fixes a section names; the rest are one row stating their count.',
   ],

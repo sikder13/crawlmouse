@@ -6,6 +6,7 @@ import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import { addSeat, makePaid, person } from '../account/sites-test-support';
 import { hashToken } from '../account/tokens';
+import { competitorSiteId } from '../competitors/compare';
 import { supabaseMailStore } from './store';
 
 /**
@@ -158,5 +159,46 @@ describe('supabaseMailStore: a seat’s invitation', () => {
     const inv = await invited(null);
     const issued = await supabaseMailStore(client()).issueSeatInvite(inv.seatId, inv.seq, NOW);
     expect(issued?.accountName).toBeNull();
+  });
+});
+
+describe('supabaseMailStore.finishedCheck: a competitor’s check (row 18)', () => {
+  /** A site and one ended check of it; `accountId` null for a site no account keeps. */
+  async function siteWithCheck(id: string, host: string, accountId: string | null) {
+    await db.query(`insert into public.sites (id, account_id, host) values ($1, $2, $3)`, [
+      id,
+      accountId,
+      host,
+    ]);
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.checks (site_id, status, trigger, grade_version, started_at, finished_at, failure_reason)
+       values ($1, 'failed', 'manual', '1.0.0', now(), now(), 'crawl_failed') returning id`,
+      [id],
+    );
+    return rows[0]!.id;
+  }
+
+  it('is a competitor’s only at the competitor site of its own host, kept by no account', async () => {
+    const store = supabaseMailStore(client());
+    const host = `rival-${randomUUID().slice(0, 8)}.example`;
+    const competitor = await siteWithCheck(competitorSiteId(host), host, null);
+    expect(await store.finishedCheck(competitor)).toMatchObject({ competitor: true });
+    // A public audit's site: no account, but a random id.
+    const anonymous = await siteWithCheck(randomUUID(), `anon-${host}`, null);
+    expect(await store.finishedCheck(anonymous)).toMatchObject({ competitor: false });
+    // The competitor id of another host: not this site's own.
+    const misnamed = await siteWithCheck(competitorSiteId(`other-${host}`), `third-${host}`, null);
+    expect(await store.finishedCheck(misnamed)).toMatchObject({ competitor: false });
+    // A kept site.
+    const p = await person(db, 'kept-check');
+    const kept = await siteWithCheck(randomUUID(), `kept-${host}`, p.accountId);
+    expect(await store.finishedCheck(kept)).toMatchObject({
+      competitor: false,
+      accountId: p.accountId,
+    });
+    // A site an account keeps, even at its host's competitor id, is that account's audit.
+    const keptHost = `kept-at-competitor-${host}`;
+    const keptThere = await siteWithCheck(competitorSiteId(keptHost), keptHost, p.accountId);
+    expect(await store.finishedCheck(keptThere)).toMatchObject({ competitor: false });
   });
 });
