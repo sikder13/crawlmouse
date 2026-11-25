@@ -1135,3 +1135,16 @@ describe('test (web), sharded', () => {
     if (want !== 0) expect(r.stdout).toMatch(/^::error::/m);
   });
 });
+
+describe('the build’s memory budget (CTO 094)', () => {
+  const step = (job('build').steps ?? []).find((s) => s.name === 'next build (apps/web)');
+
+  it('runs next build through build-peak.sh, which fails above the budget', () => {
+    expect(step, 'the next build step').toBeDefined();
+    expect(String(step!.run)).toMatch(/build-peak\.sh pnpm build\s*$/m);
+  });
+
+  it('sets the budget at 6,000 MB', () => {
+    expect((step!.env as Record<string, unknown>).BUILD_PEAK_BUDGET_MB).toBe(6000);
+  });
+});
