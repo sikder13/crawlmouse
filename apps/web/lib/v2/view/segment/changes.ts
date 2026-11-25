@@ -5,7 +5,14 @@
  * with it, never as caused by it: a check sees that something differs, not why.
  */
 import { everySectionMeasured } from '../section-measured';
-import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
+import type {
+  Change,
+  Check,
+  EvidenceClass,
+  FixEvent,
+  GradeName,
+  Verdict,
+} from '@crawlmouse/types/v2';
 import type { ViewDataset } from '../../fixtures';
 
 type ChangeKind = Change['kind'];
@@ -153,8 +160,28 @@ function causeOf(c: Change): string {
     : `First observed at this check. What we found: ${text}.`;
 }
 
-/** One change as a row: `check` is the check that found it, `at` the clock its times are read by. */
-export function rowOf(c: Change, check: Check, at: (ts: string) => string): ChangeRowView {
+/** The pill of an `opened` row for a fix that was done and is found again (F-296). */
+export const FOUND_AGAIN = 'found again';
+
+/**
+ * Whether `c` opened a fix that was done before: its own record says so, a `reopened` event for that
+ * fix at the check that wrote the row.
+ */
+export const foundAgain = (c: Change, events: readonly FixEvent[]): boolean =>
+  c.kind === 'opened' &&
+  c.fix_id !== null &&
+  events.some((e) => e.kind === 'reopened' && e.fix_id === c.fix_id && e.check_id === c.check_id);
+
+/**
+ * One change as a row: `check` is the check that found it, `at` the clock its times are read by,
+ * `events` the fix events that say whether an opened fix was found again.
+ */
+export function rowOf(
+  c: Change,
+  check: Check,
+  at: (ts: string) => string,
+  events: readonly FixEvent[] = [],
+): ChangeRowView {
   const crawler = c.ua ? check.crawlers.find((x) => x.ua === c.ua) : undefined;
   const n = c.notified;
   const channels = n
@@ -166,7 +193,7 @@ export function rowOf(c: Change, check: Check, at: (ts: string) => string): Chan
     key: c.id,
     when: at(c.detected_at),
     kind: c.kind,
-    pill: { state: PILL[c.kind], label: c.kind },
+    pill: { state: PILL[c.kind], label: foundAgain(c, events) ? FOUND_AGAIN : c.kind },
     summary: c.summary,
     subject: SUBJECTS[c.subject],
     where: c.where,
@@ -283,7 +310,9 @@ export function changesView(
     };
   }
 
-  const rows = d.changes.filter((c) => c.check_id === check.id).map((c) => rowOf(c, check, at));
+  const rows = d.changes
+    .filter((c) => c.check_id === check.id)
+    .map((c) => rowOf(c, check, at, d.fix_events));
   const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);
   return {

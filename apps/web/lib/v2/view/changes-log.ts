@@ -153,7 +153,7 @@ export function changesLogView(
 
   const clock = (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}`;
   const rows = shown.map(({ change: c, findings }) => ({
-    ...rowOf(c, findCheck(v.d, c.check_id), clock),
+    ...rowOf(c, findCheck(v.d, c.check_id), clock, v.d.fix_events),
     ...(findings === null
       ? {}
       : {
