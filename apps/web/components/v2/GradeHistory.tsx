@@ -177,7 +177,8 @@ export function GradeHistory({
         <ul className={styles.phoneNotes} aria-hidden="true" data-v2-addition="">
           {note && first(note.series) !== undefined ? <li>{note.text}</li> : null}
           {marker && marked != null ? (
-            <li>
+            // The marker's words may say "blocked": the verdicts they rest on go with them (FACTS I2).
+            <li data-v2-verdicts={(marker.verdicts ?? []).join(' ')}>
               <span className={styles.phoneMarker} />
               {marker.text}
             </li>
