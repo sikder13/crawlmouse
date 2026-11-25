@@ -70,4 +70,37 @@ describe('v2 fixtures', () => {
       }
     }
   });
+
+  it.each(files)(
+    '%s numbers its fixes as the engine does: by first-seen check, then fingerprint (F-276)',
+    (file) => {
+      // packages/engine/src/v2/diff/diff.ts:82-110: a check's new fixes take the next numbers,
+      // walked in fingerprint text order. So within a site, sorting by (the first-seen check's
+      // queued_at, fingerprint) gives the numbers in increasing order.
+      const d = JSON.parse(readFileSync(new URL(file, DIR), 'utf8')) as {
+        checks: { id: string; queued_at: string }[];
+        fixes: {
+          site_id: string;
+          number: number;
+          fingerprint: string;
+          first_seen_check_id: string;
+        }[];
+      };
+      const queued = new Map(d.checks.map((c) => [c.id, c.queued_at]));
+      const sites = [...new Set(d.fixes.map((f) => f.site_id))];
+      for (const site of sites) {
+        const inEngineOrder = d.fixes
+          .filter((f) => f.site_id === site)
+          .sort(
+            (a, b) =>
+              queued
+                .get(a.first_seen_check_id)!
+                .localeCompare(queued.get(b.first_seen_check_id)!) ||
+              (a.fingerprint < b.fingerprint ? -1 : a.fingerprint > b.fingerprint ? 1 : 0),
+          )
+          .map((f) => f.number);
+        expect(inEngineOrder, `${file} ${site}`).toEqual([...inEngineOrder].sort((a, b) => a - b));
+      }
+    },
+  );
 });
