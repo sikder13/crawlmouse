@@ -907,6 +907,12 @@ jobs:
           TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
           TRIAL_RACE_REQUIRED: '1'
         run: pnpm exec vitest run db/persist-edges.test.ts --passWithNoTests=false
+      - name: A member reads a check's rows only once it is finished (V2R A2, migration 20261125000001)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/member-read-finished.test.ts --passWithNoTests=false
       - name: Two transactions race in mark done and persist (CC-26b)
         working-directory: scripts
         env:
