@@ -1,7 +1,8 @@
 /**
  * The Changes log over generated two-account datasets (__tests__/v2/_lib/account-datasets.ts): its
- * rows are exactly the reader's changes found by `now`, under any filter; its headline counts the
- * rows it shows; and nothing of the other account appears.
+ * rows are exactly the reader's changes found by `now`, and the re-checks that recorded none
+ * (F-214), under any filter; its headline counts the rows it shows; and nothing of the other account
+ * appears.
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -47,21 +48,38 @@ describe('the Changes log, generated', () => {
             .filter((c) => !site || !live.has(site) || checkSite.get(c.check_id) === site)
             .filter((c) => days === null || instant(c.detected_at) >= now - days * 86_400_000)
             .map((c) => (folded(c) ? `first-audit-${c.check_id}` : c.id));
-          expect([...v.rows.map((r) => r.key)].sort()).toEqual([...new Set(expected)].sort());
+          // A finished or partial re-check with no change found by now is one row; no kind is it.
+          const changed = new Set(
+            d.changes.filter((c) => instant(c.detected_at) <= now).map((c) => c.check_id),
+          );
+          const quiet = d.checks
+            .filter((c) => ended.has(c.id) && live.has(c.site_id))
+            .filter(
+              (c) => (c.status === 'finished' || c.status === 'partial') && !changed.has(c.id),
+            )
+            .filter((c) => c.previous_check_id !== null && !kind)
+            .filter((c) => !site || !live.has(site) || c.site_id === site)
+            .filter((c) => days === null || instant(c.finished_at!) >= now - days * 86_400_000)
+            .map((c) => `check-${c.id}`);
+          if (quiet.length) reached.add('a quiet re-check');
+          expect([...v.rows.map((r) => r.key)].sort()).toEqual(
+            [...new Set([...expected, ...quiet])].sort(),
+          );
           reached.add(v.rows.length ? 'rows' : 'no rows');
           if (site && live.has(site)) reached.add('a site filter applied');
           const before = new Map(MERGED.sites.map((s) => [s.id, s.account_id]));
           if (d.sites.some((s) => s.account_id === viewer.accountId && before.get(s.id) === other))
             reached.add('another account’s site moved in');
           const filtered = kind !== undefined || since !== 'all' || (site && live.has(site));
-          if (v.rows.length && !filtered && v.rows.every((r) => r.key.startsWith('first-audit-'))) {
+          const notChange = (key: string) => /^(first-audit|check)-/.test(key);
+          if (v.rows.length && !filtered && v.rows.every((r) => notChange(r.key))) {
             // Rare in generated accounts, so not required below: changes-log.test.ts pins this case.
             expect(v.headline).toMatch(/first audits?\. (Changes appear|No later check)/);
           } else if (v.rows.length) {
             // Filtered, it counts the rows it shows; unfiltered, only the changes among them.
             const counted = filtered
               ? v.rows.length
-              : v.rows.filter((r) => !r.key.startsWith('first-audit-')).length;
+              : v.rows.filter((r) => !notChange(r.key)).length;
             expect(v.headline).toMatch(new RegExp(`^${counted}\\b`));
           } else expect(v.empty).not.toBeNull();
           const otherHosts = new Set(
@@ -76,7 +94,13 @@ describe('the Changes log, generated', () => {
       { numRuns: 300 },
     );
     expect([...reached].sort()).toEqual(
-      ['a site filter applied', 'another account’s site moved in', 'no rows', 'rows'].sort(),
+      [
+        'a quiet re-check',
+        'a site filter applied',
+        'another account’s site moved in',
+        'no rows',
+        'rows',
+      ].sort(),
     );
   });
 });

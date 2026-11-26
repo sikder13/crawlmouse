@@ -372,19 +372,41 @@ export function aiWithheldSummary(check: Check, measured: number): string {
     ? `This audit did not measure ${orList(missing)}, which the AI readability grade needs.`
     : '';
   const { access: accessPart, quotable, signals } = ai.components;
-  // The grade stores how many crawlers Access rests on only when it is one. Otherwise it is at least
-  // I4's two, and a stored check cannot say more: a crawler with a verdict may not have counted.
+  // Tested is the contract's count: a scored crawler with a verdict (D-10, F-273: "at least two of
+  // the four" was said when all four were tested). What Access rests on is said apart, because a
+  // crawler with a verdict may not have counted: the grade stores that number only when it is one;
+  // otherwise it is at least I4's two, and a stored check cannot say more.
   const from = ai.scored_from_fewer_crawlers;
-  const accessFrom =
-    from === null ? `at least ${numberWord(I4_MEASURED_CRAWLERS)}` : numberWord(from);
+  // "all four", "both", "three of the four"; with one scored crawler, "the one". None tested: the
+  // access clause is left out (below), never "none of the one scored crawler".
+  const testedOf =
+    measured >= scored
+      ? scored === 1
+        ? 'the one scored crawler'
+        : scored === 2
+          ? 'both scored crawlers'
+          : `all ${numberWord(scored)} scored crawlers`
+      : `${numberWord(measured)} of the ${numberWord(scored)} scored crawlers`;
+  const restsOn = from === null ? `at least ${numberWord(I4_MEASURED_CRAWLERS)}` : numberWord(from);
   const tested = [
-    accessPart.score === null
-      ? null
-      : `crawler access for ${accessFrom} of the ${numberWord(scored)} scored crawlers`,
+    accessPart.score === null || measured === 0 ? null : `crawler access for ${testedOf}`,
     quotable.score === null ? null : 'content',
     signals.score === null ? null : 'AI signals',
   ].filter((x): x is string => x !== null);
-  const testedSentence = missing.length && tested.length ? `It tested ${listOf(tested)}.` : '';
+  const testedSentence =
+    missing.length && tested.length
+      ? `It tested ${listOf(tested)}.${
+          // Said only where it tells more than the tested count: not with one scored crawler, none
+          // tested, a stored count over the tested one, or "at least two" of two.
+          accessPart.score === null ||
+          measured === 0 ||
+          scored === 1 ||
+          (from !== null && from > measured) ||
+          (from === null && measured <= I4_MEASURED_CRAWLERS)
+            ? ''
+            : ` Its access score rests on ${restsOn} of those crawlers.`
+        }`
+      : '';
   const range = ai.access_range;
   const access = range ? `Access is somewhere between ${range.min} and ${range.max} of 40.` : '';
   return [why, unmeasured, testedSentence, access].filter(Boolean).join(' ');

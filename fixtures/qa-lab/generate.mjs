@@ -556,6 +556,25 @@ function buildSites() {
     site.pages
       .find((p) => p.path === '/patients/fees/')
       .links.push({ href: '/payment-plans/', text: 'Payment plans' });
+    // Three redirected links, for "Links and pages" (inbox c/025): old addresses this practice moved,
+    // each answered by a 301 route in vercel.json, never by a page. One hop to a page; two hops to a
+    // page; two hops to an address with no page (404).
+    site.redirects = [
+      { from: '/check-ups/', to: '/treatments/check-ups/' },
+      { from: '/hygiene/', to: '/hygienist/' },
+      { from: '/hygienist/', to: '/treatments/hygienist-visits/' },
+      { from: '/offers/', to: '/offers/winter/' },
+      { from: '/offers/winter/', to: '/offers/winter-2025/' },
+    ];
+    site.pages
+      .find((p) => p.path === '/patients/')
+      .links.push({ href: '/check-ups/', text: 'Book a check-up' });
+    site.pages
+      .find((p) => p.path === '/cosmetic/')
+      .links.push({ href: '/hygiene/', text: 'Hygiene appointments' });
+    site.pages
+      .find((p) => p.path === '/patients/fees/')
+      .links.push({ href: '/offers/', text: 'Seasonal offers' });
     site.pages.push(
       ...chain(site.pages, '/patients/children/', [
         'First visit for toddlers',
@@ -1193,6 +1212,38 @@ function buildSites() {
     );
     sites.push(site);
   }
+
+  // sentinel-b — the sentinel's daily twin (api/sentinel.mjs): its robots.txt disallows GPTBot on even
+  // UTC days and allows it on odd ones, so a full check on an odd day records GPTBot allowed and the
+  // next day's look finds it blocked, in whichever hour the site's id puts that look (inbox c/025).
+  // Its pages are served as they are, at once.
+  {
+    const site = {
+      label: 'sentinel-b',
+      name: 'Pellmoor Clocks',
+      town: 'Pellmoor',
+      tagline: 'Clocks cleaned, regulated and set going again.',
+      homeTitle: 'Clock repair in Pellmoor',
+      homeTopic: 'clock repair',
+      palette: 'plum',
+      words: ['pendulum', 'escapement', 'mainspring', 'dial', 'chime', 'case', 'regulation'],
+      sitemap: true,
+      llms: false,
+      schema: true,
+      robots: 'open',
+      nav: [{ href: '/repairs/', text: 'Repairs' }],
+    };
+    site.pages = hierarchy(
+      site,
+      [
+        { title: 'Repairs', leaves: ['Cleaning', 'Mainsprings', 'Chimes'] },
+        { title: 'Clocks', leaves: ['Longcase clocks', 'Mantel clocks', 'Wall clocks'] },
+        { title: 'Visit', leaves: ['Opening hours', 'Finding us'] },
+      ],
+      {},
+    );
+    sites.push(site);
+  }
   return sites;
 }
 
@@ -1446,12 +1497,23 @@ function vercelJson(sites) {
         dest: '/blocked.html',
       });
     }
+    // A redirected address answers 301 before the host's rewrite, with the absolute address it moved to.
+    for (const r of s.redirects ?? []) {
+      routes.push({
+        src: r.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        has: [{ type: 'host', value: host }],
+        status: 301,
+        headers: { Location: `https://${host}${r.to}` },
+      });
+    }
     routes.push({
       src: '/(.*)',
       has: [{ type: 'host', value: host }],
-      // The slow site is served by its function, which answers late, and the sentinel site by its
-      // own, whose robots.txt changes with the clock; every other site is static files.
-      dest: FUNCTION_SITES.has(s.label) ? `/api/${s.label}?path=/$1` : `/sites/${s.label}/$1`,
+      // The slow site is served by its function, which answers late, and the two sentinel sites by
+      // theirs, whose robots.txt changes with the clock; every other site is static files.
+      dest: FUNCTION_SITES[s.label]
+        ? `/api/${FUNCTION_SITES[s.label]}?path=/$1`
+        : `/sites/${s.label}/$1`,
     });
   }
   // The large lab: one function renders the same ~2,500 pages on four hosts and answers each host its
@@ -1470,7 +1532,7 @@ function vercelJson(sites) {
       ignoreCommand: IGNORE_COMMAND,
       functions: {
         'api/slow.mjs': { includeFiles: 'sites/slow/**', maxDuration: 10 },
-        'api/sentinel.mjs': { includeFiles: 'sites/sentinel/**', maxDuration: 10 },
+        'api/sentinel.mjs': { includeFiles: 'sites/sentinel*/**', maxDuration: 10 },
         'api/large.mjs': { maxDuration: 10 },
       },
       routes,
@@ -1480,8 +1542,8 @@ function vercelJson(sites) {
   )}\n`;
 }
 
-/** The sites served by a function of their own under `api/`, rather than as static files. */
-const FUNCTION_SITES = new Set(['slow', 'sentinel']);
+/** The sites served by a function under `api/` rather than as static files: site label → function. */
+const FUNCTION_SITES = { slow: 'slow', sentinel: 'sentinel', 'sentinel-b': 'sentinel' };
 
 /**
  * A user agent that discloses Crawlmouse: the engine's and the worker's, except the worker's browser

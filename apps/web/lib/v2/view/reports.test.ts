@@ -405,11 +405,16 @@ describe('Reports, with what a live page knows', () => {
     expect(labels(v, CSV)).toEqual(['Download · 310 KB']);
     expect(row(v, CSV).linkUntil).toBe('Link · until Tue 24 Nov');
     expect(labels(live({ role: 'account_manager' }), PDF)).toEqual(['Download · 1.2 MB', 'Link']);
-    expect(v.shell).toEqual(
-      reportsView(bad, ACCOUNT_VIEWERS.home(), {}, BASE, {
-        role: 'account_manager',
-      }).shell,
-    );
+    // A manager's frame without Integrations, which answers a developer with a 404 (F-335: this
+    // viewer names no seat, so the rail must read the role it is given).
+    const manager = reportsView(bad, ACCOUNT_VIEWERS.home(), {}, BASE, {
+      role: 'account_manager',
+    }).shell;
+    expect(manager.nav.map((n) => n.label)).toContain('Integrations');
+    expect(v.shell).toEqual({
+      ...manager,
+      nav: manager.nav.filter((n) => n.label !== 'Integrations'),
+    });
     expect(v.shell).not.toEqual(home().shell);
   });
 
