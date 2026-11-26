@@ -1406,6 +1406,18 @@ const ENTRIES: readonly Spec[] = [
     ),
   },
   {
+    path: 'apps/web/app/(v2-kept)/v2-kept/login/page.tsx',
+    v2: true,
+    identity: 'anyone',
+    gate: 'public',
+    detail:
+      'v1’s sign-in form in the v2 shell, with V2_CHECKS_PUBLIC on. It reads only the caller’s own session: a signed-in person is sent to a same-origin `next` (`safeNextPath`) or the dashboard (D-38); anyone else gets the form.',
+    proof: by(
+      'app/(v2-kept)/v2-kept/login/page.test.tsx',
+      'never to another origin: an unsafe next goes to the dashboard',
+    ),
+  },
+  {
     path: 'apps/web/app/(v2-kept)/v2-kept/verify/[id]/page.tsx',
     v2: true,
     identity: 'signed-in person',

@@ -54,6 +54,8 @@ function rawHealth(d: FixtureDataset, accountId: string, adopt: readonly string[
   let withheld = 0;
   for (const s of d.sites) {
     if (s.account_id !== accountId && !adopt.includes(s.id)) continue;
+    // A staging copy holds no slot: the health mean is over primary sites only (F-097).
+    if (s.staging_of_site_id !== null) continue;
     if (instant(s.created_at) > now) continue;
     const latest = d.checks
       .filter((c) => c.site_id === s.id && c.finished_at && instant(c.finished_at) <= now)
@@ -88,8 +90,12 @@ function rawMove(
   now: number,
   start: number,
 ) {
+  // Primary sites only: a staging copy is neither in the move nor the "since" check (F-097).
   const mine = d.sites.filter(
-    (s) => (s.account_id === accountId || adopt.includes(s.id)) && instant(s.created_at) <= now,
+    (s) =>
+      (s.account_id === accountId || adopt.includes(s.id)) &&
+      s.staging_of_site_id === null &&
+      instant(s.created_at) <= now,
   );
   const results = (id: string, until: number) =>
     d.checks
@@ -202,7 +208,10 @@ describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
           expect(dash.strip.health.value).toBe(truth.value ?? '—');
           if (truth.withheld > 0) {
             expect(dash.strip.health.excluded).toMatch(
-              new RegExp(`^${truth.withheld} sites? excluded: AI readability withheld`),
+              // Beside a Technical SEO mean (no site with both grades) the line is said on its terms.
+              new RegExp(
+                `^(${truth.withheld} sites? excluded: AI readability withheld|AI readability withheld on ${truth.withheld} sites?)`,
+              ),
             );
             seen.withheld++;
           } else {

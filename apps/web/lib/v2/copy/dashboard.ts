@@ -10,6 +10,23 @@ import { ALERTS_SENDER } from '../../auth/constants';
 import { TRIAL_DAYS } from './account';
 import { formatPlanPrice } from './plan-price';
 
+/**
+ * What a plan's offer lists, each part only where it is offered (D-16, M5): "Weekly checks, every
+ * fix with its packet, Slack alerts and one competitor per site", or "Weekly checks and every fix with
+ * its packet" with neither Slack nor competitors offered.
+ */
+const planParts = (checks: string, slack: boolean, competitors: number) => {
+  const parts = [
+    checks,
+    'every fix with its packet',
+    slack ? 'Slack alerts' : null,
+    competitors > 0
+      ? `${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site`
+      : null,
+  ].filter((p): p is string => p !== null);
+  return `${parts.filter((_, i) => i < parts.length - 1).join(', ')} and ${parts.at(-1)}`;
+};
+
 export const DASHBOARD_COPY = {
   /** The heading: the site, or with several, the account's count of them (F-118). */
   kept: (hosts: readonly string[]) =>
@@ -21,6 +38,15 @@ export const DASHBOARD_COPY = {
   /** The sites note with some paused, within the plan's limit: a paused site still holds its slot. */
   sitesWithPaused: (slots: number, limit: number, plan: string, paused: number) =>
     `${slots} of ${limit} on ${plan} · ${paused} paused`,
+  /** Beside the sites note: the staging copies the table lists, which hold no slot (F-097, Q10). */
+  stagingApart: (n: number) =>
+    n === 1 ? '1 staging copy holds no slot' : `${n} staging copies hold no slot`,
+  /** The health tile's label when no site carries both grades: what its figure is instead (D-10). */
+  healthSeoOnly: (n: number) =>
+    `Technical SEO, mean of ${n} ${plural(n, 'site', 'sites')} · no site has both grades`,
+  /** The card of AI crawlers blocked on sites the crawler panels do not read (D-09). */
+  blockedElsewhereTitle: (panels: boolean) =>
+    panels ? 'AI crawlers blocked on your other sites' : 'AI crawlers blocked on your sites',
   /** The sites note over the plan's limit, as after a trial ends: how many are checked (F-235). */
   sitesOverLimit: (checked: number, slots: number, plan: string, limit: number) =>
     `${checked} of ${slots} sites checked · ${plan} checks ${limit} ${plural(limit, 'site', 'sites')}`,
@@ -42,12 +68,18 @@ export const DASHBOARD_COPY = {
   topFixesFoot: (rest: number, open: string) =>
     `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}.${rest === 0 ? '' : ` The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`}`,
   setupTrialTitle: 'Worth doing while Pro is on',
+  /** The set-up card with no item listed, only the schedule line (M1): it claims nothing done. */
+  setupScheduleTitle: 'Weekly check schedule',
+  /** The tile's line when it shows the Technical SEO mean: what is withheld, and on how many. */
+  withheldOn: (n: number) => `AI readability withheld on ${n} ${plural(n, 'site', 'sites')}`,
+  /** Another reason a site is left out, said the same way: "no finished check yet on 1 site". */
+  reasonOn: (why: string, n: number) => `${why} on ${n} ${plural(n, 'site', 'sites')}`,
   setupLeftTitle: (n: number) =>
     n === 0
       ? 'Everything is set up'
       : `${capitalise(numberWord(n))} ${plural(n, 'thing', 'things')} left to set up`,
   setupTrialFoot: (n: number, plansOpen = true, sitePaused = false) =>
-    `All ${numberWord(n)} stop when the ${TRIAL_DAYS} days end${plansOpen ? ' unless you keep Pro' : ''}. ${
+    `${n === 1 ? 'It stops' : n === 2 ? 'Both stop' : `All ${numberWord(n)} stop`} when the ${TRIAL_DAYS} days end${plansOpen ? ' unless you keep Pro' : ''}. ${
       sitePaused
         ? 'The site and its audits do not.'
         : 'The site, its audits and its monthly check do not.'
@@ -70,8 +102,9 @@ export const DASHBOARD_COPY = {
     `You will hear from us ${numberWord(n)} ${plural(n, 'way', 'ways')} and no others:`,
   startProTitle: (days: number) => `Start ${days} days of Pro`,
   startProHeading: 'Weekly checks and every fix, if you want them',
-  startProBody: (days: number, competitors: number, sites: number) =>
-    `Weekly checks, every fix with its packet, Slack alerts and ${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site, on up to ${sites} sites, for ${days} days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.`,
+  /** `competitors` is 0 where competitors are not offered (built and shown, D-16): no clause. */
+  startProBody: (days: number, competitors: number, sites: number, slack = true) =>
+    `${planParts('Weekly checks', slack, competitors)}, on up to ${sites} sites, for ${days} days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.`,
   sitesFirstRun: (free: string) => `Checked weekly for ${TRIAL_DAYS} days, then ${free} on Free`,
   /** Day 0 with no site yet: the account exists, nothing is watched. */
   noSiteTitle: 'Add the site to watch',
@@ -89,8 +122,9 @@ export const DASHBOARD_COPY = {
     competitors: number,
     sites: number,
     noCard: boolean,
+    slack = true,
   ) =>
-    `You have ${plan} until ${until}: ${schedule} checks, every fix with its packet, Slack alerts and ${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site, on up to ${sites} sites.${noCard ? ' No card.' : ''}`,
+    `You have ${plan} until ${until}: ${planParts(`${schedule} checks`, slack, competitors)}, on up to ${sites} sites.${noCard ? ' No card.' : ''}`,
   /** The email-a-developer form's one field, on a live page. */
   developerField: { label: 'Developer’s email', placeholder: 'dev@example.com' },
   /** Copy fix on a live page: what the status line says. */
@@ -151,7 +185,8 @@ export const SETUP_COPY = {
     todo: `Add ${STAGING} so audits run after each staging deploy`,
     done: 'Staging audited on each deploy',
   },
-  schedule: (when: string) => `Choose the day and hour the weekly check runs (now ${when})`,
+  schedule: (host: string, when: string) =>
+    `Choose the day and hour ${host} is checked weekly (now ${when})`,
 };
 
 // ── Where the dashboards differ from their locked HTML ─────────────────────────────────────
@@ -223,7 +258,7 @@ const DAY0: CopyChange[] = [
     screen: 'dashboard-day0',
     kind: 'facts',
     locked: 'Sun 25 Oct · 1 site · audited 02:34 UTC',
-    rendered: 'Sat 24 Oct · 1 site · audited 22:34',
+    rendered: 'Sat 24 Oct · 1 site · audited today 22:34',
     source: `${ZONE}. Day 0 is read when the account begins, 25 Oct 02:41Z (Q9, owner ruling), Sat 24 Oct there; the first audit finished 02:34Z, 22:34 there`,
   },
   {
@@ -301,9 +336,9 @@ const DAY0: CopyChange[] = [
     kind: 'fixture',
     locked:
       'Alerts to Slack, as well as email Connect Name one competitor to audit the same way Add',
-    rendered: 'done Slack alerts connected done One competitor added',
+    rendered: 'done Slack alerts connected',
     source:
-      'The contract records no date for an integration or a competitor, so day 0 cannot roll them back: the account has Slack connected and summitgear.co named, shown done. Done, the Slack row names Slack alone, since Free keeps the email alerts (FACTS l.31)',
+      'The contract records no date for an integration, so day 0 cannot roll it back: the account has Slack connected, shown done. Done, the Slack row names Slack alone, since Free keeps the email alerts (FACTS l.31). The competitor row is not offered: QA dashboard walk D-16 (F-279): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov)',
   },
   {
     screen: 'dashboard-day0',
@@ -312,23 +347,23 @@ const DAY0: CopyChange[] = [
       "Connect Search Console to lay Google's AI-feature impressions over these pages Connect",
     rendered: '',
     source:
-      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov)',
   },
   {
     screen: 'dashboard-day0',
     kind: 'ruling',
     locked: 'before each deploy Add All four stop',
-    rendered: 'before each deploy Add All three stop',
+    rendered: 'before each deploy It stops',
     source:
-      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them; the count is the items’',
+      'V2R register, F-279 (QA dashboard walk D-16) and FACTS l.57: the foot counts the items the card offers, here the one Slack row, so "It stops"; the count is the items’',
   },
   {
     screen: 'dashboard-day0',
     kind: 'ruling',
     locked: 'Add a staging URL so audits run before each deploy',
-    rendered: 'Add a staging URL so audits run after each staging deploy',
+    rendered: '',
     source:
-      'V2R register, F-097 (CTO 057): the deploy hook fires once a staging deploy has finished, so the audit runs after it',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov)',
   },
   {
     screen: 'dashboard-day0',
@@ -366,6 +401,14 @@ const DAY0: CopyChange[] = [
     rendered: 'from their collections · about 20 minutes +4 SEO',
     source:
       'Owner ruling 2026-11-08 (ruling 1): the effort is data, so a phone shows it, where the locked page hides it',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Worth doing while Pro is on',
+    rendered: 'Everything is set up',
+    source:
+      'V2R register, F-269 (QA dashboard walk D-06, review M1): the title claims only what the card lists, and its one listed row, Slack, is connected',
   },
 ];
 
@@ -545,7 +588,7 @@ const HOME: CopyChange[] = [
     locked: 'Two things left to set up',
     rendered: 'Everything is set up',
     source:
-      'V2R register (CTO ruling 047, 23 Nov): the two items left in the locked page are not offered, so on this fixture nothing is left',
+      'V2R register, F-269 and F-279 (QA dashboard walk D-06, D-16): the title counts the rows the card lists as left, and the card lists none (the one offered item, Slack, is connected)',
   },
   {
     screen: 'dashboard',
@@ -559,10 +602,10 @@ const HOME: CopyChange[] = [
     screen: 'dashboard',
     kind: 'ruling',
     locked:
-      "One competitor added 2 min Connect Search Console to lay Google's AI-feature impressions over these pages Connect 1 min",
-    rendered: 'One competitor added done Staging audited on each deploy',
+      "done One competitor added 2 min Connect Search Console to lay Google's AI-feature impressions over these pages Connect 1 min",
+    rendered: '',
     source:
-      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them; staging is done (a staging site exists); the efforts "2 min" and "1 min" are in no record and are left out',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov); the efforts "2 min" and "1 min" are in no record',
   },
   {
     screen: 'dashboard',
@@ -578,6 +621,22 @@ const HOME: CopyChange[] = [
       'example-outfitter.com vs summitgear.co Change You summitgear.co Crawlers with full access 2 / 6 6 / 6 Text readable without JavaScript 31% 96% Product schema ● yes ● yes Technical SEO B · 79 B- · 72',
     rendered: '',
     source: 'CC-26 brief, out of scope: competitor data is a later step; this card is not built',
+  },
+  {
+    screen: 'dashboard',
+    kind: 'ruling',
+    locked: 'Choose the day and hour the weekly check runs',
+    rendered: 'Choose the day and hour example-outfitter.com is checked weekly',
+    source:
+      'V2R register, F-279 (review M6): the schedule line names the site whose schedule it sets, from the data',
+  },
+  {
+    screen: 'dashboard',
+    kind: 'ruling',
+    locked: 'mean of both grades 74',
+    rendered: 'mean of both grades 71',
+    source:
+      'V2R register, F-097 (A1’s rule; review of PR 1): a staging copy holds no slot, so the health mean is over the four primary sites, 569 / 8 = 71.1; the locked 74 averaged in the staging copy',
   },
 ];
 
@@ -623,6 +682,28 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
     screen: 'dashboard',
     what: 'On a live page, Email to my developer’s address field, and Copy fix copying the packet as a prompt with a status line',
     source: 'CC-26b follow-up (live fix actions)',
+  },
+  {
+    screen: 'dashboard',
+    what: 'Beside the sites note, the rows the table lists that hold no slot ("1 staging copy holds no slot"), counted from the sites, shown only when one is',
+    source: 'V2R dashboard fixes (e): five rows beside "4 of 5 on Pro"; F-097 and owner ruling Q10',
+  },
+  {
+    screen: 'dashboard',
+    what: 'Under "Crawler access now", the site the two crawler panels read; and a card of the AI crawlers blocked at the latest result of each other site, shown only when one is',
+    source:
+      'QA dashboard walk D-09 (F-272): a block on a site other than the first never reached the dashboard',
+  },
+  {
+    screen: 'dashboard-day0',
+    what: 'With no crawler panels (the first run), a card of the AI crawlers blocked at each site’s latest result, above the sites table, shown only when one is: a table the locked page does not have (tests/visual/parity.spec.ts addedOmit)',
+    source:
+      'QA dashboard walk D-09 (F-272) and review M2 of PR 1: a block on any site reaches the dashboard',
+  },
+  {
+    screen: 'dashboard',
+    what: 'When no site carries both grades, the health tile shows the Technical SEO mean under a label that says so ("Technical SEO, mean of 4 sites · no site has both grades")',
+    source: 'QA dashboard walk D-10 (F-273): the headline tile read "—"',
   },
   {
     screen: 'dashboard',

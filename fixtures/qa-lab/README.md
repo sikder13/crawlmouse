@@ -17,9 +17,12 @@ every page says so in its footer (app-shell's footer is built by its script).
   `*.lab` resolves but has no certificate, so a request to it fails at TLS.
 - **Two small functions.** A static file cannot answer late, so `slow.lab.crawlmouse.com` is rewritten to `api/slow.mjs`,
   which serves the files of `sites/slow/` by looking the path up in that folder's list. A static file cannot change
-  by itself either, so `sentinel.lab.crawlmouse.com` is rewritten to `api/sentinel.mjs`, which does the same for
-  `sites/sentinel/` and writes robots.txt from the clock. Each host must be added to the Vercel project before it
-  answers; `/api/*` answers 404 on every host when requested directly.
+  by itself either, so `sentinel.lab.crawlmouse.com` and `sentinel-b.lab.crawlmouse.com` are rewritten to
+  `api/sentinel.mjs`, which tells them apart by the `Host` header, does the same for each host's own folder
+  (`sites/sentinel/`, `sites/sentinel-b/`) and writes robots.txt from the clock. Each host must be added to the
+  Vercel project before it answers; `/api/*` answers 404 on every host when requested directly.
+- **Redirects.** A site may list moved addresses (`site.redirects` in `generate.mjs`). Each becomes a route that
+  answers 301 with the absolute address it moved to, ahead of the host's rewrite, so a moved address has no page.
 - **The large lab's function.** The four `large*` hosts are rewritten to `api/large.mjs`, which renders
   about 2,500 pages from the request path and fixed tables, so none is a committed file. It tells the hosts
   apart by the `Host` header. Each host must be added to the Vercel project before it answers (see
@@ -60,26 +63,27 @@ _grades_ it is measured, not written here; to read it:
 pnpm smoke -- --url=https://healthy.lab.crawlmouse.com
 ```
 
-| Host                  | Built to show                                                                                       |
-| --------------------- | --------------------------------------------------------------------------------------------------- |
-| `healthy`             | a well-linked guide site: no orphans, depth ≤ 3, varied anchors, sitemap, `llms.txt`, JSON-LD       |
-| `app-shell`           | a client-rendered app: the HTML is an empty `<div id="root">` and a script                          |
-| `cf-blocked`          | a firewall block: 403 to a user agent containing `Crawlmouse`, 200 to a browser                     |
-| `client-1`            | sitemap-only orphan pages; one repeated anchor into each section; no JSON-LD                        |
-| `client-2`            | a deep chain of pages; "Read more" links; a few orphans                                             |
-| `client-3`            | two broken internal links (404); a deep chain; no sitemap; robots.txt disallows GPTBot              |
-| `client-4`            | a larger, mostly sound site whose text nav links three sections with the same words on every page   |
-| `client-5`            | many orphans, generic anchors and deep pages on a small site; no JSON-LD                            |
-| `client-6`            | a five-item text nav on every page, deep pages, orphans; robots.txt disallows GPTBot                |
-| `trial-client-1`      | a middling site for the Agency trial: some orphans, "Learn more" links                              |
-| `demo-1` … `3`        | polished fictional businesses with a few fixes that read well                                       |
-| `slow`                | an ordinary small site whose HTML pages each answer after 3 seconds (`api/slow.mjs`, journey J0.8g) |
-| `sentinel`            | a small site whose robots.txt disallows GPTBot in odd UTC hours (`api/sentinel.mjs`, journey J2.4i) |
-| `large`               | about 2,500 pages of an invented garden shop, answered at once (`api/large.mjs`)                    |
-| `large-slow`          | the same pages, each HTML page answered after 1 second                                              |
-| `large-throttle`      | the same pages; 429 with `Retry-After` above the throttle rule below                                |
-| `large-throttle-bare` | the same pages; 429 without `Retry-After` above the same rule                                       |
-| `dense`               | 2,000 pages, about 100 links each, about 200,000 edges, the same on every check (`api/dense.mjs`)   |
+| Host                  | Built to show                                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `healthy`             | a well-linked guide site: no orphans, depth ≤ 3, varied anchors, sitemap, `llms.txt`, JSON-LD                                                                                   |
+| `app-shell`           | a client-rendered app: the HTML is an empty `<div id="root">` and a script                                                                                                      |
+| `cf-blocked`          | a firewall block: 403 to a user agent containing `Crawlmouse`, 200 to a browser                                                                                                 |
+| `client-1`            | sitemap-only orphan pages; one repeated anchor into each section; no JSON-LD                                                                                                    |
+| `client-2`            | a deep chain of pages; "Read more" links; a few orphans                                                                                                                         |
+| `client-3`            | two broken internal links (404); three redirected links (301: one hop to a page, two hops to a page, two hops to a 404); a deep chain; no sitemap; robots.txt disallows GPTBot  |
+| `client-4`            | a larger, mostly sound site whose text nav links three sections with the same words on every page                                                                               |
+| `client-5`            | many orphans, generic anchors and deep pages on a small site; no JSON-LD                                                                                                        |
+| `client-6`            | a five-item text nav on every page, deep pages, orphans; robots.txt disallows GPTBot                                                                                            |
+| `trial-client-1`      | a middling site for the Agency trial: some orphans, "Learn more" links                                                                                                          |
+| `demo-1` … `3`        | polished fictional businesses with a few fixes that read well                                                                                                                   |
+| `slow`                | an ordinary small site whose HTML pages each answer after 3 seconds (`api/slow.mjs`, journey J0.8g)                                                                             |
+| `sentinel`            | a small site whose robots.txt disallows GPTBot in odd UTC hours (`api/sentinel.mjs`, journey J2.4i)                                                                             |
+| `sentinel-b`          | the same function's twin: robots.txt disallows GPTBot on even UTC days (days since 1970-01-01), so a watch on an even day finds a block that a full check on an odd day did not |
+| `large`               | about 2,500 pages of an invented garden shop, answered at once (`api/large.mjs`)                                                                                                |
+| `large-slow`          | the same pages, each HTML page answered after 1 second                                                                                                                          |
+| `large-throttle`      | the same pages; 429 with `Retry-After` above the throttle rule below                                                                                                            |
+| `large-throttle-bare` | the same pages; 429 without `Retry-After` above the same rule                                                                                                                   |
+| `dense`               | 2,000 pages, about 100 links each, about 200,000 edges, the same on every check (`api/dense.mjs`)                                                                               |
 
 Check every host answers:
 

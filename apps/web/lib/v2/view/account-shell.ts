@@ -132,8 +132,13 @@ export const newChanges = (v: AccountView): Change[] =>
   );
 
 /** No site has two results yet, so there is nothing to compare: the day-0 layout. */
+/**
+ * One result or none on every site that holds a slot. A staging copy is not counted (F-097), as
+ * the dashboard's "since" and "last check" read primary sites only: counting it would leave the
+ * first run with a staging copy's second check and no primary check to name (QA gate #191 F2).
+ */
 export const isFirstRun = (v: AccountView) =>
-  v.d.sites.every((s) => resultChecks(v, s.id).length <= 1);
+  primarySites(v).every((s) => resultChecks(v, s.id).length <= 1);
 
 /**
  * Where the plan's terms and its Keep action are read: in the rail's trial card (the default),

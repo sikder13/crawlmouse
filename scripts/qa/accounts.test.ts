@@ -169,7 +169,7 @@ const taggedUserAgents = (): string[] => [
 ];
 
 describe('QA_HOSTS', () => {
-  it('names the twenty lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
+  it('names the twenty-one lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
     expect(allHosts()).toEqual([
       'nahltech.com',
       'crawlmouse.com',
@@ -188,6 +188,7 @@ describe('QA_HOSTS', () => {
       'demo-3.lab.crawlmouse.com',
       'slow.lab.crawlmouse.com',
       'sentinel.lab.crawlmouse.com',
+      'sentinel-b.lab.crawlmouse.com',
       'large.lab.crawlmouse.com',
       'large-slow.lab.crawlmouse.com',
       'large-throttle.lab.crawlmouse.com',
@@ -226,18 +227,90 @@ describe('the lab serves every lab host', () => {
         expect(routeFor(host, path, CONTROL.userAgent), `${host}${path}`).toEqual({
           status: undefined,
           // The slow and sentinel sites are served by their functions, which read the same folders
-          // (api/slow.mjs, api/sentinel.mjs); the large four by one function that renders them
-          // (api/large.mjs).
+          // (api/slow.mjs; api/sentinel.mjs for both sentinel hosts); the large four by one function
+          // that renders them (api/large.mjs); dense by its own (api/dense.mjs).
           dest:
-            host === QA_HOSTS.slow || host === QA_HOSTS.sentinel
-              ? `/api/${label(host)}?path=${path}`
-              : largeHosts().includes(host)
-                ? `/api/large?path=${path}`
-                : denseHosts().includes(host)
-                  ? `/api/dense?path=${path}`
-                  : `/sites/${label(host)}${path}`,
+            host === QA_HOSTS.slow
+              ? `/api/slow?path=${path}`
+              : host === QA_HOSTS.sentinel || host === QA_HOSTS.sentinelDaily
+                ? `/api/sentinel?path=${path}`
+                : largeHosts().includes(host)
+                  ? `/api/large?path=${path}`
+                  : denseHosts().includes(host)
+                    ? `/api/dense?path=${path}`
+                    : `/sites/${label(host)}${path}`,
         });
       }
+    }
+  });
+
+  // Inbox c/025: "Links and pages" needs redirects to show. Each chain below is written out by hand,
+  // not read from the generator, and followed through the route model to where it ends.
+  it('answers client-3’s three moved addresses with 301 chains: one hop to a page, two to a page, two to a 404', () => {
+    const host = QA_HOSTS.clients[2]!;
+    const page = (path: string) => existsSync(join(SITES, 'client-3', path.slice(1), 'index.html'));
+    const follow = (start: string): { hops: string[]; end: string } => {
+      const hops: string[] = [];
+      let path = start;
+      for (let i = 0; i < 5; i++) {
+        const out = walk(host, path, CRAWL.userAgent);
+        if (out.final?.status !== 301) break;
+        const to = out.headers.Location!;
+        expect(to.startsWith(`https://${host}/`), to).toBe(true);
+        expect(out.final.dest, path).toBeUndefined();
+        path = to.slice(`https://${host}`.length);
+        hops.push(path);
+      }
+      return { hops, end: path };
+    };
+    expect(follow('/check-ups/')).toEqual({
+      hops: ['/treatments/check-ups/'],
+      end: '/treatments/check-ups/',
+    });
+    expect(follow('/hygiene/')).toEqual({
+      hops: ['/hygienist/', '/treatments/hygienist-visits/'],
+      end: '/treatments/hygienist-visits/',
+    });
+    expect(follow('/offers/')).toEqual({
+      hops: ['/offers/winter/', '/offers/winter-2025/'],
+      end: '/offers/winter-2025/',
+    });
+    expect(page('/treatments/check-ups/')).toBe(true);
+    expect(page('/treatments/hygienist-visits/')).toBe(true);
+    expect(page('/offers/winter-2025/')).toBe(false);
+    expect(routeFor(host, '/offers/winter-2025/', CRAWL.userAgent)).toEqual({
+      status: undefined,
+      dest: '/sites/client-3/offers/winter-2025/',
+    });
+    // Each first address is a link on a page the crawler reaches, and no moved address has a page.
+    for (const [from, on] of [
+      ['/check-ups/', 'patients/index.html'],
+      ['/hygiene/', 'cosmetic/index.html'],
+      ['/offers/', 'patients/fees/index.html'],
+    ] as const) {
+      expect(readFileSync(join(SITES, 'client-3', on), 'utf8'), on).toContain(`href="${from}"`);
+    }
+    for (const moved of [
+      '/check-ups/',
+      '/hygiene/',
+      '/hygienist/',
+      '/offers/',
+      '/offers/winter/',
+    ]) {
+      expect(page(moved), moved).toBe(false);
+    }
+    // No other host redirects these addresses: each goes to its own folder.
+    for (const other of labHosts().filter((h) => h !== host && staticHosts().includes(h))) {
+      if (
+        other === QA_HOSTS.slow ||
+        other === QA_HOSTS.sentinel ||
+        other === QA_HOSTS.sentinelDaily
+      )
+        continue;
+      expect(routeFor(other, '/check-ups/', CONTROL.userAgent), other).toEqual({
+        status: undefined,
+        dest: `/sites/${label(other)}/check-ups/`,
+      });
     }
   });
 

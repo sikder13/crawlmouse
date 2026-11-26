@@ -13,7 +13,7 @@ import {
   type Fix,
   type FixSection,
 } from '@crawlmouse/types/v2';
-import { findCheck, fixesAsOf, siteOf } from '../fixtures';
+import { findCheck, fixesAsOf, siteOf } from '../dataset-lookups';
 import {
   AI_WAITING,
   effectHeadline,
@@ -57,7 +57,7 @@ import {
   verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
-import type { ViewDataset } from '../fixtures';
+import type { ViewDataset } from '../dataset-lookups';
 
 export interface GradeView {
   label: string;
