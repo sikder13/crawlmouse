@@ -38,6 +38,7 @@ import { fileURLToPath } from 'node:url';
 import * as prettier from 'prettier';
 import { HOSTS as LARGE_HOSTS } from './api/large.mjs';
 import { HOSTS as DENSE_HOSTS } from './api/dense.mjs';
+import { HOSTS as FIXME_HOSTS } from './api/fixme.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const ZONE = 'lab.crawlmouse.com';
@@ -1534,6 +1535,14 @@ function vercelJson(sites) {
       dest: '/api/dense?path=/$1',
     });
   }
+  // The fixme lab: a blog whose article byline comes and goes with the UTC day (api/fixme.mjs, row 22).
+  for (const host of Object.values(FIXME_HOSTS)) {
+    routes.push({
+      src: '/(.*)',
+      has: [{ type: 'host', value: host }],
+      dest: '/api/fixme?path=/$1',
+    });
+  }
   routes.push({ src: '/(.*)', status: 404, dest: '/404.html' });
   return `${JSON.stringify(
     {
@@ -1544,6 +1553,7 @@ function vercelJson(sites) {
         'api/sentinel.mjs': { includeFiles: 'sites/sentinel*/**', maxDuration: 10 },
         'api/large.mjs': { maxDuration: 10 },
         'api/dense.mjs': { maxDuration: 10 },
+        'api/fixme.mjs': { maxDuration: 10 },
       },
       routes,
     },
@@ -1616,6 +1626,7 @@ const SOURCES = [
   'api/sentinel.mjs',
   'api/large.mjs',
   'api/dense.mjs',
+  'api/fixme.mjs',
 ];
 // `vercel link` writes .vercel/ and .env.local; both are gitignored and never uploaded.
 const generated = listed(ROOT).filter(

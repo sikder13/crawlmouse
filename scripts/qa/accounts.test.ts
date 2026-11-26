@@ -33,6 +33,12 @@ import {
   paths as densePaths,
   // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
 } from '../../fixtures/qa-lab/api/dense.mjs';
+import {
+  answer as fixmeAnswer,
+  HOSTS as FIXME,
+  paths as fixmePaths,
+  // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
+} from '../../fixtures/qa-lab/api/fixme.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LAB = join(REPO, 'fixtures', 'qa-lab');
@@ -70,12 +76,18 @@ const label = (host: string): string => host.slice(0, -LAB_ZONE.length);
 const largeHosts = (): string[] => Object.values(LARGE as Record<string, string>);
 /** The dense lab's host: its function renders its pages (api/dense.mjs), so it has no folder either. */
 const denseHosts = (): string[] => Object.values(DENSE as Record<string, string>);
+/** Row 22's lab host (api/fixme.mjs): rendered by its function too. */
+const fixmeHosts = (): string[] => Object.values(FIXME as Record<string, string>);
 /** The hosts a function renders, with no folder of their own. */
-const renderedHosts = (): string[] => [...largeHosts(), ...denseHosts()];
+const renderedHosts = (): string[] => [...largeHosts(), ...denseHosts(), ...fixmeHosts()];
 const staticHosts = (): string[] => labHosts().filter((h) => !renderedHosts().includes(h));
 /** A rendered host's pages, as its function lists them. */
 const renderedPaths = (host: string): string[] =>
-  denseHosts().includes(host) ? (densePaths() as string[]) : (largePaths() as string[]);
+  denseHosts().includes(host)
+    ? (densePaths() as string[])
+    : fixmeHosts().includes(host)
+      ? (fixmePaths() as string[])
+      : (largePaths() as string[]);
 /** A large host's robots.txt, as its function answers it. */
 const largeRobots = async (host: string): Promise<string> =>
   (
@@ -169,7 +181,7 @@ const taggedUserAgents = (): string[] => [
 ];
 
 describe('QA_HOSTS', () => {
-  it('names the twenty-one lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
+  it('names the twenty-two lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
     expect(allHosts()).toEqual([
       'nahltech.com',
       'crawlmouse.com',
@@ -194,6 +206,7 @@ describe('QA_HOSTS', () => {
       'large-throttle.lab.crawlmouse.com',
       'large-throttle-bare.lab.crawlmouse.com',
       'dense.lab.crawlmouse.com',
+      'fixme.lab.crawlmouse.com',
     ]);
   });
 
@@ -214,6 +227,7 @@ describe('the lab serves every lab host', () => {
       ].sort(),
     );
     expect(denseHosts()).toEqual([QA_HOSTS.dense]);
+    expect(fixmeHosts()).toEqual([QA_HOSTS.fixme]);
     const folders = readdirSync(SITES).filter((f) => statSync(join(SITES, f)).isDirectory());
     expect(folders.sort()).toEqual(staticHosts().map(label).sort());
     for (const host of staticHosts()) {
@@ -238,7 +252,9 @@ describe('the lab serves every lab host', () => {
                   ? `/api/large?path=${path}`
                   : denseHosts().includes(host)
                     ? `/api/dense?path=${path}`
-                    : `/sites/${label(host)}${path}`,
+                    : fixmeHosts().includes(host)
+                      ? `/api/fixme?path=${path}`
+                      : `/sites/${label(host)}${path}`,
         });
       }
     }
@@ -408,6 +424,8 @@ describe('the lab serves every lab host', () => {
         'api/large.mjs',
         'api/dense',
         'api/dense.mjs',
+        'api/fixme',
+        'api/fixme.mjs',
       ]) {
         expect(routeFor(host, `/${f}`, CONTROL.userAgent)?.status, `${host}/${f}`).toBe(404);
       }
@@ -447,7 +465,9 @@ describe('the lab serves every lab host', () => {
         ? await largeRobots(host)
         : denseHosts().includes(host)
           ? (denseAnswer({ host, path: '/robots.txt' }) as { body: string }).body
-          : readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8');
+          : fixmeHosts().includes(host)
+            ? (fixmeAnswer({ host, path: '/robots.txt', now: 0 }) as { body: string }).body
+            : readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8');
       // Structural: every non-empty Disallow, with the user agents of the group it sits in.
       const disallows: string[] = [];
       let agents: string[] = [];
@@ -496,8 +516,9 @@ describe('the lab serves every lab host', () => {
 
   // The large lab's four hosts and the dense lab exist to be crawled past 500 pages, so they alone are
   // exempt, each held to 2,600 (scripts/qa/large-lab.test.ts holds large's 2,400 floor,
-  // scripts/qa/dense-lab.test.ts dense's 2,000). Every other host stays under 500 in all.
-  it('holds under 500 pages across every host but the five rendered ones, and each of those to 2,600', () => {
+  // scripts/qa/dense-lab.test.ts dense's 2,000), and row 22's fixme, rendered too, is counted by its
+  // own list. Every host with a folder stays under 500 in all.
+  it('holds under 500 pages across every host but the six rendered ones, and each of those to 2,600', () => {
     const pages = (dir: string): number =>
       readdirSync(dir, { withFileTypes: true }).reduce(
         (n, e) =>
@@ -508,6 +529,7 @@ describe('the lab serves every lab host', () => {
     expect([...exempt].sort()).toEqual(
       [
         'dense.lab.crawlmouse.com',
+        'fixme.lab.crawlmouse.com',
         'large.lab.crawlmouse.com',
         'large-slow.lab.crawlmouse.com',
         'large-throttle.lab.crawlmouse.com',
@@ -517,7 +539,7 @@ describe('the lab serves every lab host', () => {
     const served = (host: string): number =>
       exempt.has(host) ? renderedPaths(host).length : pages(join(SITES, label(host)));
     const others = labHosts().filter((h) => !exempt.has(h));
-    expect(others.length).toBe(labHosts().length - 5);
+    expect(others.length).toBe(labHosts().length - 6);
     expect(others.reduce((n, h) => n + served(h), 0)).toBeLessThan(500);
     // Nothing else under sites/ escapes the count: the folders are the other hosts' and no more.
     expect(pages(SITES)).toBe(others.reduce((n, h) => n + served(h), 0));

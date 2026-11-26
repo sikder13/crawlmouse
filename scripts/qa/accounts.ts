@@ -50,6 +50,9 @@ export const QA_HOSTS = {
   // No account holds this one either: 2,000 pages of about 100 links each, about 200,000 edges,
   // rendered by one function (fixtures/qa-lab/api/dense.mjs), for the persist work (c/038).
   dense: 'dense.lab.crawlmouse.com',
+  // Row 22's lab (c/043): a blog whose article byline is gone on even UTC days and back on odd ones,
+  // so a check raises missing_author_date and the next day's verifies it (fixtures/qa-lab/api/fixme.mjs).
+  fixme: 'fixme.lab.crawlmouse.com',
 } as const;
 
 /** Where the person's work lives: their own account, a second (agency) account, or a seat on one. */
