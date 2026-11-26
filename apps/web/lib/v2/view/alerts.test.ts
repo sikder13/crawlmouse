@@ -21,7 +21,7 @@ describe('Alerts, the header', () => {
     // Messages: outfitter × c…06 (email + Slack), nahltech × c…0c (email), staging × c…29 (Slack).
     // The account began 25 Oct 02:41Z, Sat 24 Oct 22:41 in Indiana.
     expect(home().header.line).toBe(
-      '2 emails since 24 Oct, one per site per check that found something · last Fri 30 Oct 06:03 · 1 open: Claude-SearchBot blocked',
+      '2 emails since 24 Oct, one per site per check that found something · last Fri 30 Oct 06:03 EDT · 1 open: Claude-SearchBot blocked',
     );
   });
 
@@ -44,25 +44,25 @@ describe('Alerts, Fired (D4)', () => {
     ).toEqual([
       [
         '001',
-        'Fri 30 Oct 06:03',
+        'Fri 30 Oct 06:03 EDT',
         'example-outfitter.com',
         'crawler blocked',
         'bad',
-        'Claude-SearchBot, all pages · robots.txt changed Thu 19:40',
+        'Claude-SearchBot, all pages · robots.txt changed Thu 19:40 EDT',
         'email, #seo',
       ],
       [
         '002',
-        'Fri 30 Oct 06:03',
+        'Fri 30 Oct 06:03 EDT',
         'example-outfitter.com',
         'crawler blocked',
         'bad',
-        'ClaudeBot, all pages · robots.txt changed Thu 19:40',
+        'ClaudeBot, all pages · robots.txt changed Thu 19:40 EDT',
         'email, #seo',
       ],
       [
         '003',
-        'Fri 30 Oct 06:03',
+        'Fri 30 Oct 06:03 EDT',
         'example-outfitter.com',
         'grade moved',
         'bad',
@@ -71,7 +71,7 @@ describe('Alerts, Fired (D4)', () => {
       ],
       [
         '005',
-        'Fri 30 Oct 06:03',
+        'Fri 30 Oct 06:03 EDT',
         'nahltech.com',
         'resolved',
         'ok',
@@ -80,7 +80,7 @@ describe('Alerts, Fired (D4)', () => {
       ],
       [
         '006',
-        'Tue 27 Oct 14:13',
+        'Tue 27 Oct 14:13 EDT',
         'staging.example-outfitter.dev',
         'deploy audited',
         'ok',
@@ -97,7 +97,7 @@ describe('Alerts, Fired (D4)', () => {
 
   it('words its footnote from the messages: two emails, one carrying three rows, and the Slack one', () => {
     expect(home().fired.foot).toBe(
-      'One email per site per check that found something: Fri 06:03 sent two, one for example-outfitter.com carrying three rows and one for nahltech.com. The staging deploy went to Slack only.',
+      'One email per site per check that found something: Fri 06:03 EDT sent two, one for example-outfitter.com carrying three rows and one for nahltech.com. The staging deploy went to Slack only.',
     );
     expect(home().fired.sub).toBe(
       'Everything that was sent, newest first. One email per site per check that found something, from alerts@crawlmouse.com.',
@@ -108,7 +108,7 @@ describe('Alerts, Fired (D4)', () => {
     const early = alertsView(bad, { accountId: BAD, now: '2026-10-30T10:02:30Z' });
     expect(early.fired.rows.map((r) => r.key.slice(-3))).toEqual(['006']);
     expect(early.header.line).toBe(
-      'No emails since 24 Oct; one Slack message, last Tue 27 Oct 14:13',
+      'No emails since 24 Oct; one Slack message, last Tue 27 Oct 14:13 EDT',
     );
     expect(early.header.actions).toEqual([]);
   });

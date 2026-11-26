@@ -27,7 +27,15 @@ import {
   SHARE_LINK_DAYS,
 } from '../copy/reports';
 import { findCheck } from '../fixtures';
-import { calendarDays, dayDate, dayMonth, dayOfMonth, hourMinute, weekday } from '../format';
+import {
+  calendarDays,
+  dayDate,
+  dayMonth,
+  dayOfMonth,
+  hourMinute,
+  hourMinuteZoned,
+  weekday,
+} from '../format';
 import {
   PLAN_NAMES,
   primarySite,
@@ -152,7 +160,8 @@ export function reportsView(
   const v = viewAt(d, viewer);
   const role = side.role ?? readerRole(v) ?? 'developer';
   const zone = v.account.timezone;
-  const when = (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}`;
+  // D-17: each time names its zone, as on the dashboard and the site page.
+  const when = (ts: string) => `${dayDate(ts, zone)} ${hourMinuteZoned(ts, zone)}`;
   const at = (ts: string) => instant(ts);
   const plan = PLAN_NAMES[v.tier];
   const exportsPlan = firstPlanWith('exports');

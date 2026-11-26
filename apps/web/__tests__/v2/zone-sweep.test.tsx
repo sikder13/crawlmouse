@@ -1,0 +1,88 @@
+/**
+ * D-17's rule, every time on an account page names its zone, read from the rendered pages this
+ * change touches: Alerts, Trial ending and the Agency client reports. Each preview is rendered, every
+ * clock time in its text is found, and the test fails on any time with no zone after it. Read from
+ * the page, not listed, so a time added later is held to the rule too.
+ */
+import { JSDOM } from 'jsdom';
+import type { ReactElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it } from 'vitest';
+import {
+  CLIENT_REPORTS_PREVIEWS,
+  clientReportsPreview,
+  type ClientReportsPreview,
+} from '../../app/(v2-preview)/v2-preview/_preview/agency-reports';
+import { alertsPreview, trialEndPreview } from '../../app/(v2-preview)/v2-preview/_preview/screens';
+import { ACCOUNT_VIEWERS } from '../../app/(v2-preview)/v2-preview/_preview/accounts';
+import { fixture } from '../../lib/v2/fixtures';
+import { alertsView } from '../../lib/v2/view/alerts';
+import { ClientReportsScreen } from '../../components/v2/screens/agency/ReportsScreen';
+import { AlertsScreen } from '../../components/v2/screens/alerts/AlertsScreen';
+import { TrialEndScreen } from '../../components/v2/screens/trial-end/TrialEndScreen';
+
+const PAGES: Record<string, () => ReactElement> = {
+  'Alerts (home)': () => <AlertsScreen data={alertsPreview('home')} />,
+  'Alerts (clean)': () => <AlertsScreen data={alertsPreview('clean')} />,
+  'Trial ending': () => <TrialEndScreen data={trialEndPreview()} />,
+  // On the trial's last day the rail's trial card shows a time ("ends today at", QA's B1 on #218):
+  // bad-site's trial ends Sat 7 Nov 21:41 EST, read here at 10:00 EST that day.
+  'Alerts (home), on the trial’s last day': () => (
+    <AlertsScreen
+      data={alertsView(fixture('bad-site'), {
+        ...ACCOUNT_VIEWERS.home(),
+        now: '2026-11-07T15:00:00.000Z',
+      })}
+    />
+  ),
+  ...Object.fromEntries(
+    (Object.keys(CLIENT_REPORTS_PREVIEWS) as ClientReportsPreview[]).map((path) => [
+      `Client reports ${path}`,
+      () => <ClientReportsScreen data={clientReportsPreview(path)} />,
+    ]),
+  ),
+};
+
+/**
+ * What may follow a time: a zone abbreviation, which ends in T ("EDT", "BST", "AEDT", read even where
+ * the markup runs it into the next word) or is UTC; not any capitals, so "PDF" is no zone (QA's N3); a full zone name ("America/Denver"), or a client report's "their time", the
+ * recipient's own zone, which the row's next run then names in full.
+ */
+const ZONED = /^ ?(?:[A-Z]{1,4}T|UTC|GMT[+-]\d|[A-Z][a-z]+\/[A-Za-z_]+|their time)/;
+
+/** Each clock time in the page's text and the twenty characters after it. */
+function times(page: ReactElement): string[][] {
+  const doc = new JSDOM(renderToStaticMarkup(page)).window.document;
+  const text = (doc.body.textContent ?? '').replace(/\s+/g, ' ');
+  return [...text.matchAll(/(?<!\d)\d{2}:\d{2}(?!\d)(.{0,20})/g)].map((m) => [m[0], m[1]!]);
+}
+
+describe('every time on these pages names its zone (D-17)', () => {
+  it('reads a zone, and not any capitals, after a time (QA’s N3)', () => {
+    for (const after of [' EDT', ' EDTexample', ' AEDT', ' UTC.', ' America/Denver', ' their time'])
+      expect(ZONED.test(after), after).toBe(true);
+    for (const after of [' PDF', ' CSV', ' Link', ' sent', '.'])
+      expect(ZONED.test(after), after).toBe(false);
+  });
+
+  for (const [name, page] of Object.entries(PAGES)) {
+    it(name, () => {
+      const found = times(page());
+      const unzoned = found.filter(([, after]) => !ZONED.test(after!)).map(([t]) => t);
+      expect(unzoned).toEqual([]);
+    });
+  }
+
+  it('reads some times, so a page that shows none does not pass for the wrong reason', () => {
+    const counts = Object.fromEntries(
+      Object.entries(PAGES).map(([n, p]) => [n, times(p()).length]),
+    );
+    expect(counts['Alerts (home)']).toBeGreaterThan(0);
+    expect(counts['Trial ending']).toBeGreaterThan(0);
+    const lastDay = new JSDOM(
+      renderToStaticMarkup(PAGES['Alerts (home), on the trial’s last day']!()),
+    ).window.document.body.textContent;
+    expect(lastDay).toContain('ends today at 21:41 EST');
+    expect(Object.values(counts).reduce((a, b) => a + b, 0)).toBeGreaterThan(5);
+  });
+});

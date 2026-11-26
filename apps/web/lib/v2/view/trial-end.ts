@@ -18,10 +18,10 @@ import {
   calendarDays,
   dayDate,
   daysBefore,
-  hourMinute,
+  hourMinuteZoned,
   listOf,
   sameDay,
-  weekdayTime,
+  weekdayTimeZoned,
 } from '../format';
 import { count } from '../words';
 import {
@@ -136,8 +136,8 @@ export function trialEndView(
   const last = [...v.d.checks].sort((x, y) => at(y.finished_at!) - at(x.finished_at!))[0];
   const lastWhen = last
     ? sameDay(last.finished_at!, v.now, zone)
-      ? COPY.today(hourMinute(last.finished_at!, zone))
-      : `${dayDate(last.finished_at!, zone)} ${hourMinute(last.finished_at!, zone)}`
+      ? COPY.today(hourMinuteZoned(last.finished_at!, zone))
+      : `${dayDate(last.finished_at!, zone)} ${hourMinuteZoned(last.finished_at!, zone)}`
     : null;
   const line = [
     dayDate(v.now, zone),
@@ -611,7 +611,7 @@ function describeChanges(changes: readonly Change[], zone: string): string {
         dayDate(first.detected_at, zone),
       );
       return first.cause?.changed_at
-        ? `${blocked}, ${COPY.after(first.where, weekdayTime(first.cause.changed_at, zone))}`
+        ? `${blocked}, ${COPY.after(first.where, weekdayTimeZoned(first.cause.changed_at, zone))}`
         : blocked;
     })
     .join(' · ');

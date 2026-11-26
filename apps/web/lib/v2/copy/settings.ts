@@ -39,6 +39,10 @@ export const SETTINGS_COPY = {
     agency
       ? 'Shown on sign-in links and on client reports.'
       : 'Shown on sign-in links and, on Agency, on client reports.',
+  /** D-17: the account's zone, which its dates, times and site schedules follow. */
+  zoneLabel: 'Time zone',
+  zoneHint:
+    'Dates and times on these pages are in this zone. Changing it moves each site’s next check to the same local time in the new zone.',
   signInTitle: 'Sign-in',
   signIn: (minutes: number) =>
     `Email link only; there is no password to lose. Links work once, for ${count(minutes)} minutes.`,
@@ -345,6 +349,11 @@ export const SETTINGS_CHANGES: CopyChange[] = [
 ];
 
 export const SETTINGS_ADDITIONS: Addition[] = [
+  {
+    screen: 'settings',
+    what: 'A “Time zone” select in the Account card, under Name, saved with it: the zone the account’s dates, times and site schedules follow',
+    source: 'D-17 (QA’s production dashboard walk, 24 Nov: “Settings has no time zone control”)',
+  },
   {
     screen: 'settings',
     what: 'For a developer seat, Settings in its rail and one line: the account’s address, email and plan are changed by its owner or an account manager. The page had been the public 404',
