@@ -12,16 +12,20 @@ import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-m
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import {
   CHUNK_BYTES,
+  PIECES_PER_STEP,
+  PIECE_CUT,
   chunked,
   edgePieces,
   pageVantage,
   persistBuiltCheck,
   persistCalls,
+  persistStep,
+  rowPieces,
   supabasePersistDb,
 } from './persist';
 import { loadCheck } from './load';
 import { pgliteCheckReader, pglitePersistDb, seedRunningCheck } from './test-support/pglite';
-import type { PageVantage, PersistDb, PersistInput } from './types';
+import type { PageVantage, PersistDb, PersistInput, RowTarget } from './types';
 
 /**
  * The one writer (D5): persistBuiltCheck parses every row before any call, stages the bulk rows in
@@ -58,12 +62,20 @@ const checkOf = (b: BuiltCheck = built) => ({ ...recordedBuild().check, id: b.ch
 /** A PersistDb that records what it was sent, stages answering `staged`, the last call `answer`. */
 const LINEAGE = 'f0000000-0000-4000-8000-000000000330';
 
-function recording(answer: unknown = { written: true, counts: {} }, staged: unknown = true) {
+function recording(
+  answer: unknown = { written: true, counts: {} },
+  staged: unknown = true,
+  target: RowTarget = { running: true, lineageId: LINEAGE, checkMonth: '2026-11-01' },
+  /** What `storedRows` answers, in turn; the built check's own counts, running, when left out. */
+  storedAnswers: { status: string; page_results: number; link_edges: number }[] = [],
+) {
   const sent: unknown[] = [];
   const stages: [string, string, number, readonly unknown[]][] = [];
-  /** Every call, in order: `stage`, `target`, `edges`, `persist`. */
+  /** Every call, in order: `target`, `pages`, `edges`, `stage`, `persist`. */
   const order: string[] = [];
   const pieces: (readonly Record<string, unknown>[])[] = [];
+  const pagePieces: (readonly Record<string, unknown>[])[] = [];
+  const identities: unknown[] = [];
   const db: PersistDb = {
     async stageCheckRows(checkId, collection, chunk, rows) {
       order.push('stage');
@@ -75,50 +87,84 @@ function recording(answer: unknown = { written: true, counts: {} }, staged: unkn
       sent.push(payload);
       return answer;
     },
-    async edgeTarget() {
+    async rowTarget(_checkId, _fetching, identity) {
       order.push('target');
-      return { lineageId: LINEAGE, checkMonth: '2026-11-01' };
+      identities.push(identity);
+      return target;
+    },
+    async insertPageResults(rows) {
+      order.push('pages');
+      pagePieces.push(rows);
     },
     async insertEdges(rows) {
       order.push('edges');
       pieces.push(rows);
     },
+    async storedRows() {
+      order.push('count');
+      return (
+        storedAnswers.shift() ?? {
+          status: 'running',
+          page_results: built.page_results.length,
+          link_edges: built.link_edges.length,
+        }
+      );
+    },
   };
-  return { db, sent, stages, order, pieces };
+  return { db, sent, stages, order, pieces, pagePieces, identities };
 }
 
 describe('persistBuiltCheck: what it sends', () => {
   it('every row the builder made: the bulk rows staged in order, each page with its crawl row’s vantage, the rest in the last call', async () => {
-    const { db, sent, stages, order, pieces } = recording({
+    const { db, sent, stages, order, pieces, pagePieces, identities } = recording({
       written: true,
-      counts: { page_results: 60, link_edges: 0 },
+      counts: { page_results: 0, link_edges: 0 },
     });
     const outcome = await persistBuiltCheck(db, inputOf());
-    // The edge count is the edges written before the call, which moved none (F-330).
+    // The page and edge counts are the rows written before the call, which moved none (F-330).
     expect(outcome).toEqual({
       written: true,
-      counts: { page_results: 60, link_edges: built.link_edges.length },
+      counts: { page_results: built.page_results.length, link_edges: built.link_edges.length },
       verified: [],
     });
+    // The rows are asked for with the built check's identity, as persist_built_check holds it.
+    expect(identities).toEqual([
+      {
+        site_id: built.check.site_id,
+        trigger: built.check.trigger,
+        grade_version: built.check.grade_version,
+        queued_at: built.check.queued_at,
+        started_at: built.check.started_at,
+      },
+    ]);
     const stagedRows = (collection: string) =>
       stages.filter(([, c]) => c === collection).flatMap(([, , , rows]) => rows);
     expect(stages.every(([id]) => id === built.check.id)).toBe(true);
-    expect(stagedRows('page_results')).toEqual(
-      built.page_results.map((page) => ({ ...page, ...vantage.get(page.url) })),
-    );
-    // F-330: no edge is staged; every edge is written, in order, with the check's month and its
-    // fetching lineage, before the last call.
+    // F-330: no page row or edge is staged; every one is written, in order, with the check's month
+    // and its fetching lineage, each page with its crawl row's vantage, before anything is staged.
+    expect(stagedRows('page_results')).toEqual([]);
     expect(stagedRows('link_edges')).toEqual([]);
+    expect(pagePieces.flat()).toEqual(
+      built.page_results.map((page) => ({
+        ...page,
+        ...vantage.get(page.url),
+        check_month: '2026-11-01',
+        lineage_id: LINEAGE,
+      })),
+    );
     expect(pieces.flat()).toEqual(
       built.link_edges.map((e) => ({ ...e, check_month: '2026-11-01', lineage_id: LINEAGE })),
     );
-    expect(order.filter((o) => o !== 'stage')).toEqual([
+    expect(order).toEqual([
       'target',
+      ...pagePieces.map(() => 'pages'),
       ...pieces.map(() => 'edges'),
+      'count',
+      ...stages.map(() => 'stage'),
       'persist',
     ]);
     expect(stagedRows('access_tests')).toEqual(built.access_tests);
-    for (const collection of ['page_results', 'access_tests'])
+    for (const collection of ['access_tests'])
       expect(stages.filter(([, c]) => c === collection).map(([, , n]) => n)).toEqual([
         ...Array(stages.filter(([, c]) => c === collection).length).keys(),
       ]);
@@ -127,7 +173,7 @@ describe('persistBuiltCheck: what it sends', () => {
     expect(p.check).toEqual(built.check);
     const chunks = (collection: string) => stages.filter(([, c]) => c === collection).length;
     expect(p.staged).toEqual({
-      page_results: { chunks: chunks('page_results'), rows: built.page_results.length },
+      page_results: { chunks: 0, rows: 0 },
       link_edges: { chunks: 0, rows: 0 },
       access_tests: { chunks: chunks('access_tests'), rows: built.access_tests.length },
     });
@@ -163,6 +209,16 @@ describe('persistBuiltCheck: what it sends', () => {
       verified: [],
     });
     expect(stages).toHaveLength(1);
+    expect(sent).toHaveLength(1);
+  });
+
+  it('writes no row of a check that is not running, and still asks the last call', async () => {
+    const { db, sent, order } = recording({ written: false, counts: {} }, false, {
+      running: false,
+      status: 'finished',
+    });
+    await persistBuiltCheck(db, inputOf());
+    expect(order.filter((o) => o === 'pages' || o === 'edges')).toEqual([]);
     expect(sent).toHaveLength(1);
   });
 
@@ -272,6 +328,203 @@ describe('persistBuiltCheck: what it sends', () => {
   });
 });
 
+// F-330: a persist step writes at most PIECES_PER_STEP pieces; the check's rows may take several.
+describe('persistStep: the rows across steps', () => {
+  const tableOf = (o: string) => (o === 'pages' ? 'page_results' : 'link_edges');
+
+  it('writes at most `perStep` pieces a step, from where the last stopped, and finishes only on the last', async () => {
+    const calls = persistCalls(inputOf());
+    expect(
+      calls.pieces.length,
+      'anti-vacuity: the recorded check is several pieces',
+    ).toBeGreaterThan(1);
+    const { db, sent, order, pieces, pagePieces } = recording({ written: true, counts: {} });
+    const seen: string[][] = [];
+    let from: number | null = 0;
+    while (from !== null) {
+      const before = order.length;
+      const step = await persistStep(db, inputOf(), { from: from, perStep: 1 });
+      seen.push(order.slice(before));
+      if (step.next === null) {
+        expect(step.outcome.written).toBe(true);
+        from = null;
+      } else {
+        expect(step.next).toBe(from + 1);
+        from = step.next;
+      }
+    }
+    // One piece a step, each in order and once; the staging and the finishing call on the last.
+    expect(seen).toHaveLength(calls.pieces.length);
+    seen.forEach((calls_, i) => {
+      const rowCalls = calls_.filter((o) => o === 'pages' || o === 'edges');
+      expect(rowCalls.map(tableOf)).toEqual([calls.pieces[i]!.table]);
+      expect(calls_.includes('persist')).toBe(i === seen.length - 1);
+      expect(calls_.includes('stage')).toBe(i === seen.length - 1);
+    });
+    expect(sent).toHaveLength(1);
+    expect(pagePieces.flat()).toHaveLength(built.page_results.length);
+    expect(pieces.flat()).toHaveLength(built.link_edges.length);
+  });
+
+  it('a retried step sends its own pieces again and no other', async () => {
+    const calls = persistCalls(inputOf());
+    const last = calls.pieces.length - 1;
+    const { db, pieces, pagePieces, sent } = recording();
+    await persistStep(db, inputOf(), { from: last - 1, perStep: 1 });
+    await persistStep(db, inputOf(), { from: last - 1, perStep: 1 });
+    const sentRows = [...pagePieces, ...pieces];
+    expect(sentRows).toHaveLength(2);
+    for (const rows of sentRows) expect(rows).toHaveLength(calls.pieces[last - 1]!.rows.length);
+    expect(sent).toEqual([]);
+  });
+
+  it.each([
+    [-1, 1],
+    [0.5, 1],
+    [0, 0],
+    [0, 1.5],
+  ])('refuses from %d and perStep %d before any call', async (from, perStep) => {
+    const { db, order } = recording();
+    await expect(persistStep(db, inputOf(), { from: from, perStep: perStep })).rejects.toThrow(
+      /not a step/,
+    );
+    expect(order).toEqual([]);
+  });
+
+  it('a step from past the last piece writes no row and finishes the check', async () => {
+    const calls = persistCalls(inputOf());
+    const { db, order } = recording();
+    const step = await persistStep(db, inputOf(), { from: calls.pieces.length });
+    expect(step.next).toBeNull();
+    expect(order.filter((o) => o !== 'stage')).toEqual(['count', 'persist']);
+  });
+
+  // QA B3 on #219: the finishing call is made only when the stored rows are the built check's.
+  const short = () => ({
+    status: 'running',
+    page_results: built.page_results.length - 1,
+    link_edges: built.link_edges.length,
+  });
+
+  it('a last step whose stored rows fall short starts again from piece 0, and asks no last call', async () => {
+    const n = persistCalls(inputOf()).pieces.length;
+    const { db, sent, stages } = recording(undefined, true, undefined, [short()]);
+    expect(await persistStep(db, inputOf(), { from: n - 1, perStep: 1 })).toEqual({
+      next: 0,
+      restarted: true,
+    });
+    expect(sent).toEqual([]);
+    expect(stages).toEqual([]);
+  });
+
+  it('a shortfall after the restart fails the persist, naming both counts', async () => {
+    const n = persistCalls(inputOf()).pieces.length;
+    const { db, sent } = recording(undefined, true, undefined, [short()]);
+    await expect(
+      persistStep(db, inputOf(), { from: n - 1, perStep: 1, restarted: true }),
+    ).rejects.toThrow(
+      new RegExp(
+        `stores ${built.page_results.length - 1} of ${built.page_results.length} page_results and ` +
+          `${built.link_edges.length} of ${built.link_edges.length} link_edges after a restart`,
+      ),
+    );
+    expect(sent).toEqual([]);
+  });
+
+  // QA's re-gate on #219: a shortfall in the edges alone, every page row stored.
+  const edgesShort = () => ({
+    status: 'running',
+    page_results: built.page_results.length,
+    link_edges: built.link_edges.length - 1,
+  });
+
+  it('a shortfall in the edges alone starts again from piece 0, then fails naming both counts', async () => {
+    const n = persistCalls(inputOf()).pieces.length;
+    const first = recording(undefined, true, undefined, [edgesShort()]);
+    expect(await persistStep(first.db, inputOf(), { from: n - 1, perStep: 1 })).toEqual({
+      next: 0,
+      restarted: true,
+    });
+    expect(first.sent).toEqual([]);
+    const second = recording(undefined, true, undefined, [edgesShort()]);
+    await expect(
+      persistStep(second.db, inputOf(), { from: n - 1, perStep: 1, restarted: true }),
+    ).rejects.toThrow(
+      new RegExp(
+        `stores ${built.page_results.length} of ${built.page_results.length} page_results and ` +
+          `${built.link_edges.length - 1} of ${built.link_edges.length} link_edges after a restart`,
+      ),
+    );
+    expect(second.sent).toEqual([]);
+  });
+
+  it('a step after the restart carries `restarted` on', async () => {
+    const { db } = recording();
+    expect(await persistStep(db, inputOf(), { from: 0, perStep: 1, restarted: true })).toEqual({
+      next: 1,
+      restarted: true,
+    });
+  });
+
+  it('persistBuiltCheck writes every piece again after a shortfall, then finishes once the counts agree', async () => {
+    const { db, sent, pagePieces, pieces } = recording(
+      { written: true, counts: {} },
+      true,
+      undefined,
+      [short()],
+    );
+    expect((await persistBuiltCheck(db, inputOf())).written).toBe(true);
+    expect(pagePieces.flat()).toHaveLength(2 * built.page_results.length);
+    expect(pieces.flat()).toHaveLength(2 * built.link_edges.length);
+    expect(sent).toHaveLength(1);
+  });
+
+  it('persistBuiltCheck fails on a second shortfall, and asks no last call', async () => {
+    const { db, sent } = recording(undefined, true, undefined, [short(), short()]);
+    await expect(persistBuiltCheck(db, inputOf())).rejects.toThrow(/after a restart from piece 0/);
+    expect(sent).toEqual([]);
+  });
+
+  it('a check that is not running is not counted against the built check', async () => {
+    const { db, sent } = recording(
+      { written: false, counts: {} },
+      false,
+      {
+        running: false,
+        status: 'finished',
+      },
+      [{ status: 'finished', page_results: 0, link_edges: 0 }],
+    );
+    await persistBuiltCheck(db, inputOf());
+    expect(sent).toHaveLength(1);
+  });
+
+  it('cuts the pieces by the stored cut, not this release’s', () => {
+    const calls = persistCalls({ ...inputOf(), cut: { rows: 7, bytes: 1024 * 1024, perStep: 3 } });
+    expect(calls.cut).toEqual({ rows: 7, bytes: 1024 * 1024, perStep: 3 });
+    expect(Math.max(...calls.pieces.map((p) => p.rows.length))).toBe(7);
+    // A check built before the cut was stored takes this release's.
+    expect(persistCalls(inputOf()).cut).toEqual(PIECE_CUT);
+  });
+
+  it('a step takes its pieces a step from the stored cut', async () => {
+    const { db, order } = recording();
+    const input = { ...inputOf(), cut: { rows: 7, bytes: 1024 * 1024, perStep: 3 } };
+    expect(await persistStep(db, input, { from: 0 })).toEqual({ next: 3, restarted: false });
+    expect(order.filter((o) => o === 'pages' || o === 'edges')).toHaveLength(3);
+  });
+
+  /**
+   * The arithmetic in PIECES_PER_STEP's comment. Production's first 2,000-page save (fc947155,
+   * a2/evidence/prod-2000): the slowest edge piece took 2,257 ms. The Inngest route's maxDuration is
+   * 300 s, and a step keeps at least 180 s for reading the built check and the finishing call.
+   */
+  it('a step of PIECES_PER_STEP pieces at production’s slowest piece leaves 180 s of the route’s 300 s', () => {
+    const SLOWEST_PIECE_MS = 2_257;
+    expect(PIECES_PER_STEP * SLOWEST_PIECE_MS).toBeLessThanOrEqual(300_000 - 180_000);
+  });
+});
+
 describe('chunked', () => {
   const rows = Array.from({ length: 300 }, (_, i) => ({ i, text: 'x'.repeat(i % 97) }));
 
@@ -371,8 +624,11 @@ describe('supabasePersistDb', () => {
     await expect(supabasePersistDb(sb).persistBuiltCheck({})).rejects.toThrow(/55000.*not running/);
   });
 
-  /** A client that records each call as the query builder chain made it, and answers `answers`. */
-  const chained = (answers: Record<string, unknown>) => {
+  /**
+   * A client that records each call as the query builder chain made it, and answers `answers`: by
+   * table, or by the whole chain when `answers` is a function of it.
+   */
+  const chained = (answers: Record<string, unknown> | ((chain: string) => unknown)) => {
     const calls: string[] = [];
     const chain = (label: string): unknown =>
       new Proxy(
@@ -380,7 +636,10 @@ describe('supabasePersistDb', () => {
         {
           get(_t, key) {
             if (key === 'then') {
-              const data = answers[label.split(' ')[0]!] ?? null;
+              const data =
+                typeof answers === 'function'
+                  ? answers(label)
+                  : (answers[label.split(' ')[0]!] ?? null);
               return (resolve: (v: unknown) => void) => resolve({ data, error: null });
             }
             return (...args: unknown[]) =>
@@ -401,22 +660,110 @@ describe('supabasePersistDb', () => {
     return { sb, calls };
   };
 
-  // F-330: the production port's edge calls.
-  it('edgeTarget reads the check’s month, makes its partitions, then ensures and reads the lineage', async () => {
+  // F-330: the production port's row calls.
+  const identity = () => persistCalls(inputOf()).identity;
+  it('rowTarget reads the check, tests it against the built check, makes its partitions, then ensures and reads the lineage', async () => {
     const { sb, calls } = chained({
-      checks: [{ check_month: '2026-11-01' }],
+      checks: [{ status: 'running', check_month: '2026-11-01' }],
       measurement_lineages: [{ id: LINEAGE }],
     });
     const lineage = built.lineages.fetching;
-    expect(await supabasePersistDb(sb).edgeTarget(built.check.id, lineage)).toEqual({
+    expect(await supabasePersistDb(sb).rowTarget(built.check.id, lineage, identity())).toEqual({
+      running: true,
       lineageId: LINEAGE,
       checkMonth: '2026-11-01',
     });
     expect(calls).toEqual([
       'from checks',
+      'from checks',
       `rpc v2_premake_month_partitions ${JSON.stringify({ p_from: '2026-11-01', p_through: '2026-11-01' })}`,
       'from measurement_lineages',
       'from measurement_lineages',
+    ]);
+  });
+
+  it('rowTarget answers a check that is not running with its status, and writes nothing', async () => {
+    const { sb, calls } = chained({ checks: [{ status: 'finished', check_month: '2026-11-01' }] });
+    expect(
+      await supabasePersistDb(sb).rowTarget(built.check.id, built.lineages.fetching, identity()),
+    ).toEqual({ running: false, status: 'finished' });
+    expect(calls).toEqual(['from checks']);
+  });
+
+  it('rowTarget refuses a check that does not exist', async () => {
+    const { sb } = chained({ checks: [] });
+    await expect(
+      supabasePersistDb(sb).rowTarget(built.check.id, built.lineages.fetching, identity()),
+    ).rejects.toThrow(/not found/);
+  });
+
+  it('rowTarget refuses a check its built check does not match, filtering on each of the five', async () => {
+    const chains: string[] = [];
+    const { sb } = chained((chain) => {
+      chains.push(chain);
+      // The check exists; the query with the built check's five values finds nothing.
+      return chain.includes('eq(["site_id"')
+        ? []
+        : [{ status: 'running', check_month: '2026-11-01' }];
+    });
+    const id = identity();
+    await expect(
+      supabasePersistDb(sb).rowTarget(built.check.id, built.lineages.fetching, id),
+    ).rejects.toThrow(/differs/);
+    const same = chains.find((c) => c.includes('eq(["site_id"'))!;
+    for (const [column, value] of Object.entries(id))
+      expect(same).toContain(
+        value === null
+          ? `is(${JSON.stringify([column, null])})`
+          : `eq(${JSON.stringify([column, value])})`,
+      );
+  });
+
+  // QA's re-gate on #219: the counts the finishing call waits on are of this check's rows only.
+  it('storedRows reads the check’s status, then counts each table’s rows filtered on the check id', async () => {
+    const calls: unknown[][] = [];
+    const counts: Record<string, number> = { page_results: 7, link_edges: 11 };
+    const sb = {
+      from: (table: string) => ({
+        select: (columns: string, options?: unknown) => ({
+          eq: async (column: string, value: string) => {
+            calls.push([table, columns, options ?? null, column, value]);
+            return table === 'checks'
+              ? { data: [{ status: 'running' }], error: null }
+              : { count: counts[table], data: null, error: null };
+          },
+        }),
+      }),
+    } as unknown as SupabaseClient;
+    expect(await supabasePersistDb(sb).storedRows(built.check.id)).toEqual({
+      status: 'running',
+      page_results: 7,
+      link_edges: 11,
+    });
+    expect(calls).toEqual([
+      ['checks', 'status', null, 'id', built.check.id],
+      ['page_results', 'check_id', { count: 'exact', head: true }, 'check_id', built.check.id],
+      ['link_edges', 'check_id', { count: 'exact', head: true }, 'check_id', built.check.id],
+    ]);
+  });
+
+  it('insertPageResults writes one piece as an insert that skips a row already written', async () => {
+    const seen: unknown[][] = [];
+    const sb = {
+      from: (table: string) => ({
+        upsert: async (rows: unknown, opts: unknown) => {
+          seen.push([table, rows, opts]);
+          return { data: null, error: null };
+        },
+      }),
+    } as unknown as SupabaseClient;
+    await supabasePersistDb(sb).insertPageResults([{ a: 1 }]);
+    expect(seen).toEqual([
+      [
+        'page_results',
+        [{ a: 1 }],
+        { onConflict: 'check_id,url_hash,check_month', ignoreDuplicates: true },
+      ],
     ]);
   });
 
@@ -622,7 +969,7 @@ describe('persist_built_check, through persistBuiltCheck', () => {
 
   it.each([
     ['start time', `started_at = started_at + interval '1 microsecond'`],
-    ['queue time', `queued_at = queued_at - interval '1 second'`],
+    ['queue time', `queued_at = queued_at - interval '1 microsecond'`],
     ['trigger', `trigger = 'manual'`],
     ['grade version', `grade_version = '1.9.9'`],
   ])('refuses a built check whose %s differs from the row', async (_label, change) => {
@@ -674,6 +1021,55 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     expect(await staged()).toEqual([]);
   });
 
+  // QA B1 on #219: page rows are written by row before the RPC too, so the app refuses one naming
+  // another check, before any call. The foreign key alone would let it land under any check of the
+  // same month.
+  it('refuses a page row naming another check before any call', async () => {
+    const other = { ...site(), id: randomUUID(), host: 'other.test' };
+    const theirs = { ...checkOf(), id: randomUUID(), site_id: other.id };
+    await seedRunningCheck(db, other, theirs);
+    await seedRunningCheck(db, site(), checkOf());
+    const input = inputOf();
+    const pages = [...input.built.page_results];
+    pages[3] = { ...pages[3]!, check_id: theirs.id };
+    await expect(
+      persistBuiltCheck(pglitePersistDb(db), {
+        ...input,
+        built: { ...input.built, page_results: pages },
+      }),
+    ).rejects.toThrow(/a page names check/);
+    expect(await count('page_results')).toBe(0);
+    expect(await count('page_results', 'check_id', theirs.id)).toBe(0);
+  });
+
+  // QA B3 on #219: a deploy between persist steps that cuts the pieces otherwise.
+  it('a cut that moves between steps leaves rows out, which the count catches and the restart writes', async () => {
+    await seedRunningCheck(db, site(), checkOf());
+    const pdb = pglitePersistDb(db);
+    const small = { ...inputOf(), cut: { rows: 30, bytes: 1024 * 1024, perStep: 1 } };
+    const large = { ...inputOf(), cut: { rows: 2_000, bytes: 1024 * 1024, perStep: 1 } };
+    // The first step by one cut writes pages 0–29; every later step cuts pages 0–59 as piece 0.
+    expect(await persistStep(pdb, small, { from: 0 })).toEqual({ next: 1, restarted: false });
+    let at: { from: number; restarted: boolean } = { from: 1, restarted: false };
+    const seen: unknown[] = [];
+    for (;;) {
+      const step = await persistStep(pdb, large, at);
+      seen.push(step.next === null ? 'finished' : step);
+      if (step.next === null) break;
+      at = { from: step.next, restarted: step.restarted };
+    }
+    // The last piece's step found pages 30–59 missing and started again from piece 0, once.
+    expect(seen).toContainEqual({ next: 0, restarted: true });
+    expect(seen.at(-1)).toBe('finished');
+    expect(await count('page_results')).toBe(built.page_results.length);
+    expect(await count('link_edges')).toBe(built.link_edges.length);
+    const { rows } = await db.query<{ status: string }>(
+      `select status from public.checks where id = $1`,
+      [built.check.id],
+    );
+    expect(rows[0]!.status).toBe(built.check.status);
+  });
+
   it('the finished write leaves no staging behind', async () => {
     await seedRunningCheck(db, site(), checkOf());
     await persistBuiltCheck(pglitePersistDb(db), inputOf());
@@ -682,9 +1078,12 @@ describe('persist_built_check, through persistBuiltCheck', () => {
 
   it('refuses when a staged chunk is missing, and writes nothing', async () => {
     await seedRunningCheck(db, site(), checkOf());
-    // Small chunks, so a collection has several.
+    // persist_built_check still accepts staged page rows; the writer sends none (F-330), so this
+    // stages them by hand, as two chunks.
     const calls = persistCalls(inputOf());
-    const pages = calls.stages.find((st) => st.collection === 'page_results')!;
+    const pages = {
+      rows: calls.pieces.filter((pc) => pc.table === 'page_results').flatMap((pc) => pc.rows),
+    };
     const halves = [pages.rows.slice(0, 30), pages.rows.slice(30)];
     const payload = {
       ...calls.payload,
@@ -754,12 +1153,14 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     expect(await count('access_tests')).toBe(built.access_tests.length);
   });
 
-  // F-330: the edges, in pieces before the RPC.
+  // F-330: the page rows and edges, in pieces before the RPC.
   it('writes every edge once, in pieces before the check is finished, and again changes nothing', async () => {
     await seedRunningCheck(db, site(), checkOf());
     const pdb = pglitePersistDb(db);
     const calls = persistCalls(inputOf());
-    const { lineageId, checkMonth } = await pdb.edgeTarget(calls.checkId, calls.fetching);
+    const target = await pdb.rowTarget(calls.checkId, calls.fetching, calls.identity);
+    if (!target.running) throw new Error('the seeded check is running');
+    const { lineageId, checkMonth } = target;
     const small = edgePieces(inputOf().built.link_edges as never, 7);
     expect(small.length).toBeGreaterThan(2);
     for (const piece of small) {
@@ -782,6 +1183,7 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     expect(outcome.written).toBe(true);
     expect(outcome.counts.link_edges).toBe(built.link_edges.length);
     expect(await count('link_edges')).toBe(built.link_edges.length);
+    expect(await count('page_results')).toBe(built.page_results.length);
     const { rows: lineages } = await db.query<{ lineage_id: string }>(
       `select distinct lineage_id from public.link_edges where check_id = $1`,
       [built.check.id],
@@ -790,11 +1192,70 @@ describe('persist_built_check, through persistBuiltCheck', () => {
       `select distinct lineage_id from public.page_results where check_id = $1`,
       [built.check.id],
     );
-    // The edges name the lineage persist_built_check gave the pages: the same `fetching`.
+    // The edges and the pages name the same lineage: the check's `fetching`.
     expect(lineages).toEqual(pages);
+    expect(pages).toEqual([{ lineage_id: built.lineages.fetching.id }]);
   });
 
-  it('a persist that fails after the edges leaves the check running, its edges unread', async () => {
+  it('writes every page row once, in pieces before the check is finished, and again changes nothing', async () => {
+    await seedRunningCheck(db, site(), checkOf());
+    const pdb = pglitePersistDb(db);
+    const calls = persistCalls(inputOf());
+    const target = await pdb.rowTarget(calls.checkId, calls.fetching, calls.identity);
+    if (!target.running) throw new Error('the seeded check is running');
+    const rows = calls.pieces.filter((pc) => pc.table === 'page_results').flatMap((pc) => pc.rows);
+    const small = rowPieces(rows, 7);
+    expect(small.length).toBeGreaterThan(2);
+    const named = { check_month: target.checkMonth, lineage_id: target.lineageId };
+    for (const piece of small) {
+      await pdb.insertPageResults(piece.map((r) => ({ ...r, ...named })));
+      // A retried piece writes nothing more.
+      await pdb.insertPageResults(piece.map((r) => ({ ...r, ...named })));
+    }
+    expect(await count('page_results')).toBe(built.page_results.length);
+    const { rows: still } = await db.query<{ status: string }>(
+      `select status from public.checks where id = $1`,
+      [built.check.id],
+    );
+    expect(still[0]!.status).toBe('running');
+    await expect(loadCheck(pgliteCheckReader(db), built.check.id)).rejects.toThrow(
+      /only a finished or partial check is read back/,
+    );
+    expect((await persistBuiltCheck(pdb, inputOf())).written).toBe(true);
+    expect(await count('page_results')).toBe(built.page_results.length);
+    // Read back as persist_built_check wrote them before F-330: the same pages.
+    const back = await loadCheck(pgliteCheckReader(db), built.check.id);
+    expect(back.page_results).toHaveLength(built.page_results.length);
+    expect(new Set(back.page_results.map((pr) => pr.url))).toEqual(
+      new Set(built.page_results.map((pr) => pr.url)),
+    );
+  });
+
+  it('persists a check across steps, a piece a step, finished only by the last', async () => {
+    await seedRunningCheck(db, site(), checkOf());
+    const pdb = pglitePersistDb(db);
+    const n = persistCalls(inputOf()).pieces.length;
+    for (let from = 0; from < n - 1; from++) {
+      const step = await persistStep(pdb, inputOf(), { from: from, perStep: 1 });
+      expect(step.next).toBe(from + 1);
+      const { rows } = await db.query<{ status: string }>(
+        `select status from public.checks where id = $1`,
+        [built.check.id],
+      );
+      expect(rows[0]!.status).toBe('running');
+    }
+    const last = await persistStep(pdb, inputOf(), { from: n - 1, perStep: 1 });
+    expect(last.next).toBeNull();
+    expect(await count('page_results')).toBe(built.page_results.length);
+    expect(await count('link_edges')).toBe(built.link_edges.length);
+    const { rows } = await db.query<{ status: string }>(
+      `select status from public.checks where id = $1`,
+      [built.check.id],
+    );
+    expect(rows[0]!.status).toBe(built.check.status);
+  });
+
+  it('a persist that fails after the rows leaves the check running, its rows unread', async () => {
     await seedRunningCheck(db, site(), checkOf());
     const pdb = pglitePersistDb(db);
     const failing = {
@@ -805,6 +1266,7 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     };
     await expect(persistBuiltCheck(failing, inputOf())).rejects.toThrow(/statement timeout/);
     expect(await count('link_edges')).toBe(built.link_edges.length);
+    expect(await count('page_results')).toBe(built.page_results.length);
     const { rows } = await db.query<{ status: string }>(
       `select status from public.checks where id = $1`,
       [built.check.id],
@@ -813,9 +1275,10 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     await expect(loadCheck(pgliteCheckReader(db), built.check.id)).rejects.toThrow(
       /only a finished or partial check is read back/,
     );
-    // The retried step then finishes it, with each edge once.
+    // The retried step then finishes it, with each edge and page once.
     expect((await persistBuiltCheck(pdb, inputOf())).written).toBe(true);
     expect(await count('link_edges')).toBe(built.link_edges.length);
+    expect(await count('page_results')).toBe(built.page_results.length);
   });
 
   it('staging a chunk again with other rows keeps only the later rows', async () => {
@@ -911,7 +1374,16 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     await expect(persistBuiltCheck(pglitePersistDb(db), inputOf())).rejects.toThrow(
       new RegExp(`wrote ${built.fixes.length - 1} and withheld 0 of ${built.fixes.length} fixes`),
     );
-    expect(await count('page_results')).toBe(0);
+    // The rows were written before the finishing call (F-330), which refused: the check stays
+    // running, so the read-back refuses it and nothing of it is shown.
+    const { rows: status } = await db.query<{ status: string }>(
+      `select status from public.checks where id = $1`,
+      [built.check.id],
+    );
+    expect(status[0]!.status).toBe('running');
+    await expect(loadCheck(pgliteCheckReader(db), built.check.id)).rejects.toThrow(
+      /only a finished or partial check is read back/,
+    );
   });
 
   it('inserts the fix events the diff appended, and refuses one naming a fix of another site', async () => {
@@ -1082,12 +1554,12 @@ describe('a built check at the page cap (Q11)', () => {
     const size = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
     // What one request would have carried: every row in a single body (supabase-js sends {"p": …}).
     const bulk = {
-      ...Object.fromEntries(
-        ['page_results', 'access_tests'].map((c) => [
-          c,
-          calls.stages.filter((st) => st.collection === c).flatMap((st) => st.rows),
-        ]),
-      ),
+      page_results: calls.pieces
+        .filter((pc) => pc.table === 'page_results')
+        .flatMap((pc) => pc.rows),
+      access_tests: calls.stages
+        .filter((st) => st.collection === 'access_tests')
+        .flatMap((st) => st.rows),
       link_edges: calls.edges.flat(),
     };
     const rest: Record<string, unknown> = { ...calls.payload };
@@ -1101,8 +1573,11 @@ describe('a built check at the page cap (Q11)', () => {
         p_rows: st.rows,
       }),
     );
-    // F-330: each edge piece is its own request, the rows as the body.
+    // F-330: each piece of page rows or edges is its own request, the rows as the body.
     const edgeBodies = calls.edges.map((piece) => size(piece));
+    const pageBodies = calls.pieces
+      .filter((pc) => pc.table === 'page_results')
+      .map((pc) => size(pc.rows));
     const finishing = size({ p: calls.payload });
 
     await seedRunningCheck(capDb, site(), checkOf());
@@ -1122,7 +1597,13 @@ describe('a built check at the page cap (Q11)', () => {
         finishingMs = performance.now() - t;
         return answer;
       },
-      edgeTarget: (...args) => pdb.edgeTarget(...args),
+      rowTarget: (checkId, fetching, identity) => pdb.rowTarget(checkId, fetching, identity),
+      storedRows: (checkId) => pdb.storedRows(checkId),
+      async insertPageResults(rows) {
+        const t = performance.now();
+        await pdb.insertPageResults(rows);
+        pagesMs += performance.now() - t;
+      },
       async insertEdges(rows) {
         const t = performance.now();
         await pdb.insertEdges(rows);
@@ -1130,6 +1611,7 @@ describe('a built check at the page cap (Q11)', () => {
       },
     };
     let edgesMs = 0;
+    let pagesMs = 0;
     const outcome = await persistBuiltCheck(timed, input);
     expect(outcome.counts).toMatchObject({
       page_results: 500,
@@ -1145,13 +1627,14 @@ describe('a built check at the page cap (Q11)', () => {
         `Q11 staged: ${calls.stages.length} chunks, the largest request ${mib(Math.max(...stageBodies))}, staging ${Math.round(stagingMs)} ms in PGlite`,
         `Q11 finishing request ${mib(finishing)}, persist_built_check ${Math.round(finishingMs)} ms in PGlite`,
         `F-330 edges: ${calls.edges.length} pieces, the largest request ${mib(Math.max(...edgeBodies))}, ${Math.round(edgesMs)} ms in PGlite`,
+        `F-330 page rows: ${pageBodies.length} pieces, the largest request ${mib(Math.max(...pageBodies))}, ${Math.round(pagesMs)} ms in PGlite`,
       ].join('\n') + '\n',
     );
     // The owner's bound (rulings.md Q11), on every request the writer makes.
     expect(single, 'anti-vacuity: one request would exceed the bound').toBeGreaterThan(
       2 * 1024 * 1024,
     );
-    for (const bytes of [...stageBodies, ...edgeBodies, finishing])
+    for (const bytes of [...stageBodies, ...edgeBodies, ...pageBodies, finishing])
       expect(bytes).toBeLessThan(2 * 1024 * 1024);
   }, 120_000);
 });
@@ -1211,8 +1694,14 @@ const PERSIST_FUNCTIONS = new Set(['persist_built_check', 'stage_check_rows', 'm
 const PERSIST_BODY = [...WRITTEN];
 /** Each file that may write, and the names it writes, in the order the scan finds them in code. */
 const WRITERS: Readonly<Record<string, readonly string[]>> = {
-  // F-330: the edges, in pieces before persist_built_check, with the lineage they name.
-  [WRITER]: ['stage_check_rows', 'persist_built_check', 'measurement_lineages', 'link_edges'],
+  // F-330: the page rows and edges, in pieces before persist_built_check, with the lineage they name.
+  [WRITER]: [
+    'stage_check_rows',
+    'persist_built_check',
+    'measurement_lineages',
+    'page_results',
+    'link_edges',
+  ],
   [MIGRATION]: PERSIST_BODY,
   'apps/web/lib/v2/account/fixes-store.ts': ['mark_fix_done'],
   'infra/supabase/migrations/20261112000001_v2_026b_sites_fixes.sql': PERSIST_BODY,

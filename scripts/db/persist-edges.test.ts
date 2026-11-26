@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { chunked, persistBuiltCheck, persistCalls } from '../../apps/web/lib/v2/pipeline/persist';
+import {
+  PIECES_PER_STEP,
+  chunked,
+  persistBuiltCheck,
+  persistCalls,
+  persistStep,
+} from '../../apps/web/lib/v2/pipeline/persist';
 import {
   largeBuiltInput,
   largeBuiltSeed,
@@ -20,7 +26,8 @@ import type { PersistDb } from '../../apps/web/lib/v2/pipeline/types';
  *
  * The edge count is what `large.lab` produced on staging, 37,540. Production's insert of those
  * edges in persist_built_check, one statement, passed 8 s three times and the check failed. Now
- * the edges are written first, in pieces (persist.ts EDGE_PIECE_ROWS), each its own statement.
+ * the page rows and the edges are written first, in pieces (persist.ts PIECE_ROWS), each its own
+ * statement, and persist_built_check writes the rest.
  *
  * Run like render-budget-race.test.ts: against TRIAL_RACE_DB_URL (a Postgres on this machine),
  * required when TRIAL_RACE_REQUIRED=1, skipped otherwise. A Postgres on CI or a laptop is faster
@@ -51,10 +58,14 @@ const SHAPES = [
 const FILLER_EDGES = 568_590;
 const TIMEOUT_MS = 8_000;
 /**
- * What persist_built_check, now without the edges, is held to on CI: half the timeout, for
- * production's slower instance (the CTO's margin, inbox 114).
+ * What persist_built_check, now without the page rows or the edges, is held to on CI, so that
+ * production stays under 4 s (inbox 114's margin, inbox 120). On production's first 2,000-page save
+ * after #214 (fc947155, a2/evidence/prod-2000) the same call took 3,460 ms against 268 ms here on CI
+ * for the same shape: 12.9×. 4,000 ms ÷ 12.9 = 310 ms, rounded down to 300. The ratio is one
+ * reading: the same ratio for an edge piece was 49× (2,257 ms against 46 ms), so production's
+ * figure is still read after deploy.
  */
-const FINISH_BOUND_MS = TIMEOUT_MS / 2;
+const FINISH_BOUND_MS = 300;
 /** What one edge piece is held to: a tenth of the timeout, for production's slower instance. */
 const PIECE_BOUND_MS = TIMEOUT_MS / 10;
 const HOOK_TIMEOUT_MS = 600_000;
@@ -140,8 +151,10 @@ function timed(db: PersistDb) {
   const port: PersistDb = {
     stageCheckRows: time('stage', db.stageCheckRows),
     persistBuiltCheck: time('persist_built_check', db.persistBuiltCheck),
-    edgeTarget: time('edge_target', db.edgeTarget),
+    rowTarget: time('row_target', db.rowTarget),
+    insertPageResults: time('pages', db.insertPageResults),
     insertEdges: time('edges', db.insertEdges),
+    storedRows: time('count', db.storedRows),
   };
   return { port, calls };
 }
@@ -152,6 +165,7 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
     now: `persist_edges_${stamp}`,
     dense500: `persist_edges_dense_${stamp}`,
     before: `persist_edges_before_${stamp}`,
+    steps: `persist_edges_steps_${stamp}`,
   };
   let admin: Sql;
   const dbs: Partial<Record<keyof typeof names, Sql>> = {};
@@ -201,17 +215,22 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
         const kinds = calls.map((c) => c.kind);
         expect(kinds.at(-1)).toBe('persist_built_check');
         expect(kinds.lastIndexOf('edges')).toBeLessThan(kinds.indexOf('persist_built_check'));
+        expect(kinds.lastIndexOf('pages')).toBeLessThan(kinds.indexOf('edges'));
         const pieces = calls.filter((c) => c.kind === 'edges');
+        const pagePieces = calls.filter((c) => c.kind === 'pages');
+        expect(pagePieces.length, 'the page rows are written in pieces').toBeGreaterThan(0);
         for (const c of calls) expect(c.ms, c.kind).toBeLessThan(TIMEOUT_MS);
-        for (const c of pieces) expect(c.ms, 'an edge piece').toBeLessThan(PIECE_BOUND_MS);
+        for (const c of [...pieces, ...pagePieces])
+          expect(c.ms, `a ${c.kind} piece`).toBeLessThan(PIECE_BOUND_MS);
         const max = (k: string) =>
           Math.round(Math.max(...calls.filter((c) => c.kind === k).map((c) => c.ms)));
         process.stdout.write(
-          `F-330 ${name} (${PAGES} pages, ${EDGES} edges): ${pieces.length} edge pieces, the slowest ` +
-            `${max('edges')} ms; persist_built_check ${max('persist_built_check')} ms; the slowest ` +
-            `stage ${max('stage')} ms\n`,
+          `F-330 ${name} (${PAGES} pages, ${EDGES} edges): ${pagePieces.length} page pieces, the ` +
+            `slowest ${max('pages')} ms; ${pieces.length} edge pieces, the slowest ${max('edges')} ms; ` +
+            `persist_built_check ${max('persist_built_check')} ms; the slowest stage ` +
+            `${max('stage')} ms\n`,
         );
-        // The rest of the check, still one statement: within the CTO's margin (inbox 114).
+        // The rest of the check, still one statement: within FINISH_BOUND_MS (inbox 114, 120).
         expect(max('persist_built_check'), 'persist_built_check without the edges').toBeLessThan(
           FINISH_BOUND_MS,
         );
@@ -222,6 +241,63 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
           { again: number },
         ];
         expect(again).toBe(EDGES);
+        const [{ pages }] = (await sql`
+          select count(*)::int as pages from public.page_results where check_id = ${check.id}`) as unknown as [
+          { pages: number },
+        ];
+        expect(pages).toBe(PAGES);
+      } finally {
+        await sql.end();
+      }
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'across steps: 10 pieces a step, the check running between them and finished by the last',
+    async () => {
+      const PER_STEP = 10;
+      const { check } = largeBuiltSeed();
+      await seedRunning(asDb(dbs.steps!), check);
+      const sql = underTimeout(names.steps);
+      try {
+        const input = largeBuiltInput(PAGES, EDGES);
+        const n = persistCalls(input).pieces.length;
+        expect(n, 'anti-vacuity: several steps').toBeGreaterThan(2 * PER_STEP);
+        const status = async () =>
+          (
+            (await sql`select status from public.checks where id = ${check.id}`) as unknown as [
+              { status: string },
+            ]
+          )[0].status;
+        const stepMs: number[] = [];
+        let from: number | null = 0;
+        while (from !== null) {
+          const { port, calls } = timed(pglitePersistDb(asDb(sql)));
+          const t = performance.now();
+          const step = await persistStep(port, input, { from, perStep: PER_STEP });
+          stepMs.push(performance.now() - t);
+          for (const c of calls) expect(c.ms, c.kind).toBeLessThan(TIMEOUT_MS);
+          if (step.next === null) {
+            expect(calls.at(-1)!.kind).toBe('persist_built_check');
+            from = null;
+          } else {
+            expect(calls.map((c) => c.kind)).not.toContain('persist_built_check');
+            expect(await status()).toBe('running');
+            from = step.next;
+          }
+        }
+        expect(stepMs).toHaveLength(Math.ceil(n / PER_STEP));
+        expect(await status()).not.toBe('running');
+        const [{ e, pr }] = (await sql`
+          select (select count(*)::int from public.link_edges where check_id = ${check.id}) as e,
+                 (select count(*)::int from public.page_results where check_id = ${check.id}) as pr
+        `) as unknown as [{ e: number; pr: number }];
+        expect([e, pr]).toEqual([EDGES, PAGES]);
+        process.stdout.write(
+          `F-330 steps: ${n} pieces in ${stepMs.length} steps of ${PER_STEP}, the slowest step ` +
+            `${Math.round(Math.max(...stepMs))} ms (PIECES_PER_STEP is ${PIECES_PER_STEP})\n`,
+        );
       } finally {
         await sql.end();
       }
@@ -239,9 +315,16 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
         const input = largeBuiltInput(PAGES, EDGES);
         const calls = persistCalls(input);
         const pdb = pglitePersistDb(asDb(sql));
-        // As persist.ts did before F-330: the edges staged, and moved by persist_built_check.
+        // As persist.ts did before F-330: the page rows and edges staged, and moved by
+        // persist_built_check.
         for (const st of calls.stages) {
           await pdb.stageCheckRows(calls.checkId, st.collection, st.chunk, st.rows);
+        }
+        const pageChunks = chunked(
+          calls.pieces.filter((pc) => pc.table === 'page_results').flatMap((pc) => pc.rows),
+        );
+        for (const [i, rows] of pageChunks.entries()) {
+          await pdb.stageCheckRows(calls.checkId, 'page_results', i, rows);
         }
         const edgeChunks = chunked(calls.edges.flat());
         for (const [i, rows] of edgeChunks.entries()) {
@@ -251,6 +334,7 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
           ...calls.payload,
           staged: {
             ...(calls.payload.staged as object),
+            page_results: { chunks: pageChunks.length, rows: PAGES },
             link_edges: { chunks: edgeChunks.length, rows: EDGES },
           },
         };
@@ -258,7 +342,9 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
         const answer = (await pdb.persistBuiltCheck(payload)) as { written: boolean };
         const ms = Math.round(performance.now() - t);
         expect(answer.written).toBe(true);
-        process.stdout.write(`F-330 before: persist_built_check with every edge in it ${ms} ms\n`);
+        process.stdout.write(
+          `F-330 before: persist_built_check with every page row and edge in it ${ms} ms\n`,
+        );
         // The one statement production cancelled at 8 s is many times the slowest piece's bound.
         expect(ms).toBeGreaterThan(PIECE_BOUND_MS);
       } finally {

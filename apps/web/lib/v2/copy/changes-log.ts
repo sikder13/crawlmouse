@@ -32,6 +32,15 @@ export const CHANGES_LOG_COPY = {
   /** The same, once a site has been checked again and nothing differed. */
   firstAuditsNoChange: (n: number) =>
     `${capitalise(numberWord(n))} first ${plural(n, 'audit', 'audits')}. No later check has found a change.`,
+  /**
+   * One row for a re-check that recorded no change (F-214), so the log shows that monitoring ran.
+   * `measured` is false when either check left a section unmeasured, which the diff skips.
+   */
+  quiet: (trigger: string, measured: boolean) =>
+    `${trigger}: ${measured ? 'nothing changed' : 'no change in what both checks measured'}.`,
+  quietCause: (previous: string | null) =>
+    previous ? `Compared with the check of ${previous}.` : 'Compared with the check before it.',
+  quietPill: 'checked',
   noChanges: 'No changes yet.',
   noMatch: 'No change matches these filters.',
   /** A site filter naming no site of this account, whether or not the id exists (F-130). */

@@ -119,7 +119,7 @@ describe('changesView: a check that found changes', () => {
 
   // The engine's own cause text is quoted as found, so inputs that contain the phrase are left out:
   // what this pins is the page's wording around it, which says "first observed", never "caused by".
-  it('words every cause as first observed, never as caused by (property)', () => {
+  it('words every cause as first observed or first seen, never as caused by (property)', () => {
     const base = fixture('bad-site').changes[0]!;
     const changeArb = fc.record({
       kind: fc.constantFrom('opened', 'resolved', 'changed'),
@@ -127,10 +127,17 @@ describe('changesView: a check that found changes', () => {
       dated: fc.boolean(),
       hasCause: fc.boolean(),
       told: fc.boolean(),
+      seenEarlier: fc.boolean(),
     });
     fc.assert(
       fc.property(fc.array(changeArb, { minLength: 1, maxLength: 5 }), (specs) => {
         const d = structuredClone(fixture('bad-site'));
+        // Each change gets a fix of its own, first seen at the first audit or at this check (F-213).
+        d.fixes = specs.map((s, i) => ({
+          ...d.fixes.find((f) => f.id === base.fix_id)!,
+          id: `80000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`,
+          first_seen_check_id: s.seenEarlier ? 'c0000000-0000-4000-8000-000000000001' : HISTORY,
+        }));
         d.changes = specs.map(
           (s, i): Change => ({
             ...base,
@@ -140,13 +147,18 @@ describe('changesView: a check that found changes', () => {
               ? { text: s.text, changed_at: s.dated ? base.cause!.changed_at : null, diff: null }
               : null,
             notified: s.told ? base.notified : null,
+            fix_id: `80000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`,
           }),
         );
         const view = changesView(d, HISTORY);
         return (
           view.rows.length === specs.length &&
           view.rows.every(
-            (r) => /^First observed /.test(r.cause) && !/\bcaused by\b/i.test(r.cause),
+            (r, i) =>
+              // Seen earlier only for an opened row: a resolved or changed one was observed here.
+              (specs[i]!.seenEarlier && specs[i]!.kind === 'opened'
+                ? /^First seen at the Sat 24 Oct 22:34 EDT check[.;]/.test(r.cause)
+                : /^First observed /.test(r.cause)) && !/\bcaused by\b/i.test(r.cause),
           )
         );
       }),
@@ -165,6 +177,77 @@ describe('changesView: a check that found changes', () => {
     const prev = findCheck(fixture('bad-site'), 'c0000000-0000-4000-8000-000000000005');
     expect(v.coverage.read).toBe(
       `Compared with the check of ${new Date(prev.finished_at!).getUTCDate()} Oct 2026, ${prev.finished_at!.slice(11, 16)} UTC`,
+    );
+  });
+});
+
+describe('changesView: a fix found again (F-213)', () => {
+  const FIRST_AUDIT = 'c0000000-0000-4000-8000-000000000001';
+  const OPENED = '90000000-0000-4000-8000-000000000001'; // Claude-SearchBot, fix …000
+  const REOPENED = {
+    text: 'Marked done on 2026-10-28, and found again on this check.',
+    changed_at: null,
+    diff: null,
+  };
+  /** bad-site with change …001's fix first seen at `seenAt`, and the change's cause set to `cause`. */
+  function reopened(seenAt: string, cause: Change['cause'] = REOPENED) {
+    const d = structuredClone(fixture('bad-site'));
+    const change = d.changes.find((c) => c.id === OPENED)!;
+    change.cause = cause;
+    d.fixes.find((f) => f.id === change.fix_id)!.first_seen_check_id = seenAt;
+    return changesView(d, HISTORY).rows.find((r) => r.key === OPENED)!;
+  }
+
+  it('says where it was first seen, not "first observed at this check"', () => {
+    // The first audit finished 2026-10-25T02:34Z: Sat 24 Oct 22:34 in Indiana (EDT, UTC−4). The
+    // day is named: a reopened fix can be weeks old, and a weekday alone would not say which check.
+    expect(reopened(FIRST_AUDIT).cause).toBe(
+      'First seen at the Sat 24 Oct 22:34 EDT check. What we found: Marked done on 2026-10-28, and found again on this check.',
+    );
+  });
+
+  it('says so with no cause, and with a dated one', () => {
+    expect(reopened(FIRST_AUDIT, null).cause).toBe(
+      'First seen at the Sat 24 Oct 22:34 EDT check; we found no cause.',
+    );
+    const dated = fixture('bad-site').changes.find((c) => c.id === OPENED)!.cause!;
+    expect(reopened(FIRST_AUDIT, dated).cause).toBe(
+      'First seen at the Sat 24 Oct 22:34 EDT check. What we found: robots.txt changed Thu 19:40: a group for "User-agent: ClaudeBot" and "User-agent: Claude-SearchBot" with "Disallow: /" was added.',
+    );
+  });
+
+  it('says another check when the dataset does not hold the one it was first seen at', () => {
+    expect(reopened('c0000000-0000-4000-8000-0000000000ff').cause).toBe(
+      'First seen at another check. What we found: Marked done on 2026-10-28, and found again on this check.',
+    );
+  });
+
+  it('does not call a check queued after this one the check it was first seen at', () => {
+    const d = structuredClone(fixture('bad-site'));
+    const change = d.changes.find((c) => c.id === OPENED)!;
+    change.cause = REOPENED;
+    d.fixes.find((f) => f.id === change.fix_id)!.first_seen_check_id = FIRST_AUDIT;
+    // The first audit moved after the row's own check (…006, queued 2026-10-30).
+    d.checks.find((c) => c.id === FIRST_AUDIT)!.queued_at = '2026-10-31T00:00:00Z';
+    expect(changesView(d, HISTORY).rows.find((r) => r.key === OPENED)!.cause).toBe(
+      'First observed at this check. What we found: Marked done on 2026-10-28, and found again on this check.',
+    );
+  });
+
+  it('reads as before for a fix first seen at this check', () => {
+    expect(reopened(HISTORY).cause).toBe(
+      'First observed at this check. What we found: Marked done on 2026-10-28, and found again on this check.',
+    );
+  });
+
+  it('leaves a resolved row of an earlier fix as observed at this check', () => {
+    const d = structuredClone(fixture('bad-site'));
+    const change = d.changes.find((c) => c.id === OPENED)!;
+    change.kind = 'resolved';
+    change.cause = null;
+    d.fixes.find((f) => f.id === change.fix_id)!.first_seen_check_id = FIRST_AUDIT;
+    expect(changesView(d, HISTORY).rows.find((r) => r.key === OPENED)!.cause).toBe(
+      'First observed at this check; we found no cause.',
     );
   });
 });

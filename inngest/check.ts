@@ -10,8 +10,8 @@
  * check.test.ts moves the system clock between invocations).
  *
  * Step order: claim (with `claim-wait-{i}` / `claim-{i}` while the site is busy) → discover → crawl
- * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist → emit →
- * finalize. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
+ * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist (and
+ * `persist-{k}` while rows are left to write) → emit → finalize. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
  * `{p}-poll-{i}` until the batch is done, failed or past its deadline, then `{p}-read`. A worker
  * that signals a batch's end replaces the wait with `{p}-done-{i}`, and a poll follows only a wait
  * that timed out. A batch the worker lost is posted once more (`{p}-repost`), and a later read is
@@ -46,6 +46,12 @@ export const CHECK_CANCELLED_FN_ID = 'crawlmouse.check.cancelled';
  * window closes (steps/time.ts); the budget bounds what is added back, not what is waited.
  */
 export const QUEUE_WAIT_MAX_S = 900;
+/**
+ * The most further persist steps a check takes (F-330). At 50 pieces a step of at most 2,000 rows,
+ * 41 steps hold at most 4,100,000 rows, or half that when a shortfall restarts the persist from piece
+ * 0 once; fewer where 1 MiB cuts a piece first. A run past it fails persist_failed rather than loop.
+ */
+export const PERSIST_STEPS_MAX = 40;
 
 /** The orchestration's waits and bounds, in seconds unless named otherwise. */
 export const PACE = {
@@ -200,7 +206,11 @@ export type ReadOutput =
   | { status: 'failed' };
 export type RenderOutput = { rendered: number; not_rendered: number };
 export type BuildOutput = { status: 'finished' | 'partial'; pages: number; fixes: number };
-export type PersistOutput = { written: boolean };
+/**
+ * `next`: the first piece of rows a further persist step writes (F-330), or null when the check is
+ * persisted. An output stored by a release before it has none, and reads as null.
+ */
+export type PersistOutput = { written: boolean; next?: number | null; restarted?: boolean };
 /**
  * Whether the check is failed with the reason asked for (by this call, or by an earlier one with the
  * same reason that this call retries), and if so the site the database holds it under.
@@ -225,7 +235,11 @@ export interface CheckSteps {
   failBatch(event: CheckRequested, at: BatchAt): Promise<Empty>;
   render(event: CheckRequested, so: RunSoFar): Promise<RenderOutput>;
   build(event: CheckRequested, so: RunSoFar): Promise<BuildOutput>;
-  persist(event: CheckRequested): Promise<PersistOutput>;
+  /**
+   * Writes rows from piece `from` (0 on the first step); the last step also finishes the check.
+   * `restarted`: the persist has started again from piece 0 once, after a shortfall.
+   */
+  persist(event: CheckRequested, from?: number, restarted?: boolean): Promise<PersistOutput>;
   finalize(event: CheckRequested): Promise<Empty>;
   /** Marks the check failed unless it has ended; `failed` says whether it is failed with `reason`. */
   fail(event: CheckRequested, reason: FailureReason): Promise<FailOutput>;
@@ -511,7 +525,7 @@ export async function runCheck(
   const built = await failingAs('build_failed', () =>
     run('build', () => steps.build(data, soFar())),
   );
-  await failingAs('persist_failed', () => run('persist', () => steps.persist(data)));
+  await persistAll(run, steps, data);
   // Before finalize: a finalize that fails after the check is persisted cannot cost its event.
   await step.sendEvent('emit', {
     id: checkFinishedEventId(data.checkId),
@@ -538,6 +552,37 @@ function failedEvent(
     name: 'check.failed' as const,
     data: { checkId, siteId: out.siteId, reason: out.as ?? reason },
   };
+}
+
+/**
+ * The persist steps (F-330): `persist`, then `persist-1`, `persist-2`, … while rows are left, each
+ * from where the last stopped (persist.ts writes at most the stored cut's pieces a step), so no
+ * invocation runs toward the route's 300 s and a retry repeats one step's pieces. The first step
+ * keeps its id. An output stored by a release before this has no `next` and ends the steps. A
+ * persist that starts again from piece 0 after a shortfall says so (`restarted`), and the steps
+ * after it carry that on. Past PERSIST_STEPS_MAX further steps the check fails persist_failed.
+ */
+export async function persistAll(
+  run: <T>(id: string, fn: () => Promise<T>) => Promise<T>,
+  steps: Pick<CheckSteps, 'persist'>,
+  data: CheckRequested,
+): Promise<PersistOutput> {
+  let persisted = await failingAs('persist_failed', () =>
+    run('persist', () => steps.persist(data)),
+  );
+  for (let k = 1; (persisted.next ?? null) !== null; k++) {
+    if (k > PERSIST_STEPS_MAX) {
+      throw new CheckFailure('persist_failed', {
+        cause: new Error(`more than ${PERSIST_STEPS_MAX} persist steps`),
+      });
+    }
+    const from = persisted.next!;
+    const restarted = persisted.restarted === true;
+    persisted = await failingAs('persist_failed', () =>
+      run(`persist-${k}`, () => steps.persist(data, from, restarted)),
+    );
+  }
+  return persisted;
 }
 
 /**

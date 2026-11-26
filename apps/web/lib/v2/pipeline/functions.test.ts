@@ -524,7 +524,13 @@ const UNUSED_DB: StepStores['persistDb'] = {
   stageCheckRows: async () => {
     throw new Error('persistDb is not called in this test');
   },
-  edgeTarget: async () => {
+  rowTarget: async () => {
+    throw new Error('persistDb is not called in this test');
+  },
+  insertPageResults: async () => {
+    throw new Error('persistDb is not called in this test');
+  },
+  storedRows: async () => {
     throw new Error('persistDb is not called in this test');
   },
   insertEdges: async () => {

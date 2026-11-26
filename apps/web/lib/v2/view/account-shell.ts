@@ -21,7 +21,6 @@ import {
   PLAN_NAMES,
   primarySite,
   primarySites,
-  readerRole,
   readerSeat,
   resultChecks,
   type AccountView,
@@ -350,12 +349,14 @@ function planCard(v: AccountView, owner: boolean): PlanCardView | null {
 /** The rail link a page marks: on the agency rail a page under Sites sits under Clients, and back. */
 const SAME_PLACE: Partial<Record<RailLabel, RailLabel>> = { Sites: 'Clients', Clients: 'Sites' };
 
-function rail(v: AccountView, current: RailLabel | null): NavItemView[] {
+function rail(v: AccountView, current: RailLabel | null, role: SeatRole): NavItemView[] {
   const fresh = newChanges(v).length;
   const agency = v.tier === 'agency';
   // Integrations answers a role that may not edit the account's alerts with a 404 (its page's gate),
-  // so that role's rail does not link it (QA's F5). A preview reads as the owner.
-  const integrations = roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts');
+  // so that role's rail does not link it (QA's F5). The role is the one the page passes, as Billing
+  // and Keep use, not one read from the viewer: a page whose viewer names no seat (Settings, F-335)
+  // reads there as the owner.
+  const integrations = roleMay(role, 'edit_account_alerts');
   const links: readonly { label: RailLabel; href: string }[] = (
     agency ? AGENCY_NAV : ACCOUNT_NAV
   ).filter((n) => n.label !== 'Integrations' || integrations);
@@ -409,7 +410,7 @@ export function accountShellView(
 ): ShellView {
   const seat = readerSeat(v);
   const shell: ShellView = {
-    nav: rail(v, current),
+    nav: rail(v, current, role),
     badge: v.tier === 'agency' ? PLAN_NAMES.agency : null,
     trial: trialCard(v, plan, billingEnd, role === 'owner', billingOpen),
     plan: planCard(v, role === 'owner'),

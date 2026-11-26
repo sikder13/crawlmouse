@@ -1,6 +1,8 @@
 /**
  * The account Changes log (D3) against values worked out by hand from bad-site at its as_of
- * (2026-10-30T10:05Z): eight changes on four sites (drivepei.ca has none).
+ * (2026-10-30T10:05Z): eight changes on four sites (drivepei.ca has none), and six re-checks that
+ * recorded no change (F-214): example-outfitter.com's checks …002 to …005, drivepei.ca's …020 and
+ * the staging copy's deploy check …02a.
  */
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
@@ -22,8 +24,24 @@ const firstAuditCheck = bad.changes.find((c) => c.id.endsWith('007'))!.check_id;
 describe('the Changes log', () => {
   it('lists every change of the account, newest first, the site first, ties by id', () => {
     const v = log();
-    // The last row is example-outfitter.com's first audit, one row for what it found (F-100).
-    expect(ids(v)).toEqual(['001', '002', '003', '004', '005', '008', '006', '001']);
+    // The last row is example-outfitter.com's first audit, one row for what it found (F-100). The
+    // re-checks that changed nothing sit among the changes by when they finished.
+    expect(ids(v)).toEqual([
+      '001',
+      '002',
+      '003',
+      '004',
+      '005',
+      '008',
+      '020',
+      '02a',
+      '005',
+      '004',
+      '006',
+      '003',
+      '002',
+      '001',
+    ]);
     expect(v.rows.at(-1)!.key).toBe('first-audit-' + firstAuditCheck);
     expect(v.rows.map((r) => r.site)).toEqual([
       'example-outfitter.com',
@@ -32,9 +50,16 @@ describe('the Changes log', () => {
       'example-outfitter.com',
       'nahltech.com',
       'redbirdaviation.com',
+      'drivepei.ca',
       'staging.example-outfitter.dev',
       'example-outfitter.com',
+      'example-outfitter.com',
+      'staging.example-outfitter.dev',
+      'example-outfitter.com',
+      'example-outfitter.com',
+      'example-outfitter.com',
     ]);
+    // The headline counts changes, not the re-checks that found none.
     expect(v.headline).toBe('7 changes across 4 sites, newest first.');
     // The rail's "3 new": Claude-SearchBot, ClaudeBot (opened) and nahltech's orphans (resolved).
     expect(v.newNote).toBe('Three were opened or resolved at a site’s latest check.');
@@ -50,15 +75,36 @@ describe('the Changes log', () => {
   it('filters by kind, and says how many of how many match', () => {
     const v = log({ kind: 'opened' });
     expect(ids(v)).toEqual(['001', '002']);
-    expect(v.headline).toBe('2 of 8 entries match: opened.');
+    expect(v.headline).toBe('2 of 14 entries match: opened.');
     expect(v.newNote).toBeNull();
   });
 
   it('filters by site and by since, together', () => {
     const outfitter = '50000000-0000-4000-8000-000000000001';
-    expect(ids(log({ site: outfitter }))).toEqual(['001', '002', '003', '004', '001']);
-    // The last 24 hours from Fri 30 Oct 10:05Z: everything detected that morning.
-    expect(ids(log({ since: '24h' }))).toEqual(['001', '002', '003', '004', '005', '008']);
+    expect(ids(log({ site: outfitter }))).toEqual([
+      '001',
+      '002',
+      '003',
+      '004',
+      '005',
+      '004',
+      '003',
+      '002',
+      '001',
+    ]);
+    // The last 24 hours from Fri 30 Oct 10:05Z: everything detected that morning, and the re-checks
+    // that finished after 10:05Z on the 29th (…020 that morning, …02a at 22:23, …005 at 12:42).
+    expect(ids(log({ since: '24h' }))).toEqual([
+      '001',
+      '002',
+      '003',
+      '004',
+      '005',
+      '008',
+      '020',
+      '02a',
+      '005',
+    ]);
     expect(ids(log({ site: outfitter, since: '24h', kind: 'changed' }))).toEqual(['003', '004']);
   });
 
@@ -87,10 +133,10 @@ describe('the Changes log', () => {
   });
 
   it('says when nothing matches, and ignores a value outside the account or the contract', () => {
-    const none = log({ site: '50000000-0000-4000-8000-000000000004' });
+    const none = log({ site: '50000000-0000-4000-8000-000000000004', kind: 'opened' });
     expect(none.rows).toEqual([]);
     expect(none.empty).toBe('No change matches these filters.');
-    expect(ids(log({ site: 'not-a-site', kind: 'nonsense', since: 'forever' }))).toHaveLength(8);
+    expect(ids(log({ site: 'not-a-site', kind: 'nonsense', since: 'forever' }))).toHaveLength(14);
     // A contract kind filters even on a day the account has none of it.
     const day0 = changesLogView(
       bad,
@@ -207,7 +253,8 @@ describe('a first audit in the Changes log (F-100)', () => {
     };
     const v = changesLogView({ ...d, checks: [...d.checks, again] }, viewer, {}, BASE);
     expect(v.headline).toBe('One first audit. No later check has found a change.');
-    expect(v.rows[0]!.cause).toBe(
+    expect(v.rows.map((r) => r.key)).toEqual([`check-${again.id}`, `first-audit-${site.id}`]);
+    expect(v.rows[1]!.cause).toBe(
       'What the first audit found. Later changes are listed as their own rows.',
     );
   });
@@ -343,5 +390,134 @@ describe('a site filter for a site outside the account (F-130)', () => {
     expect(log({ site: OWN }).notice).toBeNull();
     expect(log().notice).toBeNull();
     expect(log({ site: '' }).notice).toBeNull();
+  });
+});
+
+describe('a re-check that recorded no change, in the Changes log (F-214)', () => {
+  const DRIVEPEI = '50000000-0000-4000-8000-000000000004';
+  const OUTFITTER = '50000000-0000-4000-8000-000000000001';
+  const row = (v: ChangesLogView, check: string) =>
+    v.rows.find((r) => r.key === `check-c0000000-0000-4000-8000-000000000${check}`);
+
+  it('lists a scheduled check that changed nothing, as QA reproduced it on drivepei.ca', () => {
+    const v = log({ site: DRIVEPEI });
+    expect(v.rows).toHaveLength(1);
+    // Check …020 finished 2026-10-30T10:01:05Z, 06:01 in Indiana; the first audit …01f at 19:11Z
+    // on the 26th, 15:11. Neither read without-JavaScript, structure or content, so the diff
+    // compared crawler access only.
+    expect(v.rows[0]).toEqual({
+      key: 'check-c0000000-0000-4000-8000-000000000020',
+      site: 'drivepei.ca',
+      when: 'Fri 30 Oct 06:01 EDT',
+      kind: 'checked',
+      pill: { state: 'neutral', label: 'checked' },
+      summary: 'Scheduled check: no change in what both checks measured.',
+      subject: null,
+      where: 'the whole site',
+      pages: null,
+      effect: 'none',
+      verdict: null,
+      cause: 'Compared with the check of Mon 26 Oct 15:11 EDT.',
+      diff: [],
+      told: 'nobody was notified',
+    });
+    expect(v.headline).toBe('1 of 14 entries match: drivepei.ca.');
+  });
+
+  it('says nothing changed when both checks measured every section, and names each trigger', () => {
+    const v = log({ site: OUTFITTER });
+    // …002 finished 2026-10-26T13:14:10Z (09:14 EDT), compared with the first audit at 22:34 on the 24th.
+    expect(row(v, '002')).toMatchObject({
+      when: 'Mon 26 Oct 09:14 EDT',
+      summary: 'Re-run: nothing changed.',
+      cause: 'Compared with the check of Sat 24 Oct 22:34 EDT.',
+    });
+    expect(row(v, '004')).toMatchObject({
+      when: 'Wed 28 Oct 16:04 EDT',
+      summary: 'Re-check after a fix: nothing changed.',
+      cause: 'Compared with the check of Tue 27 Oct 10:32 EDT.',
+    });
+  });
+
+  it('is not a change of any kind: a kind filter leaves it out', () => {
+    for (const kind of ['opened', 'resolved', 'changed', 'baseline']) {
+      expect(log({ kind }).rows.filter((r) => r.kind === 'checked')).toEqual([]);
+    }
+  });
+
+  it('lists only a finished or partial re-check: none for a failed one or a first audit', () => {
+    const d = structuredClone(bad);
+    const failed = d.checks.find((c) => c.id.endsWith('020'))!;
+    failed.status = 'failed';
+    const v = changesLogView(d, viewer, { site: DRIVEPEI }, BASE);
+    expect(v.rows).toEqual([]);
+    // drivepei.ca's first audit …01f changed nothing and found nothing.
+    expect(log().rows.filter((r) => r.key.endsWith('01f'))).toEqual([]);
+    const partial = structuredClone(bad);
+    partial.checks.find((c) => c.id.endsWith('020'))!.status = 'partial';
+    expect(changesLogView(partial, viewer, { site: DRIVEPEI }, BASE).rows).toHaveLength(1);
+  });
+
+  it('leaves out a re-check that recorded a change: its changes are its rows', () => {
+    expect(log().rows.some((r) => r.key.endsWith('000000000006') && r.kind === 'checked')).toBe(
+      false,
+    );
+  });
+
+  it('is counted by the since filter at the time the check finished', () => {
+    // From 2026-10-29T10:05Z: …005 finished at 12:42Z that day, …004 the day before.
+    const v = log({ site: OUTFITTER, since: '24h' });
+    expect(v.rows.filter((r) => r.kind === 'checked').map((r) => r.when)).toEqual([
+      'Thu 29 Oct 08:42 EDT',
+    ]);
+    const week = log({ site: OUTFITTER, since: '7d' });
+    expect(week.rows.filter((r) => r.kind === 'checked').map((r) => r.when)).toEqual([
+      'Thu 29 Oct 08:42 EDT',
+      'Wed 28 Oct 16:04 EDT',
+      'Tue 27 Oct 10:32 EDT',
+      'Mon 26 Oct 09:14 EDT',
+    ]);
+  });
+
+  it('orders entries of one instant: a change, then re-checks by id', () => {
+    const d = structuredClone(bad);
+    const at = '2026-10-30T10:02:00Z'; // when …001 to …004 were found at …006
+    for (const id of ['020', '005']) {
+      d.checks.find((c) => c.id.endsWith(id))!.finished_at = at;
+    }
+    const keys = changesLogView(d, viewer, {}, BASE)
+      .rows.slice(0, 6)
+      .map((r) => r.key.slice(-3));
+    expect(keys).toEqual(['001', '002', '003', '004', '005', '020']);
+  });
+
+  it('places a re-check by when it finished, not when it was queued', () => {
+    const d = structuredClone(bad);
+    // …004 queued 30 hours before now and finished 20 hours before it: inside the last 24 hours.
+    const check = d.checks.find((c) => c.id.endsWith('004'))!;
+    check.queued_at = '2026-10-29T04:05:00Z';
+    check.started_at = '2026-10-29T04:05:00Z';
+    check.finished_at = '2026-10-29T14:05:00Z';
+    const v = changesLogView(d, viewer, { site: OUTFITTER, since: '24h' }, BASE);
+    expect(v.rows.filter((r) => r.kind === 'checked').map((r) => r.key.slice(-3))).toEqual([
+      '004',
+      '005',
+    ]);
+  });
+
+  it('says where a reopened fix was first seen, with its day (F-213)', () => {
+    const d = structuredClone(bad);
+    const change = d.changes.find((c) => c.id.endsWith('001'))!;
+    change.cause = {
+      text: 'Marked done on 2026-10-28, and found again on this check.',
+      changed_at: null,
+      diff: null,
+    };
+    d.fixes.find((f) => f.id === change.fix_id)!.first_seen_check_id =
+      'c0000000-0000-4000-8000-000000000001';
+    const row = changesLogView(d, viewer, {}, BASE).rows.find((r) => r.key === change.id)!;
+    expect(row.cause).toBe(
+      'First seen at the Sat 24 Oct 22:34 EDT check. What we found: Marked done on 2026-10-28, and found again on this check.',
+    );
   });
 });

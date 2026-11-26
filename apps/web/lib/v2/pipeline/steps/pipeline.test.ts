@@ -21,20 +21,23 @@ import { REQUEST_TIMEOUT_MS } from '@crawlmouse/engine/v2/pipeline';
 import { RENDER_STEP_MS } from './deps';
 import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
 import type { WorkerClient } from '../../../worker-client/types';
+import type { RowTarget } from '../types';
 
 // persist.ts and checkMap are workstreams A's and D's: stand-ins here, so this test is about the
 // steps and the orchestration. The persist stand-in records what the persist step hands it.
 const persisted = vi.hoisted(() => [] as unknown[]);
 vi.mock('../persist', () => ({
+  PIECE_CUT: { rows: 2_000, bytes: 1024 * 1024, perStep: 50 },
   pageVantage: (pages: { url: string; outcome: string; identity_sent: string }[]) =>
     new Map(
       pages
         .filter((p) => p.outcome === 'fetched')
         .map((p) => [p.url, { identity_sent: p.identity_sent }]),
     ),
-  persistBuiltCheck: async (_db: unknown, input: unknown) => {
+  // One persist step that writes every row and finishes the check (persist.ts persistStep).
+  persistStep: async (_db: unknown, input: unknown) => {
     persisted.push(input);
-    return { written: true, counts: {}, verified: [] };
+    return { next: null, outcome: { written: true, counts: {}, verified: [] } };
   },
   // What the build read of the fixes, marked so the persist step's hand-over can be seen.
   readOfFixes: (fixes: unknown[], events: unknown[]) => [
@@ -58,7 +61,13 @@ const UNUSED_DB = {
   stageCheckRows: async (): Promise<unknown> => {
     throw new Error('persistDb is not called in this test');
   },
-  edgeTarget: async (): Promise<{ lineageId: string; checkMonth: string }> => {
+  rowTarget: async (): Promise<RowTarget> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  insertPageResults: async (): Promise<void> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  storedRows: async (): Promise<{ status: string; page_results: number; link_edges: number }> => {
     throw new Error('persistDb is not called in this test');
   },
   insertEdges: async (): Promise<void> => {
@@ -440,6 +449,16 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     expect([...input.vantage.keys()].sort()).toEqual(
       input.built.page_results.map((p) => p.url).sort(),
     );
+  });
+
+  // QA B3 on #219: the build stores its release's piece cut, and persist cuts by the stored one.
+  it('hands persistence the piece cut the build stored with the built check', async () => {
+    await runRecorded();
+    expect((persisted[0] as { cut: unknown }).cut).toEqual({
+      rows: 2_000,
+      bytes: 1024 * 1024,
+      perStep: 50,
+    });
   });
 
   it('hands persistence what the build read of the site’s fixes, for the watermark (CC-26b D5)', async () => {
