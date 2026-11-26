@@ -25,7 +25,7 @@ export type SettingsPageRead =
   | {
       kind: 'account';
       userId: string;
-      /** The caller's own seat on the account. `viewer` names none: a page that needs it adds it. */
+      /** The caller's own seat on the account, which `viewer` names too. */
       seatId: string;
       role: SeatRole;
       d: FixtureDataset;
@@ -78,7 +78,9 @@ export async function readSettingsPage(now = new Date()): Promise<SettingsPageRe
     seatId: found.viewer.seat.id,
     role,
     d: viewInput(d),
-    viewer: { accountId, now: now.toISOString() },
+    // The viewer names the reader's seat: one that names none reads as the owner's, and the frame
+    // took the owner's theme on these pages (and, until F-335, the owner's rail).
+    viewer: { accountId, seatId: found.viewer.seat.id, now: now.toISOString() },
     billingEnd,
     subscriptionStatus,
     accounts: found.viewer.accounts,
