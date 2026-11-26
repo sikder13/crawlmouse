@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { DASHBOARD_COPY } from '../copy/dashboard';
 import { fixture } from '../fixtures';
 import { firstRunNow } from './account';
+import { CAPABILITIES } from './agencies';
 import {
   ACCOUNT_ACTIONS,
   dashboardView,
@@ -14,7 +15,10 @@ import {
   type DashboardView,
   withoutTrialOffer,
 } from './dashboard';
-import { CLEAN_VIEWER } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
+import {
+  CLEAN_VIEWER,
+  dashboardPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 
 const BAD_ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
 const C9 = 'a0000000-0000-4000-8000-0000000000c9';
@@ -46,11 +50,12 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     );
   });
 
-  it('means both grades over the five sites, 743 / 10 = 74, and moves over the four with a previous result', () => {
-    // now: 79+22 · 84+93 · 74+78 · 73+66 · 86+88 = 743 / 10 = 74.3.
+  it('means both grades over the four sites that hold a slot, 569 / 8 = 71, and moves over the three with a previous result', () => {
+    // The staging copy holds no slot (F-097), so it is neither averaged nor counted (it read 74 with it).
+    // now: 79+22 · 84+93 · 74+78 · 73+66 = 569 / 8 = 71.125 → 71.
     // The move leaves out redbirdaviation.com (74+78 at both), on a new baseline since Thursday:
-    // Thursday 80+41 · 79+93 · 73+66 · 86+88 = 606 / 8 = 75.75 → 76; now 591 / 8 = 73.875 → 74.
-    expect(v.strip!.health.value).toBe('74');
+    // Thursday 80+41 · 79+93 · 73+66 = 432 / 6 = 72; now 79+22 · 84+93 · 73+66 = 417 / 6 = 69.5 → 70.
+    expect(v.strip!.health.value).toBe('71');
     expect(v.strip!.health.delta).toBe('−2 since Thu');
     expect(v.strip!.health.fresh).toBe('1 new');
     expect(v.strip!.health.excluded).toBeNull();
@@ -149,12 +154,12 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.crawlersNow!.map((r) => r.ua)).toHaveLength(8);
   });
 
-  it('lists the set-up items that have something behind them: Slack, competitor, staging', () => {
+  it('lists what is left to set up from the Pro gates and what is built: none of one (FACTS l.57, D-16)', () => {
     expect(v.setup!.title).toBe('Everything is set up');
-    expect(v.setup!.items.map((i) => i.done)).toEqual([true, true, true]);
+    expect(v.setup!.items.map((i) => i.done)).toEqual([true]);
   });
 
-  it('offers nothing to connect that has no connection behind it', () => {
+  it('offers nothing to connect that has no connection behind it (CTO ruling 047)', () => {
     const text = JSON.stringify(v.setup);
     expect(text).not.toContain('Search Console');
     expect(text).not.toContain('Vercel Drain');
@@ -178,6 +183,227 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
   });
 });
 
+describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 Nov)', () => {
+  const v = home();
+  const OUTFITTER_LATEST = 'c0000000-0000-4000-8000-000000000006';
+  const NAHLTECH_LATEST = 'c0000000-0000-4000-8000-00000000000c';
+
+  it('(e) says beside "4 of 5" which of the five rows holds no slot, counted from the records', () => {
+    // Five rows; staging.example-outfitter.dev is the staging copy of example-outfitter.com.
+    expect(v.sites.rows).toHaveLength(5);
+    expect(v.sites.note).toBe('4 of 5 on Pro');
+    expect(v.sites.apart).toBe('1 staging copy holds no slot');
+  });
+
+  it('(l) counts the same four sites in the rail, the header line, the add-site button and the card', () => {
+    // The 1280 and 390-dark baselines drew "Sites 5" and "5 sites" from before F-097.
+    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('4');
+    expect(v.header.line).toContain(' · 4 sites · ');
+    expect(v.header.actions.map((a) => a.label)).toContain('Add a site · 4 of 5 on Pro');
+  });
+
+  it('D-05: "last check" is the newest result of any site, not the first site’s', () => {
+    const copy = structuredClone(bad);
+    // nahltech.com's latest result moved to 10:04Z (06:04 in Indiana), after the first site's 06:02.
+    copy.checks.find((c) => c.id === NAHLTECH_LATEST)!.finished_at = '2026-10-30T10:04:00Z';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.header.line).toContain('last check today 06:04');
+  });
+
+  it('D-07: a partial result says "partial" beside its time in the sites table', () => {
+    const copy = structuredClone(bad);
+    copy.checks.find((c) => c.id === OUTFITTER_LATEST)!.status = 'partial';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.sites.rows.map((r) => r.lastCheck)).toEqual([
+      'Fri 06:02 EDT · partial',
+      'Fri 06:01 EDT',
+      'Fri 06:01 EDT',
+      'Fri 06:01 EDT · check queued',
+      'Thu 18:23 EDT',
+    ]);
+  });
+
+  it('D-09: an AI crawler blocked on a site the panels do not read is listed, with its site', () => {
+    expect(v.crawlersSite).toBe('example-outfitter.com');
+    expect(v.blockedElsewhere).toEqual([]);
+    const copy = structuredClone(bad);
+    const c = copy.checks.find((x) => x.id === NAHLTECH_LATEST)!;
+    c.crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'disallowed_by_robots';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.blockedTitle).toBe('AI crawlers blocked on your other sites');
+    expect(w.blockedElsewhere.map((b) => [b.host, b.ua, b.verdict])).toEqual([
+      ['nahltech.com', 'GPTBot', 'disallowed_by_robots'],
+    ]);
+  });
+
+  it('D-10: with no site carrying both grades, the tile shows the Technical SEO mean, named as that', () => {
+    expect(v.strip!.health.seoOnly).toBeNull();
+    const copy = structuredClone(bad);
+    const latestIds = [
+      OUTFITTER_LATEST,
+      NAHLTECH_LATEST,
+      'c0000000-0000-4000-8000-000000000016',
+      'c0000000-0000-4000-8000-000000000020',
+      'c0000000-0000-4000-8000-00000000002a',
+    ];
+    for (const id of latestIds) {
+      const ai = copy.checks.find((x) => x.id === id)!.ai_readability!;
+      ai.withheld = true;
+      ai.withheld_reasons = ['readable_unmeasured'];
+    }
+    const h = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).strip!.health;
+    expect(h.value).toBe('—');
+    // The four sites that hold a slot, the staging copy left out (B1, F-097).
+    expect(h.excluded).toBe('AI readability withheld on 4 sites');
+    // 79 + 84 + 74 + 73 = 310 / 4 = 77.5 → 78.
+    expect(h.seoOnly).toEqual({
+      label: 'Technical SEO, mean of 4 sites · no site has both grades',
+      value: '78',
+    });
+  });
+
+  it('D-06: the set-up title counts the rows it lists as left; the schedule is not one of them', () => {
+    for (const w of [v, day0()]) {
+      const s = w.setup!;
+      expect(s.items.map((i) => i.key)).not.toContain('schedule');
+      if (!w.firstRun) {
+        expect(s.title).toBe(DASHBOARD_COPY.setupLeftTitle(s.items.filter((i) => !i.done).length));
+      }
+    }
+    expect(v.setup!.title).toBe('Everything is set up');
+    expect(v.setup!.schedule!.label).toBe(
+      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00 EST)',
+    );
+  });
+
+  it('D-16: offers only built, shown set-up items whose control has a page', () => {
+    // Slack (built, its Connect page served) is done; competitors and staging are "coming"
+    // (CAPABILITIES); Search Console and observed visits are not offered at all (CTO ruling 047).
+    expect(v.setup!.items.map((i) => [i.key, i.label, i.done])).toEqual([
+      ['slack', 'Slack alerts connected', true],
+    ]);
+    expect(day0().setup!.items.map((i) => i.key)).toEqual(['slack']);
+    expect(day0().setup!.foot).toBe(
+      'It stops when the 14 days end unless you keep Pro. The site, its audits and its monthly check do not.',
+    );
+  });
+
+  it('D-16, M5: the trial offer names Slack, whose Connect page is served (#167), and no competitor', () => {
+    expect(dashboardPreview('clean').startPro!.body).toBe(
+      'Weekly checks, every fix with its packet and Slack alerts, on up to 5 sites, for 14 days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.',
+    );
+  });
+
+  it('M1: Slack not connected is the one thing left; with no row listed, the card claims nothing done', () => {
+    const copy = structuredClone(bad);
+    for (const a of copy.accounts) {
+      a.integrations = a.integrations.map((i) => ({ ...i, connected: false }));
+    }
+    const left = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).setup!;
+    expect(left.title).toBe('One thing left to set up');
+    expect(left.items.map((i) => [i.key, i.done])).toEqual([['slack', false]]);
+    // With Slack not offered (as when its capability is not built), no row is listed.
+    const slack = CAPABILITIES.slack_alerts as { status: string };
+    slack.status = 'coming';
+    try {
+      const s = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).setup!;
+      expect(s.items).toEqual([]);
+      expect(s.title).toBe('Weekly check schedule');
+      expect(s.schedule!.label).toBe(
+        'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00 EST)',
+      );
+    } finally {
+      slack.status = 'built';
+    }
+  });
+
+  it('says each reason on its own terms beside the Technical SEO mean (review 2)', () => {
+    const copy = structuredClone(bad);
+    // Three primary sites withheld; drivepei.ca has no result (its checks failed).
+    for (const id of ['000000000006', '00000000000c', '000000000016']) {
+      const ai = copy.checks.find((x) => x.id === `c0000000-0000-4000-8000-${id}`)!.ai_readability!;
+      ai.withheld = true;
+      ai.withheld_reasons = ['readable_unmeasured'];
+    }
+    for (const c of copy.checks) {
+      if (c.site_id === '50000000-0000-4000-8000-000000000004') c.status = 'failed';
+    }
+    const h = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).strip!.health;
+    // 79 + 84 + 74 = 237 / 3 = 79.
+    expect(h.seoOnly).toEqual({
+      label: 'Technical SEO, mean of 3 sites · no site has both grades',
+      value: '79',
+    });
+    expect(h.excluded).toBe('AI readability withheld on 3 sites; no finished check yet on 1 site');
+  });
+
+  it('names "since" from a site that holds a slot, never the staging copy (review 3)', () => {
+    const copy = structuredClone(bad);
+    // The first site has one result, so "since" falls back to the others' previous results:
+    // drivepei.ca's Mon 26 Oct 19:11Z, not the staging copy's later Tue 27 Oct 18:13Z.
+    for (const id of [2, 3, 4, 5, 6]) {
+      copy.checks.find((c) => c.id === `c0000000-0000-4000-8000-00000000000${id}`)!.status =
+        'failed';
+    }
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.header.title).toBe("Since Monday's check");
+  });
+
+  it('F2: an account whose only results are a staging copy’s is on its first run, and does not throw', () => {
+    const copy = structuredClone(bad);
+    // Every check of the four primary sites failed; the staging copy keeps its two results.
+    const staging = new Set(
+      copy.sites.filter((s) => s.staging_of_site_id !== null).map((s) => s.id),
+    );
+    for (const c of copy.checks) if (!staging.has(c.site_id)) c.status = 'failed';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.firstRun).toBe(true);
+    // No primary result: no "audited" and no "last check"; the first site's schedule and the trial.
+    expect(w.header.line).toBe(
+      'Fri 30 Oct · 4 sites · next weekly check Fri 6 Nov around 06:00 EST · trial ends Sat 7 Nov',
+    );
+  });
+
+  it('(8) day 0 with every listed row done says so, not "Worth doing while Pro is on"', () => {
+    expect(day0().setup!.items.map((i) => i.done)).toEqual([true]);
+    expect(day0().setup!.title).toBe('Everything is set up');
+  });
+
+  it('M4: a staging copy’s check is never the "last check"', () => {
+    const copy = structuredClone(bad);
+    // staging.example-outfitter.dev's latest moved to 10:04Z (06:04), after every primary site's.
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-00000000002a')!.finished_at =
+      '2026-10-30T10:04:00Z';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.header.line).toContain('last check today 06:02');
+  });
+
+  it('M2: a first site with one result lists its own blocks, since no panel is drawn', () => {
+    const copy = structuredClone(bad);
+    // Only the first audit stays a result; the later five checks of example-outfitter.com failed.
+    for (const id of [2, 3, 4, 5, 6]) {
+      copy.checks.find((c) => c.id === `c0000000-0000-4000-8000-00000000000${id}`)!.status =
+        'failed';
+    }
+    copy.checks
+      .find((c) => c.id === 'c0000000-0000-4000-8000-000000000001')!
+      .crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'disallowed_by_robots';
+    const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
+    expect(w.history).toBeNull();
+    expect(w.crawlersSite).toBeNull();
+    expect(w.blockedTitle).toBe('AI crawlers blocked on your sites');
+    expect(w.blockedElsewhere.map((b) => [b.host, b.ua])).toEqual([
+      ['example-outfitter.com', 'GPTBot'],
+    ]);
+  });
+
+  it('D-15: the schedule link opens the first site’s settings card by its anchor', () => {
+    expect(v.setup!.schedule!.action!.href).toBe(
+      '/sites/50000000-0000-4000-8000-000000000001#settings',
+    );
+  });
+});
+
 describe('Dashboard, day 0: the moment the account begins', () => {
   const v = day0();
 
@@ -187,7 +413,7 @@ describe('Dashboard, day 0: the moment the account begins', () => {
     expect(v.changed).toEqual([]);
     expect(v.header.title).toBe('example-outfitter.com is kept.');
     expect(v.header.line).toBe(
-      'Sat 24 Oct · 1 site · audited 22:34 EDT · next weekly check Fri 30 Oct around 06:00 EDT · trial ends Sat 7 Nov',
+      'Sat 24 Oct · 1 site · audited today 22:34 EDT · next weekly check Fri 30 Oct around 06:00 EDT · trial ends Sat 7 Nov',
     );
     expect(v.sites.rows.map((r) => r.sinceLabel)).toEqual(['first audit · 13 fixes']);
     reconciles(v);
@@ -373,10 +599,11 @@ describe('Who builds each account route', () => {
 describe('A site on its first baseline is left out of the health move (owner ruling 2026-11-08)', () => {
   // A copy of bad-site in which redbirdaviation.com's re-graded check (the new baseline, Fri 30 Oct)
   // scores 100 and 100. Worked by hand, earlier moment Thu 29 Oct 12:42Z:
-  //   the four other sites: Thursday 80+41 · 79+93 · 73+66 · 86+88 = 606 / 8 = 75.75 → 76;
-  //                         now      79+22 · 84+93 · 73+66 · 86+88 = 591 / 8 = 73.875 → 74: −2.
-  //   counting redbird too: Thursday 606 + 74+78 = 758 / 10 = 75.8 → 76;
-  //                         now      591 + 100+100 = 791 / 10 = 79.1 → 79: +3, the other sign.
+  // The staging copy holds no slot, so it is in neither mean (F-097).
+  //   the three other sites: Thursday 80+41 · 79+93 · 73+66 = 432 / 6 = 72;
+  //                          now      79+22 · 84+93 · 73+66 = 417 / 6 = 69.5 → 70: −2.
+  //   counting redbird too:  Thursday 432 + 74+78 = 584 / 8 = 73;
+  //                          now      417 + 100+100 = 617 / 8 = 77.125 → 77: +4, the other sign.
   const copy = structuredClone(bad);
   const rebased = copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000016')!;
   rebased.technical_seo!.score = 100;
@@ -388,8 +615,8 @@ describe('A site on its first baseline is left out of the health move (owner rul
     expect(h.fresh).toBe('1 new');
   });
 
-  it('still means every graded site in the value: 791 / 10 = 79', () => {
-    expect(h.value).toBe('79');
+  it('still means every graded primary site in the value: 617 / 8 = 77', () => {
+    expect(h.value).toBe('77');
   });
 });
 

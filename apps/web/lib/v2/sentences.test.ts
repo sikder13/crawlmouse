@@ -429,32 +429,59 @@ describe('a withheld AI readability grade says what was measured', () => {
   it('names both parts the grade waits on, and what was tested', () => {
     const c = withheld(['readable_unmeasured', 'quotable_unmeasured'], { access: 40, signals: 5 });
     expect(aiWithheldSummary(c, 4)).toBe(
-      `This audit did not measure the JavaScript comparison or a content score, ${NEEDS} It tested crawler access for at least two of the four scored crawlers and AI signals.`,
+      `This audit did not measure the JavaScript comparison or a content score, ${NEEDS} It tested crawler access for all four scored crawlers and AI signals. Its access score rests on at least two of those crawlers.`,
     );
   });
 
   it('names one missing part alone', () => {
     const c = withheld(['readable_unmeasured'], { access: 40, quotable: 12, signals: 5 });
     expect(aiWithheldSummary(c, 4)).toBe(
-      `This audit did not measure the JavaScript comparison, ${NEEDS} It tested crawler access for at least two of the four scored crawlers, content and AI signals.`,
+      `This audit did not measure the JavaScript comparison, ${NEEDS} It tested crawler access for all four scored crawlers, content and AI signals. Its access score rests on at least two of those crawlers.`,
     );
   });
 
-  it('claims no exact count where the grade does not store one', () => {
+  it('says how many were tested from the verdicts, and claims no exact count for what Access rests on (D-10)', () => {
     const c = withheld(['readable_unmeasured', 'quotable_unmeasured'], { access: 40, signals: 5 });
-    // Two crawlers may hold a verdict and not count toward Access, so the verdict count is not used.
-    for (const measured of [2, 3, 4]) {
-      expect(aiWithheldSummary(c, measured)).toContain(
-        'It tested crawler access for at least two of the four scored crawlers and AI signals.',
-      );
-    }
+    // A crawler may hold a verdict and not count toward Access, so what Access rests on stays
+    // "at least two" where the grade stores no number; how many were tested is the verdict count.
+    expect(aiWithheldSummary(c, 4)).toContain(
+      'It tested crawler access for all four scored crawlers and AI signals. Its access score rests on at least two of those crawlers.',
+    );
+    expect(aiWithheldSummary(c, 3)).toContain(
+      'It tested crawler access for three of the four scored crawlers and AI signals. Its access score rests on at least two of those crawlers.',
+    );
+    // None tested: the access clause is left out, never "none of the four" or "zero of".
+    expect(aiWithheldSummary(c, 0)).toMatch(/ It tested AI signals\.$/);
+    // Two scored, both tested: "both", not "all two".
+    const two = structuredClone(c);
+    let kept = 0;
+    two.crawlers.forEach((x) => (x.scored = x.scored && kept++ < 2));
+    expect(aiWithheldSummary(two, 2)).toMatch(
+      /It tested crawler access for both scored crawlers and AI signals\.$/,
+    );
+    // A stored count over the tested one says nothing more: no "rests on three of those".
+    const over = structuredClone(c);
+    over.ai_readability!.scored_from_fewer_crawlers = 3;
+    expect(aiWithheldSummary(over, 2)).toMatch(
+      /It tested crawler access for two of the four scored crawlers and AI signals\.$/,
+    );
+    // One scored crawler, tested: "the one", not "all one".
+    const one = structuredClone(c);
+    one.crawlers.forEach((x, i) => (x.scored = i === one.crawlers.findIndex((y) => y.scored)));
+    expect(aiWithheldSummary(one, 1)).toMatch(
+      /It tested crawler access for the one scored crawler and AI signals\.$/,
+    );
+    // Two tested: "at least two of those crawlers" would be both, so nothing is added.
+    expect(aiWithheldSummary(c, 2)).toMatch(
+      /It tested crawler access for two of the four scored crawlers and AI signals\.$/,
+    );
   });
 
   it('counts the crawlers Access was scored from, not the ones with a verdict', () => {
     const c = withheld(['readable_unmeasured', 'quotable_unmeasured'], { access: 40, signals: 5 });
     c.ai_readability!.scored_from_fewer_crawlers = 1;
     expect(aiWithheldSummary(c, 4)).toContain(
-      'It tested crawler access for one of the four scored crawlers and AI signals.',
+      'It tested crawler access for all four scored crawlers and AI signals. Its access score rests on one of those crawlers.',
     );
   });
 

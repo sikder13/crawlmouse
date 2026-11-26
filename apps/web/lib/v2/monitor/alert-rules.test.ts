@@ -14,6 +14,7 @@ import { alertsView } from '../view/alerts';
 import {
   BLOCKING_VERDICTS,
   evaluateAlerts,
+  regressedFixes,
   textDropPoints,
   type AlertChange,
   type AlertInput,
@@ -265,6 +266,24 @@ describe('fix_regressed: a fix reopened at this check whose state before was mar
     expect(
       fired(input({ changes: [c], rules: [rule('fix_regressed')], fixEvents: events })),
     ).toEqual(fires ? [['fix_regressed', [c.id]]] : []);
+  });
+
+  it('says when each regressed fix was marked done, and names no other fix (F-254)', () => {
+    expect([...regressedFixes(CHECK, [marked, reopened()])]).toEqual([
+      [FIX, '2026-11-09T10:00:00Z'],
+    ]);
+    // Marked done, then unverifiable, then found again: still the day it was marked done.
+    expect(regressedFixes(CHECK, [unable, reopened(), marked]).get(FIX)).toBe(
+      '2026-11-09T10:00:00Z',
+    );
+    // A second marking done: the later one, the one the fix was in when it was found again.
+    const again = { ...marked, at: '2026-11-09T18:00:00Z' };
+    expect(regressedFixes(CHECK, [marked, unable, again, reopened()]).get(FIX)).toBe(again.at);
+    // Marked done again after it was found again: still the marking it was found against.
+    const later = { ...marked, at: '2026-11-11T09:00:00Z' };
+    expect(regressedFixes(CHECK, [marked, reopened(), later]).get(FIX)).toBe(marked.at);
+    expect(regressedFixes(CHECK, [verified, reopened()]).size).toBe(0);
+    expect(regressedFixes(CHECK, [marked, reopened(OTHER_CHECK)]).size).toBe(0);
   });
 
   it('orders the events by time, whatever order they are given in', () => {

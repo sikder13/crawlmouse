@@ -29,13 +29,13 @@
  */
 import type { Check, LinkEdge, PageResult } from '@crawlmouse/types/v2';
 import { DESCRIPTION_BYTES, REDIRECT_STATUSES, TITLE_BYTES } from '@crawlmouse/types/v2';
-import { siteOf } from '../../fixtures';
+import { siteOf } from '../../dataset-lookups';
 import { PAGE_CELLS } from '../../reports/csv';
 import { capitalise, count, plural } from '../../words';
 import { sectionMeasured } from '../section-measured';
 import { answeredAt, errorRows, redirected, type ErrorRow } from './broken';
 import type { DoorView } from '../result';
-import type { ViewDataset } from '../../fixtures';
+import type { ViewDataset } from '../../dataset-lookups';
 
 /** The most items a list shows before "and N more"; the rest sit behind a disclosure. */
 export const LIST_MAX = 10;

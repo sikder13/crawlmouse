@@ -6,12 +6,12 @@
  */
 import { everySectionMeasured } from '../section-measured';
 import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
-import type { ViewDataset } from '../../fixtures';
+import type { ViewDataset } from '../../dataset-lookups';
 
 type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
 type CheckTrigger = Check['trigger'];
-import { findCheck, siteOf } from '../../fixtures';
+import { findCheck, siteOf } from '../../dataset-lookups';
 import { dateTimeUtc, listOf, weekdayTime, weekdayTimeZoned } from '../../format';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { ANONYMOUS_VISIBLE_MS, type DoorView } from '../result';

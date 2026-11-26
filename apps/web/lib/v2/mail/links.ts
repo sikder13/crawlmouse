@@ -2,25 +2,42 @@
  * The links of the check-notify, account-link, invitation, client-report and unsubscribe mail are
  * built here, from values this code checked (D3): our origin, a path we serve, and an id or token of
  * a shape we know. The alert and
- * weekly-summary templates build their page links in templates/alert.ts (`pageUrl`, `SITE_ORIGIN`, the
+ * weekly-summary templates build their page links in templates/alert.ts (`pageUrl`, `mailOrigin`, the
  * same origin and the same id check); their senders pass in the unsubscribe link `unsubscribeLinks`
  * builds here (lib/v2/monitor/functions.ts).
  * Which targets each template's HTML holds is what its tests assert, with templates/inspect.ts.
  */
+import { siteOrigin } from '../../site-url';
 import { auditHref } from '../view/audit-hrefs';
 import { LINK_FLOWS, type LinkFlow } from '../account/link-cookie';
 import { isToken } from '../account/tokens';
 import { signUnsubscribe } from './unsubscribe-token';
 import type { UnsubscribeKind } from './types';
 
-/** Where every link in our mail points. Production's origin, as v1's mail did (`inngest/notify.ts`). */
-export const MAIL_ORIGIN = 'https://crawlmouse.com';
+/** Production's origin: where mail links point when the deployment names none, or names one oddly. */
+export const PRODUCTION_MAIL_ORIGIN = 'https://crawlmouse.com';
+
+/**
+ * Where every link in our mail points: this deployment's own origin (`siteOrigin`, from
+ * `NEXT_PUBLIC_BASE_URL`), so staging's mail opens staging (F-253). Only a bare `https` origin is
+ * taken, no path, query, fragment or credentials; anything else is production's, as before.
+ */
+export function mailOrigin(): string {
+  const own = siteOrigin();
+  try {
+    const u = new URL(own);
+    const bare = u.pathname === '/' && !u.search && !u.hash && !u.username && !u.password;
+    return u.protocol === 'https:' && bare && u.origin === own ? own : PRODUCTION_MAIL_ORIGIN;
+  } catch {
+    return PRODUCTION_MAIL_ORIGIN;
+  }
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** An absolute link to one of our pages; `path` is a literal of ours, starting with `/`. */
 export function mailUrl(path: `/${string}`): string {
-  return `${MAIL_ORIGIN}${path}`;
+  return `${mailOrigin()}${path}`;
 }
 
 /** The page a check is read at: the audit route, whose id is the capability (CC-22b). */
