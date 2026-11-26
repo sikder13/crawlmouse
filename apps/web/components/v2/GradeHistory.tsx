@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type CSSProperties } from 'react';
 import { ScrollRegion } from './ScrollRegion';
 import layout from './layout.module.css';
 import styles from './GradeHistory.module.css';
@@ -15,8 +15,13 @@ export interface GradeSeries {
 export interface GradeHistoryProps {
   /** Names the chart's scroll region and its table. */
   label: string;
-  /** One axis label per check: "24 Oct", "26", "Thu 29". */
+  /** One axis label per check, its day: "24 Oct". */
   labels: readonly string[];
+  /**
+   * Each check's time, "02:39", where checks share a day (else null): drawn on a second line under
+   * its day, so a label never runs into the next one on a narrow axis.
+   */
+  times?: readonly (string | null)[];
   /** One date per check, in full, for the table the chart is read from. */
   dates: readonly string[];
   series: readonly [GradeSeries, GradeSeries];
@@ -29,10 +34,23 @@ export interface GradeHistoryProps {
    * verdicts its words name, so a test can hold "blocked" to them.
    */
   marker?: { series: 0 | 1; index: number; text: string; verdicts?: readonly string[] } | null;
+  /**
+   * On a phone the chart fits its card instead of scrolling: its axis lettering drawn larger, and
+   * the note and the marker's words shown in a list under it; their copies on the lines are made
+   * transparent there, never removed (owner ruling 2026-11-08).
+   */
+  fitOnPhone?: boolean;
 }
 
 const W = 640;
 const H = 186;
+/**
+ * The second axis line's offset, and the room the drawing grows by to hold it: 1.2 times the
+ * phone's 15-unit lettering, so the day and its time do not touch (GradeHistory.module.css).
+ */
+const TIME_LINE = 18;
+/** The chart's top padding, in px (GradeHistory.module.css `.chart`): its box is this plus the drawing. */
+const PAD_TOP = 8;
 const X0 = 40;
 const X1 = 630;
 const TICKS = [100, 75, 50, 25];
@@ -64,6 +82,8 @@ export function GradeHistory({
   caption,
   note,
   marker,
+  fitOnPhone = false,
+  times = [],
 }: GradeHistoryProps) {
   const n = labels.length;
   if (n < 2) throw new Error(`GradeHistory "${label}": two checks at least, got ${n}`);
@@ -82,17 +102,21 @@ export function GradeHistory({
   if (dates.length !== n)
     throw new Error(`GradeHistory "${label}": ${dates.length} dates for ${n} checks`);
   const xs = labels.map((_, i) => X0 + (i * (X1 - X0)) / (n - 1));
+  const timed = times.some((t) => t);
+  const height = timed ? H + TIME_LINE : H;
   const first = (s: 0 | 1) => series[s].values.find((v): v is number => v !== null);
   const marked = marker ? series[marker.series].values[marker.index] : null;
   const captionId = useId();
 
   return (
-    <div className={styles.history}>
+    <div className={fitOnPhone ? `${styles.history} ${styles.fit}` : styles.history}>
       <ScrollRegion label={label} className={styles.scroll} startAtEnd describedBy={captionId}>
         <svg
           className={styles.chart}
           data-v2-chart=""
-          viewBox={`0 0 ${W} ${H}`}
+          viewBox={`0 0 ${W} ${height}`}
+          // The box grows with the drawing, so a desktop chart with times keeps its lettering's size.
+          style={{ '--v2-chart-h': `${height + PAD_TOP}px` } as CSSProperties}
           aria-hidden="true"
           focusable="false"
         >
@@ -155,12 +179,34 @@ export function GradeHistory({
                 y={180}
                 textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
               >
-                {l}
+                {timed ? (
+                  <>
+                    <tspan x={xs[i]}>{l}</tspan>
+                    <tspan x={xs[i]} dy={TIME_LINE}>
+                      {times[i] ?? ''}
+                    </tspan>
+                  </>
+                ) : (
+                  l
+                )}
               </text>
             ))}
           </g>
         </svg>
       </ScrollRegion>
+      {fitOnPhone && ((note && first(note.series) !== undefined) || (marker && marked != null)) ? (
+        // The words the drawing writes on its lines, under it on a phone; read once, in the caption.
+        <ul className={styles.phoneNotes} aria-hidden="true" data-v2-addition="">
+          {note && first(note.series) !== undefined ? <li>{note.text}</li> : null}
+          {marker && marked != null ? (
+            // The marker's words may say "blocked": the verdicts they rest on go with them (FACTS I2).
+            <li data-v2-verdicts={(marker.verdicts ?? []).join(' ')}>
+              <span className={styles.phoneMarker} />
+              {marker.text}
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
       {/* A table ignores a 1px width; the box around it holds the screen-reader-only size. */}
       <div className={layout.srOnly} data-v2-sr-only="">
         <table className={styles.values}>

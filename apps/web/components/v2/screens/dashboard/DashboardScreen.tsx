@@ -3,7 +3,8 @@ import { Card } from '../../Card';
 import { CheckGlyphRow } from '../../CheckGlyphRow';
 import { GradeHistory } from '../../GradeHistory';
 import { Glyph, StatusPill } from '../../StatusPill';
-import { Table } from '../../Table';
+import { Fragment, type ReactNode } from 'react';
+import { Table, type TableColumn } from '../../Table';
 import { VERDICTS } from '../../verdicts';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import { TAGGED_UA_LINE } from '../../../../lib/v2/copy/site';
@@ -17,6 +18,65 @@ import shared from '../account/AccountScreen.module.css';
 import styles from './DashboardScreen.module.css';
 
 type Props = { data: DashboardView };
+
+/** The sites table's columns: their headers also label each cell where a phone stacks the row. */
+const SITE_COLUMNS: TableColumn[] = [
+  { header: 'Site', mono: true },
+  { header: 'Technical SEO' },
+  { header: 'AI readability' },
+  { header: 'Since last crawl' },
+  { header: 'Schedule', muted: true },
+  { header: 'Last check', numeric: true, mono: true, muted: true },
+];
+
+/**
+ * A cell's value with its column's header above it, drawn only where a phone stacks the row and the
+ * header row is not drawn. Hidden from assistive technology, which reads the column header itself.
+ */
+function Labelled({ column, children }: { column: number; children: ReactNode }) {
+  return (
+    <>
+      <span className={styles.cellName} aria-hidden="true" data-v2-addition="">
+        {SITE_COLUMNS[column]!.header}
+      </span>
+      {children}
+    </>
+  );
+}
+
+/** "staging.example-outfitter.dev" in the pieces it may break between: after each dot. */
+const hostParts = (host: string) => host.split(/(?<=\.)/);
+/** "Fri 06:01 · check queued" in the pieces it may break between: after each " · ". */
+const checkParts = (line: string) => line.split(/(?<= · )/);
+
+/**
+ * A part longer than this may break inside itself: a dot-free label of a host can run to 63
+ * characters (a punycode `xn--…` or a long hyphenated name), more than a phone's sites table holds
+ * on one line (about 40 mono characters at 390px).
+ */
+const LONG_PART = 24;
+
+/**
+ * Text that breaks between its parts, and inside a part only when the part is longer than
+ * `LONG_PART`: "example-outfitter." stays whole, a 63-character label wraps where it must.
+ */
+function Breaks({ parts }: { parts: readonly string[] }) {
+  return (
+    <>
+      {parts.map((p, i) => (
+        <Fragment key={i}>
+          {i > 0 ? <wbr /> : null}
+          <span
+            className={p.length > LONG_PART ? styles.longPart : styles.whole}
+            data-v2-part={p.length > LONG_PART ? 'long' : 'whole'}
+          >
+            {p}
+          </span>
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 function Header({ data }: Props) {
   const { header } = data;
@@ -112,8 +172,10 @@ function Changed({ data }: Props) {
         </a>
       </CardHead>
       <Table
+        shade
         label="What changed, by site"
         headersHidden
+        className={styles.changedTable}
         columns={[
           { header: 'Change' },
           { header: 'What and where' },
@@ -147,18 +209,25 @@ function History({ data }: Props) {
   return (
     <Card as="section" className={shared.panel}>
       <CardHead title={h.title}>
-        <span className={styles.legend}>
-          <span className={styles.swatch} aria-hidden="true" />
-          Technical SEO
-        </span>
-        <span className={styles.legend}>
-          <span className={`${styles.swatch} ${styles.dashed}`} aria-hidden="true" />
-          AI readability
-        </span>
+        {/* A line no check gave a score for is not drawn, so the legend does not name it (D-25). */}
+        {h.points.some((p) => p.seo !== null) ? (
+          <span className={styles.legend}>
+            <span className={styles.swatch} aria-hidden="true" />
+            Technical SEO
+          </span>
+        ) : null}
+        {h.points.some((p) => p.ai !== null) ? (
+          <span className={styles.legend}>
+            <span className={`${styles.swatch} ${styles.dashed}`} aria-hidden="true" />
+            AI readability
+          </span>
+        ) : null}
       </CardHead>
       <GradeHistory
+        fitOnPhone
         label={h.title}
         labels={h.points.map((p) => p.label)}
+        times={h.points.map((p) => p.time)}
         dates={h.points.map((p) => p.date)}
         series={[
           { name: 'Technical SEO', values: h.points.map((p) => p.seo) },
@@ -189,6 +258,7 @@ function History({ data }: Props) {
             ))}
           </div>
           <Table
+            shade
             label="Crawler access by check"
             headersHidden
             rowHeader
@@ -220,6 +290,7 @@ function CrawlersNow({ data }: Props) {
         </div>
       ) : null}
       <Table
+        shade
         label="Crawler access"
         headersHidden
         rowHeader
@@ -256,6 +327,8 @@ function BlockedElsewhere({ data }: Props) {
       >
         <CardHead title={data.blockedTitle} />
         <Table
+          // Like the dashboard's other tables: a shade shows only if a narrow screen overflows it.
+          shade
           label={data.blockedTitle}
           headersHidden
           rowHeader={0}
@@ -299,48 +372,57 @@ function Sites({ data }: Props) {
       </CardHead>
       {sites.rows.length ? (
         <Table
+          shade
           label="Watched sites"
           rowHeader
-          columns={[
-            { header: 'Site', mono: true },
-            { header: 'Technical SEO' },
-            { header: 'AI readability' },
-            { header: 'Since last crawl' },
-            { header: 'Schedule', muted: true },
-            { header: 'Last check', numeric: true, mono: true, muted: true },
-          ]}
+          // A phone lays each row out as a grid: the roles keep the column names read (review 7).
+          roles
+          className={styles.sitesTable}
+          columns={SITE_COLUMNS}
           rows={sites.rows.map((r) => ({
             key: r.key,
             cells: [
               <a key="h" href={r.href}>
-                {r.host}
+                <Breaks parts={hostParts(r.host)} />
               </a>,
-              <GradeText key="s" grade={r.seo} />,
-              <GradeText key="a" grade={r.ai} withheld={r.aiWithheld} />,
-              r.since.pills.length ? (
-                <span
-                  key="c"
-                  className={shared.pills}
-                  data-v2-verdicts={r.since.verdicts.join(' ')}
-                >
-                  {r.since.pills.map((p) => (
-                    <StatusPill key={p.label} state={p.state}>
-                      {p.label}
-                    </StatusPill>
-                  ))}
-                </span>
-              ) : (
-                <span key="c" className={shared.muted}>
-                  {r.sinceLabel}
-                </span>
-              ),
-              r.schedule,
-              r.lastCheck,
+              <Labelled key="s" column={1}>
+                <GradeText grade={r.seo} />
+              </Labelled>,
+              <Labelled key="a" column={2}>
+                <GradeText grade={r.ai} withheld={r.aiWithheld} />
+              </Labelled>,
+              <Labelled key="c" column={3}>
+                {r.since.pills.length ? (
+                  <span className={shared.pills} data-v2-verdicts={r.since.verdicts.join(' ')}>
+                    {r.since.pills.map((p) => (
+                      <StatusPill key={p.label} state={p.state}>
+                        {p.label}
+                      </StatusPill>
+                    ))}
+                  </span>
+                ) : (
+                  <span className={shared.muted}>{r.sinceLabel}</span>
+                )}
+              </Labelled>,
+              <Labelled key="sc" column={4}>
+                {r.schedule}
+              </Labelled>,
+              <Labelled key="l" column={5}>
+                <Breaks parts={checkParts(r.lastCheck)} />
+              </Labelled>,
             ],
           }))}
         />
       ) : null}
-      {sites.foot ? <div className={shared.foot}>{sites.foot}</div> : null}
+      {sites.add ? (
+        // Day 0 with no site: the action beside the sentence that says what it starts.
+        <div className={styles.empty} data-v2-no-site-add="">
+          {sites.foot ? <p>{sites.foot}</p> : null}
+          <ActionControl action={sites.add} size="md" />
+        </div>
+      ) : sites.foot ? (
+        <div className={shared.foot}>{sites.foot}</div>
+      ) : null}
       {data.earlier ? <Earlier earlier={data.earlier} /> : null}
     </Card>
   );
@@ -372,6 +454,7 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
     <Card as="section" className={shared.panel}>
       <CardHead title={top.title} />
       <Table
+        shade
         label="Top fixes"
         headersHidden
         columns={[
@@ -422,6 +505,7 @@ function Setup({ setup }: { setup: NonNullable<DashboardView['setup']> }) {
       <CardHead title={setup.title} />
       {items.length ? (
         <Table
+          shade
           label="Set-up"
           headersHidden
           columns={[{ header: 'Done' }, { header: 'What' }, { header: 'Action', numeric: true }]}

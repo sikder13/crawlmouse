@@ -48,8 +48,8 @@ import {
 } from './account';
 import {
   aiOf,
-  axisLabels,
   bothGrades,
+  checkLabels,
   crawlerOrder,
   move,
   readRuns,
@@ -150,8 +150,10 @@ export interface ChangeRowView {
 }
 
 export interface HistoryPointView {
-  /** The axis label: "24 Oct", "26", "Thu 29". */
+  /** The axis label's day, one form at every check: "24 Oct" (`checkLabels`). */
   label: string;
+  /** The check's time, "02:39", where two of the checks drawn share a day; else null. */
+  time: string | null;
   /** The check's date in full, for the text alternative. */
   date: string;
   seo: number | null;
@@ -213,6 +215,8 @@ export interface SitesView {
    * table lists a staging copy (F-097, owner ruling Q10). Null when every row holds a slot.
    */
   apart: string | null;
+  /** Day 0 with no site: the add-site action, beside the sentence that says what it starts. */
+  add: ActionView | null;
   upsell: ActionView | null;
   rows: SiteRowView[];
   foot: string | null;
@@ -649,10 +653,15 @@ function history(v: AccountView, site: Site): HistoryView | null {
   if (all.length < 2) return null;
   const zone = zoneOf(v);
   const shown = all.slice(-HISTORY_CHECKS);
-  const labels = axisLabels(shown, zone);
+  // One form at every check ("24 Oct"), and each check's time where two share a day in the
+  // account's zone (`checkLabels`, D-25).
+  const labels = checkLabels(shown, zone);
   const points = shown.map((c, i) => ({
-    label: labels[i]!,
-    date: dayDate(c.finished_at!, zone),
+    label: labels[i]!.date,
+    time: labels[i]!.time,
+    date: labels[i]!.time
+      ? `${dayDate(c.finished_at!, zone)} ${labels[i]!.time}`
+      : dayDate(c.finished_at!, zone),
     seo: seoOf(c)?.score ?? null,
     ai: aiOf(c)?.score ?? null,
   }));
@@ -977,7 +986,8 @@ function noSiteView(
       ]
         .filter(Boolean)
         .join(' · '),
-      actions: addSiteAction(v, true),
+      // The action sits in the sites card, beside the sentence that says what adding a site starts.
+      actions: [],
     },
     strip: null,
     changed: [],
@@ -991,6 +1001,7 @@ function noSiteView(
     sites: {
       note: `0 of ${v.account.limits.sites} on ${PLAN_NAMES[v.tier]}`,
       apart: null,
+      add: addSiteAction(v, true)[0] ?? null,
       upsell: null,
       rows: [],
       foot: !adds
@@ -1258,6 +1269,7 @@ export function dashboardView(
     sites: {
       note: firstRun && trial ? COPY.sitesFirstRun(free) : slotsNote,
       apart: staging.length ? COPY.stagingApart(staging.length) : null,
+      add: null,
       upsell:
         v.tier === 'pro' && slots >= limit
           ? action(

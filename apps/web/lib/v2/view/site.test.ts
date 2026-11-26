@@ -72,7 +72,14 @@ describe('Site page, example-outfitter.com at as_of', () => {
   });
 
   it('lays the eight crawlers out by check, with the cause now', () => {
-    expect(v.crawlers.columns).toEqual(['24 Oct', '26', '27', '28', 'Thu 29', 'Fri 30']);
+    expect(v.crawlers.columns).toEqual([
+      '24 Oct',
+      '26 Oct',
+      '27 Oct',
+      '28 Oct',
+      '29 Oct',
+      '30 Oct',
+    ]);
     expect(v.crawlers.rows.map((r) => r.ua)).toEqual([
       'Googlebot',
       'Bingbot',
@@ -183,13 +190,13 @@ describe('Site, withheld: granitepeak.example as Northwind Digital', () => {
 });
 
 describe('the history axis across a change of month', () => {
-  it('gives the new month its name, and the weekday only to labels without one', () => {
+  it('gives every label its day and month, in one form (D-25)', () => {
     const at = (ts: string) => ({ finished_at: ts }) as Parameters<typeof axisLabels>[0][number];
     const checks = ['2026-10-30T15:00:00Z', '2026-10-31T15:00:00Z', '2026-11-01T15:00:00Z'].map(at);
     // Fri 30 Oct, Sat 31 Oct, Sun 1 Nov in Indiana.
     expect(axisLabels(checks, 'America/Indiana/Indianapolis')).toEqual([
       '30 Oct',
-      'Sat 31',
+      '31 Oct',
       '1 Nov',
     ]);
   });
@@ -330,13 +337,17 @@ describe('the site’s public link (F-123)', () => {
     expect(v.settings.rows.find((x) => x.label === 'Public link')).toBeUndefined();
   });
 
-  it('a partial latest check cannot be published, so none is offered', () => {
+  it('a partial latest check cannot be published: no link is offered, and the row says why (D-14)', () => {
     const partial = {
       ...noLinks,
       checks: noLinks.checks.map((c) =>
         c.id === latestCheck.id ? { ...c, status: 'partial' as const } : c,
       ),
     };
-    expect(row(partial)).toBeUndefined();
+    // The row used to vanish, and the page did not say why (QA dashboard walk D-14, F-277).
+    expect(row(partial)!.value).toBe(
+      'The latest check is partial, and only a finished check can be published. A link can be made from a later check that finishes.',
+    );
+    expect(row(partial)!.publicLink!.mintCheckId).toBeNull();
   });
 });

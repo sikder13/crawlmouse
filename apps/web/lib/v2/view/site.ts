@@ -744,7 +744,8 @@ export function siteView(
           : []),
         ...(publicLink?.public_slug ||
         mintCheckId ||
-        (manage && (link.gate !== 'open' || latestHidden))
+        // A partial latest check cannot be published: the row says so rather than vanish (D-14).
+        (manage && (link.gate !== 'open' || latestHidden || result.status === 'partial'))
           ? [
               {
                 label: 'Public link',
@@ -754,7 +755,9 @@ export function siteView(
                     ? SITE_COPY.publicLink[link.gate]
                     : latestHidden
                       ? SITE_COPY.publicLink.hiddenLatest
-                      : SITE_COPY.publicLink.none,
+                      : result.status === 'partial'
+                        ? SITE_COPY.publicLink.partialLatest
+                        : SITE_COPY.publicLink.none,
                 mono: Boolean(publicLink?.public_slug),
                 muted: false,
                 action: publicLink?.public_slug

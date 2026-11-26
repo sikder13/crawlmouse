@@ -91,6 +91,7 @@ export function SettingsScreen({
           <Card as="section" className={shared.panel}>
             <CardHead title={email.title} />
             <Table
+              shade
               label={email.tableLabel}
               headersHidden
               rowHeader
@@ -135,6 +136,7 @@ export function SettingsScreen({
           <Card as="section" className={shared.panel}>
             <CardHead title={danger.title} />
             <Table
+              shade
               label={danger.tableLabel}
               headersHidden
               rowHeader

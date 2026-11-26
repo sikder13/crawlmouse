@@ -28,6 +28,14 @@
   --v2-line2: #edf0f3; /* base: --line2 */
   --v2-ctl: #808996; /* base: --ctl */
   --v2-railbg: #f1f3f6; /* base: --railbg */
+  /* A wide table's edge shade: the text colour thinned, so it reads on light and dark alike */
+  --v2-table-shade: color-mix(
+    in srgb,
+    var(--v2-fg) 22%,
+    transparent
+  ); /* derived: --v2-fg at 22%, visible on s1 in both themes */
+  /* The history chart's box; GradeHistory sets it per chart when its drawing grows */
+  --v2-chart-h: 194px; /* derived: GradeHistory H (186) + .chart padding-top (8px) */
 
   /* Text */
   --v2-fg: #13161b; /* base: --fg */

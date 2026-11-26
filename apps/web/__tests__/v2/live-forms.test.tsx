@@ -46,10 +46,7 @@ const row = (label: string) => site.settings.rows.find((r) => r.label === label)
 
 describe('each live form posts what its route reads', () => {
   it('add a site (day 0 and the home): {url}', () => {
-    for (const add of [
-      noSitePreview().header.actions[0]!,
-      dashboardPreview('home').header.actions[0]!,
-    ]) {
+    for (const add of [noSitePreview().sites.add!, dashboardPreview('home').header.actions[0]!]) {
       expect(add.route).toBe('/api/sites');
       expect(parseAddBody(asRoute(add, submitted(add)).fields)).toEqual({ url: 'example.com' });
     }

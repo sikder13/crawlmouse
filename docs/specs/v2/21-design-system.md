@@ -8,80 +8,82 @@ The v2 design system ports the locked design in `docs/design/v2` (layouts, spaci
 
 From `apps/web/styles/v2/tokens.css`. The source column is the comment on each declaration; `apps/web/__tests__/v2/tokens.test.ts` compares each `base`, `base.css`, `screen` and `brand` value with the source it names.
 
-| Token                   | Light                                                              | Dark      | Source                                                |
-| ----------------------- | ------------------------------------------------------------------ | --------- | ----------------------------------------------------- |
-| `--v2-bg`               | `#f7f8fa`                                                          | `#0f1317` | base: --bg                                            |
-| `--v2-s1`               | `#ffffff`                                                          | `#161b21` | base: --s1                                            |
-| `--v2-s2`               | `#f1f3f6`                                                          | `#1d232b` | base: --s2                                            |
-| `--v2-line`             | `#e2e6eb`                                                          | `#242b33` | base: --line                                          |
-| `--v2-line2`            | `#edf0f3`                                                          | `#222930` | base: --line2                                         |
-| `--v2-ctl`              | `#808996`                                                          | `#6b7580` | base: --ctl                                           |
-| `--v2-railbg`           | `#f1f3f6`                                                          | `#0c0f12` | base: --railbg                                        |
-| `--v2-fg`               | `#13161b`                                                          | `#e6e9ed` | base: --fg                                            |
-| `--v2-fg2`              | `#3d4654`                                                          | `#b5bcc6` | base: --fg2                                           |
-| `--v2-mut`              | `#5b6472`                                                          | `#97a1ad` | base: --mut                                           |
-| `--v2-acc`              | `#ff7849`                                                          | `#ff7849` | brand: peach                                          |
-| `--v2-acc2`             | `#ff8352`                                                          | `#ff8352` | base: --acc2                                          |
-| `--v2-on-acc`           | `#13161b`                                                          | `#13161b` | base.css: .btn-p color                                |
-| `--v2-brand`            | `#ff7849`                                                          | `#ff7849` | brand: peach                                          |
-| `--v2-mark-line`        | `#1a1a18`                                                          | `#e6e9ed` | brand: ink                                            |
-| `--v2-ok`               | `#10603f`                                                          | `#6fd49a` | base: --ok                                            |
-| `--v2-okbg`             | `#ddf3e8`                                                          | `#15301f` | base: --okbg                                          |
-| `--v2-bad`              | `#9b2613`                                                          | `#ff8f7a` | base: --bad                                           |
-| `--v2-badbg`            | `#fbe3df`                                                          | `#3a1a16` | base: --badbg                                         |
-| `--v2-badline`          | `#efb8ae`                                                          | `#5a2b26` | base: --badline                                       |
-| `--v2-warn`             | `#7a4a00`                                                          | `#f2b857` | base: --warn                                          |
-| `--v2-warnbg`           | `#fcebd2`                                                          | `#3a2a10` | base: --warnbg                                        |
-| `--v2-warnfill`         | `#b86e00`                                                          | `#b86e00` | screen: Final-Result.dc.html background               |
-| `--v2-neu`              | `#3d4654`                                                          | `#c3cad3` | base: --neu                                           |
-| `--v2-neubg`            | `#e9ecf0`                                                          | `#232a33` | base: --neubg                                         |
-| `--v2-barbg`            | `#13161b`                                                          | `#e6e9ed` | base: --barbg                                         |
-| `--v2-barfg`            | `#ffffff`                                                          | `#13161b` | base: --barfg                                         |
-| `--v2-barmut`           | `#b5bcc6`                                                          | `#3d4654` | base: --barmut                                        |
-| `--v2-barline`          | `#808996`                                                          | `#6b7580` | base: --barline                                       |
-| `--v2-barin`            | `#1d2229`                                                          | `#ffffff` | base: --barin                                         |
-| `--v2-bar-hover`        | `rgba(128, 128, 128, 0.28)`                                        | (same)    | base.css: .keep-bar .btn-q:hover background           |
-| `--v2-graph-edge`       | `#a9b2bc`                                                          | `#2e363f` | screen: Final-Home.dc.html stroke                     |
-| `--v2-graph-node`       | `#5b6472`                                                          | `#97a1ad` | screen: Final-Home.dc.html fill                       |
-| `--v2-graph-hub`        | `#13161b`                                                          | `#e6e9ed` | screen: Final-Home.dc.html fill                       |
-| `--v2-graph-js`         | `#b86e00`                                                          | `#f2b857` | screen: Final-Home.dc.html fill                       |
-| `--v2-graph-orphan`     | `#9b2613`                                                          | `#ff8f7a` | screen: Final-Home.dc.html fill                       |
-| `--v2-font-display`     | `var(--font-fraunces), Charter, Georgia, serif`                    | (same)    | font: Fraunces                                        |
-| `--v2-font-body`        | `var(--font-geist), -apple-system, BlinkMacSystemFont, sans-serif` | (same)    | font: Geist                                           |
-| `--v2-font-mono`        | `var(--font-geist-mono), 'JetBrains Mono', monospace`              | (same)    | font: Geist Mono                                      |
-| `--v2-weight-display`   | `600`                                                              | (same)    | base.css: h1,h2,h3 font-weight                        |
-| `--v2-tracking-display` | `-0.02em`                                                          | (same)    | base.css: h1,h2,h3 letter-spacing                     |
-| `--v2-line-body`        | `1.55`                                                             | (same)    | base.css: body line-height                            |
-| `--v2-text-xl`          | `56px`                                                             | (same)    | base.css: .h-xl font-size                             |
-| `--v2-text-l`           | `32px`                                                             | (same)    | base.css: .h-l font-size                              |
-| `--v2-text-m`           | `26px`                                                             | (same)    | base.css: .h-m font-size                              |
-| `--v2-text-s`           | `18px`                                                             | (same)    | base.css: .h-s font-size                              |
-| `--v2-text-xl-phone`    | `34px`                                                             | (same)    | base.css: @media (max-width:760px) .h-xl font-size    |
-| `--v2-text-l-phone`     | `26px`                                                             | (same)    | base.css: @media (max-width:760px) .h-l font-size     |
-| `--v2-text-m-phone`     | `22px`                                                             | (same)    | base.css: @media (max-width:760px) .h-m font-size     |
-| `--v2-text-body`        | `16px`                                                             | (same)    | base.css: body font-size                              |
-| `--v2-text-ui`          | `15px`                                                             | (same)    | base.css: .btn font-size                              |
-| `--v2-text-small`       | `14px`                                                             | (same)    | base.css: .btn-sm font-size                           |
-| `--v2-text-micro`       | `13px`                                                             | (same)    | base.css: .m font-size                                |
-| `--v2-wrap-max`         | `1160px`                                                           | (same)    | base.css: .wrap max-width                             |
-| `--v2-gutter`           | `40px`                                                             | (same)    | base.css: .wrap padding-left                          |
-| `--v2-gutter-phone`     | `20px`                                                             | (same)    | base.css: @media (max-width:760px) .wrap padding-left |
-| `--v2-control-h`        | `44px`                                                             | (same)    | base.css: .btn min-height                             |
-| `--v2-control-h-sm`     | `36px`                                                             | (same)    | base.css: .btn-sm min-height                          |
-| `--v2-field-h`          | `48px`                                                             | (same)    | base.css: .f height                                   |
-| `--v2-pill-h`           | `24px`                                                             | (same)    | base.css: .st height                                  |
-| `--v2-cell-pad-y`       | `13px`                                                             | (same)    | base.css: td,th padding[0]                            |
-| `--v2-cell-pad-x`       | `16px`                                                             | (same)    | base.css: td,th padding[1]                            |
-| `--v2-radius-control`   | `5px`                                                              | (same)    | base.css: .btn border-radius                          |
-| `--v2-radius-surface`   | `8px`                                                              | (same)    | base.css: .s1 border-radius                           |
-| `--v2-radius-pill`      | `4px`                                                              | (same)    | base.css: .st border-radius                           |
-| `--v2-motion-draw`      | `0.9s`                                                             | (same)    | base.css: .ge animation[1]                            |
-| `--v2-motion-pop`       | `0.5s`                                                             | (same)    | base.css: .gn animation[1]                            |
-| `--v2-ease-pop`         | `cubic-bezier(0.2, 0.8, 0.2, 1)`                                   | (same)    | base.css: .gn animation[2]                            |
-| `--v2-motion-grow`      | `1.5s`                                                             | (same)    | base.css: .prog animation[1]                          |
-| `--v2-ease-grow`        | `cubic-bezier(0.3, 0.7, 0.3, 1)`                                   | (same)    | base.css: .prog animation[2]                          |
-| `--v2-motion-fade`      | `0.6s`                                                             | (same)    | base.css: .late animation[1]                          |
-| `--v2-delay-late`       | `2.8s`                                                             | (same)    | base.css: .late animation[2]                          |
+| Token                   | Light                                                              | Dark      | Source                                                   |
+| ----------------------- | ------------------------------------------------------------------ | --------- | -------------------------------------------------------- |
+| `--v2-bg`               | `#f7f8fa`                                                          | `#0f1317` | base: --bg                                               |
+| `--v2-s1`               | `#ffffff`                                                          | `#161b21` | base: --s1                                               |
+| `--v2-s2`               | `#f1f3f6`                                                          | `#1d232b` | base: --s2                                               |
+| `--v2-line`             | `#e2e6eb`                                                          | `#242b33` | base: --line                                             |
+| `--v2-line2`            | `#edf0f3`                                                          | `#222930` | base: --line2                                            |
+| `--v2-ctl`              | `#808996`                                                          | `#6b7580` | base: --ctl                                              |
+| `--v2-railbg`           | `#f1f3f6`                                                          | `#0c0f12` | base: --railbg                                           |
+| `--v2-table-shade`      | `color-mix( in srgb, var(--v2-fg) 22%, transparent )`              | (same)    | derived: --v2-fg at 22%, visible on s1 in both themes    |
+| `--v2-chart-h`          | `194px`                                                            | (same)    | derived: GradeHistory H (186) + .chart padding-top (8px) |
+| `--v2-fg`               | `#13161b`                                                          | `#e6e9ed` | base: --fg                                               |
+| `--v2-fg2`              | `#3d4654`                                                          | `#b5bcc6` | base: --fg2                                              |
+| `--v2-mut`              | `#5b6472`                                                          | `#97a1ad` | base: --mut                                              |
+| `--v2-acc`              | `#ff7849`                                                          | `#ff7849` | brand: peach                                             |
+| `--v2-acc2`             | `#ff8352`                                                          | `#ff8352` | base: --acc2                                             |
+| `--v2-on-acc`           | `#13161b`                                                          | `#13161b` | base.css: .btn-p color                                   |
+| `--v2-brand`            | `#ff7849`                                                          | `#ff7849` | brand: peach                                             |
+| `--v2-mark-line`        | `#1a1a18`                                                          | `#e6e9ed` | brand: ink                                               |
+| `--v2-ok`               | `#10603f`                                                          | `#6fd49a` | base: --ok                                               |
+| `--v2-okbg`             | `#ddf3e8`                                                          | `#15301f` | base: --okbg                                             |
+| `--v2-bad`              | `#9b2613`                                                          | `#ff8f7a` | base: --bad                                              |
+| `--v2-badbg`            | `#fbe3df`                                                          | `#3a1a16` | base: --badbg                                            |
+| `--v2-badline`          | `#efb8ae`                                                          | `#5a2b26` | base: --badline                                          |
+| `--v2-warn`             | `#7a4a00`                                                          | `#f2b857` | base: --warn                                             |
+| `--v2-warnbg`           | `#fcebd2`                                                          | `#3a2a10` | base: --warnbg                                           |
+| `--v2-warnfill`         | `#b86e00`                                                          | `#b86e00` | screen: Final-Result.dc.html background                  |
+| `--v2-neu`              | `#3d4654`                                                          | `#c3cad3` | base: --neu                                              |
+| `--v2-neubg`            | `#e9ecf0`                                                          | `#232a33` | base: --neubg                                            |
+| `--v2-barbg`            | `#13161b`                                                          | `#e6e9ed` | base: --barbg                                            |
+| `--v2-barfg`            | `#ffffff`                                                          | `#13161b` | base: --barfg                                            |
+| `--v2-barmut`           | `#b5bcc6`                                                          | `#3d4654` | base: --barmut                                           |
+| `--v2-barline`          | `#808996`                                                          | `#6b7580` | base: --barline                                          |
+| `--v2-barin`            | `#1d2229`                                                          | `#ffffff` | base: --barin                                            |
+| `--v2-bar-hover`        | `rgba(128, 128, 128, 0.28)`                                        | (same)    | base.css: .keep-bar .btn-q:hover background              |
+| `--v2-graph-edge`       | `#a9b2bc`                                                          | `#2e363f` | screen: Final-Home.dc.html stroke                        |
+| `--v2-graph-node`       | `#5b6472`                                                          | `#97a1ad` | screen: Final-Home.dc.html fill                          |
+| `--v2-graph-hub`        | `#13161b`                                                          | `#e6e9ed` | screen: Final-Home.dc.html fill                          |
+| `--v2-graph-js`         | `#b86e00`                                                          | `#f2b857` | screen: Final-Home.dc.html fill                          |
+| `--v2-graph-orphan`     | `#9b2613`                                                          | `#ff8f7a` | screen: Final-Home.dc.html fill                          |
+| `--v2-font-display`     | `var(--font-fraunces), Charter, Georgia, serif`                    | (same)    | font: Fraunces                                           |
+| `--v2-font-body`        | `var(--font-geist), -apple-system, BlinkMacSystemFont, sans-serif` | (same)    | font: Geist                                              |
+| `--v2-font-mono`        | `var(--font-geist-mono), 'JetBrains Mono', monospace`              | (same)    | font: Geist Mono                                         |
+| `--v2-weight-display`   | `600`                                                              | (same)    | base.css: h1,h2,h3 font-weight                           |
+| `--v2-tracking-display` | `-0.02em`                                                          | (same)    | base.css: h1,h2,h3 letter-spacing                        |
+| `--v2-line-body`        | `1.55`                                                             | (same)    | base.css: body line-height                               |
+| `--v2-text-xl`          | `56px`                                                             | (same)    | base.css: .h-xl font-size                                |
+| `--v2-text-l`           | `32px`                                                             | (same)    | base.css: .h-l font-size                                 |
+| `--v2-text-m`           | `26px`                                                             | (same)    | base.css: .h-m font-size                                 |
+| `--v2-text-s`           | `18px`                                                             | (same)    | base.css: .h-s font-size                                 |
+| `--v2-text-xl-phone`    | `34px`                                                             | (same)    | base.css: @media (max-width:760px) .h-xl font-size       |
+| `--v2-text-l-phone`     | `26px`                                                             | (same)    | base.css: @media (max-width:760px) .h-l font-size        |
+| `--v2-text-m-phone`     | `22px`                                                             | (same)    | base.css: @media (max-width:760px) .h-m font-size        |
+| `--v2-text-body`        | `16px`                                                             | (same)    | base.css: body font-size                                 |
+| `--v2-text-ui`          | `15px`                                                             | (same)    | base.css: .btn font-size                                 |
+| `--v2-text-small`       | `14px`                                                             | (same)    | base.css: .btn-sm font-size                              |
+| `--v2-text-micro`       | `13px`                                                             | (same)    | base.css: .m font-size                                   |
+| `--v2-wrap-max`         | `1160px`                                                           | (same)    | base.css: .wrap max-width                                |
+| `--v2-gutter`           | `40px`                                                             | (same)    | base.css: .wrap padding-left                             |
+| `--v2-gutter-phone`     | `20px`                                                             | (same)    | base.css: @media (max-width:760px) .wrap padding-left    |
+| `--v2-control-h`        | `44px`                                                             | (same)    | base.css: .btn min-height                                |
+| `--v2-control-h-sm`     | `36px`                                                             | (same)    | base.css: .btn-sm min-height                             |
+| `--v2-field-h`          | `48px`                                                             | (same)    | base.css: .f height                                      |
+| `--v2-pill-h`           | `24px`                                                             | (same)    | base.css: .st height                                     |
+| `--v2-cell-pad-y`       | `13px`                                                             | (same)    | base.css: td,th padding[0]                               |
+| `--v2-cell-pad-x`       | `16px`                                                             | (same)    | base.css: td,th padding[1]                               |
+| `--v2-radius-control`   | `5px`                                                              | (same)    | base.css: .btn border-radius                             |
+| `--v2-radius-surface`   | `8px`                                                              | (same)    | base.css: .s1 border-radius                              |
+| `--v2-radius-pill`      | `4px`                                                              | (same)    | base.css: .st border-radius                              |
+| `--v2-motion-draw`      | `0.9s`                                                             | (same)    | base.css: .ge animation[1]                               |
+| `--v2-motion-pop`       | `0.5s`                                                             | (same)    | base.css: .gn animation[1]                               |
+| `--v2-ease-pop`         | `cubic-bezier(0.2, 0.8, 0.2, 1)`                                   | (same)    | base.css: .gn animation[2]                               |
+| `--v2-motion-grow`      | `1.5s`                                                             | (same)    | base.css: .prog animation[1]                             |
+| `--v2-ease-grow`        | `cubic-bezier(0.3, 0.7, 0.3, 1)`                                   | (same)    | base.css: .prog animation[2]                             |
+| `--v2-motion-fade`      | `0.6s`                                                             | (same)    | base.css: .late animation[1]                             |
+| `--v2-delay-late`       | `2.8s`                                                             | (same)    | base.css: .late animation[2]                             |
 
 ## Components
 
@@ -240,15 +242,17 @@ A letter grade and its score out of 100, or a withheld grade that shows neither.
 Two grades across a site's checks, as an inline SVG. The drawing is hidden from assistive
 technology; the table under it, read instead, lists every value at every check (D9).
 
-| Prop      | Type                                                                                                               | Required | Note                                                                                                                                                          |
-| --------- | ------------------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `label`   | `string`                                                                                                           | yes      | Names the chart's scroll region and its table.                                                                                                                |
-| `labels`  | `readonly string[]`                                                                                                | yes      | One axis label per check: "24 Oct", "26", "Thu 29".                                                                                                           |
-| `dates`   | `readonly string[]`                                                                                                | yes      | One date per check, in full, for the table the chart is read from.                                                                                            |
-| `series`  | `readonly [GradeSeries, GradeSeries]`                                                                              | yes      |                                                                                                                                                               |
-| `caption` | `string`                                                                                                           | yes      | What the chart shows, in a sentence: the table's caption.                                                                                                     |
-| `note`    | `{ series: 0 \| 1; text: string; } \| null \| undefined`                                                           | no       | A note above a series' first run: "AI readability · 41 since the first audit".                                                                                |
-| `marker`  | `{ series: 0 \| 1; index: number; text: string; verdicts?: readonly string[] \| undefined; } \| null \| undefined` | no       | A marked point, drawn in the bad tone: "Claude-SearchBot and ClaudeBot blocked · 22", with the verdicts its words name, so a test can hold "blocked" to them. |
+| Prop         | Type                                                                                                               | Required | Note                                                                                                                                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `label`      | `string`                                                                                                           | yes      | Names the chart's scroll region and its table.                                                                                                                                                                                                         |
+| `labels`     | `readonly string[]`                                                                                                | yes      | One axis label per check, its day: "24 Oct".                                                                                                                                                                                                           |
+| `times`      | `readonly (string \| null)[] \| undefined`                                                                         | no       | Each check's time, "02:39", where checks share a day (else null): drawn on a second line under its day, so a label never runs into the next one on a narrow axis.                                                                                      |
+| `dates`      | `readonly string[]`                                                                                                | yes      | One date per check, in full, for the table the chart is read from.                                                                                                                                                                                     |
+| `series`     | `readonly [GradeSeries, GradeSeries]`                                                                              | yes      |                                                                                                                                                                                                                                                        |
+| `caption`    | `string`                                                                                                           | yes      | What the chart shows, in a sentence: the table's caption.                                                                                                                                                                                              |
+| `note`       | `{ series: 0 \| 1; text: string; } \| null \| undefined`                                                           | no       | A note above a series' first run: "AI readability · 41 since the first audit".                                                                                                                                                                         |
+| `marker`     | `{ series: 0 \| 1; index: number; text: string; verdicts?: readonly string[] \| undefined; } \| null \| undefined` | no       | A marked point, drawn in the bad tone: "Claude-SearchBot and ClaudeBot blocked · 22", with the verdicts its words name, so a test can hold "blocked" to them.                                                                                          |
+| `fitOnPhone` | `boolean \| undefined`                                                                                             | no       | On a phone the chart fits its card instead of scrolling: its axis lettering drawn larger, and the note and the marker's words shown in a list under it; their copies on the lines are made transparent there, never removed (owner ruling 2026-11-08). |
 
 ### Heading
 
@@ -354,6 +358,8 @@ A table of records that scrolls sideways on a phone rather than squeezing (phone
 | `headersHidden` | `boolean \| undefined`           | no       | The column headers are read by assistive technology but not drawn, for a table the locked screen shows without a header row; each column still has its name. The header row stays in the table's layout, zero height, so every cell keeps its header.        |
 | `rowHeader`     | `number \| boolean \| undefined` | no       | One cell of each row names the row (`<th scope="row">`), so a control later in the row is read with the row it acts on: the first cell, or the cell of the column given (counted from 0) for a table whose first cell does not name its row, such as a rank. |
 | `className`     | `string \| undefined`            | no       |                                                                                                                                                                                                                                                              |
+| `shade`         | `boolean \| undefined`           | no       | Shade the edge a wide table continues past (the signed-in app's tables). Off by default, so the public pages' tables render as they did (OPERATING-RULES §13).                                                                                               |
+| `roles`         | `boolean \| undefined`           | no       | Explicit ARIA roles on the table, its row groups, rows and cells: for a table whose rows a phone lays out as grids, where a browser may drop the table semantics with the layout.                                                                            |
 
 ### ThemeControl
 
