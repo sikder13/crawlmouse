@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ReportsScreen } from '../../components/v2/screens/reports/ReportsScreen';
 import { REPORTS_PATHS, reportsPreview } from '../../app/(v2-preview)/v2-preview/_preview/screens';
@@ -120,4 +121,24 @@ describe('Reports, Agency', () => {
       expect(region, label).toMatch(/class="[^"]*rowHeaded[^"]*"/);
     }
   });
+});
+
+/**
+ * QA's re-walk (25 Nov): Reports showed 19 times with no zone (D-17's rule: every time on an account
+ * page names its zone). Read from each rendered Reports preview, not listed: every clock time on the
+ * page, rail and main alike, is followed by a zone.
+ */
+describe('Reports, every time names its zone (D-17)', () => {
+  for (const name of Object.keys(REPORTS_PATHS) as (keyof typeof REPORTS_PATHS)[]) {
+    it(name, () => {
+      const doc = new JSDOM(render(name)).window.document;
+      const text = (doc.body.textContent ?? '').replace(/\s+/g, ' ');
+      const times = [...text.matchAll(/(?<!\d)\d{2}:\d{2}(?!\d)(.{0,5})/g)];
+      expect(times.length, 'the page shows times').toBeGreaterThan(0);
+      const unzoned = times
+        .filter((m) => !/^ ?(?:[A-Z]{2,5}|GMT[+-]\d)/.test(m[1]!))
+        .map((m) => m[0]);
+      expect(unzoned).toEqual([]);
+    });
+  }
 });

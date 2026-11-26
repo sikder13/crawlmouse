@@ -11,6 +11,40 @@ const SOURCE =
   'V2R register D-17, QA’s production dashboard walk (24 Nov): every time names its zone';
 
 export const ZONE_CHANGES: CopyChange[] = [
+  // Reports (QA's re-walk, 25 Nov: 19 times with no zone): each time it shows, all before the
+  // clocks went back on 1 Nov.
+  {
+    screen: 'reports',
+    kind: 'ruling',
+    locked: '06:02',
+    rendered: '06:02 EDT',
+    all: true,
+    source: SOURCE,
+  },
+  {
+    screen: 'reports',
+    kind: 'ruling',
+    locked: '06:04',
+    rendered: '06:04 EDT',
+    all: true,
+    source: SOURCE,
+  },
+  {
+    screen: 'reports',
+    kind: 'ruling',
+    locked: '09:40',
+    rendered: '09:40 EDT',
+    all: true,
+    source: SOURCE,
+  },
+  {
+    screen: 'reports',
+    kind: 'ruling',
+    locked: '03:10',
+    rendered: '03:10 EDT',
+    all: true,
+    source: SOURCE,
+  },
   {
     screen: 'dashboard-day0',
     kind: 'ruling',
