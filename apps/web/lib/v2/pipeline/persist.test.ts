@@ -431,6 +431,33 @@ describe('persistStep: the rows across steps', () => {
     expect(sent).toEqual([]);
   });
 
+  // QA's re-gate on #219: a shortfall in the edges alone, every page row stored.
+  const edgesShort = () => ({
+    status: 'running',
+    page_results: built.page_results.length,
+    link_edges: built.link_edges.length - 1,
+  });
+
+  it('a shortfall in the edges alone starts again from piece 0, then fails naming both counts', async () => {
+    const n = persistCalls(inputOf()).pieces.length;
+    const first = recording(undefined, true, undefined, [edgesShort()]);
+    expect(await persistStep(first.db, inputOf(), { from: n - 1, perStep: 1 })).toEqual({
+      next: 0,
+      restarted: true,
+    });
+    expect(first.sent).toEqual([]);
+    const second = recording(undefined, true, undefined, [edgesShort()]);
+    await expect(
+      persistStep(second.db, inputOf(), { from: n - 1, perStep: 1, restarted: true }),
+    ).rejects.toThrow(
+      new RegExp(
+        `stores ${built.page_results.length} of ${built.page_results.length} page_results and ` +
+          `${built.link_edges.length - 1} of ${built.link_edges.length} link_edges after a restart`,
+      ),
+    );
+    expect(second.sent).toEqual([]);
+  });
+
   it('a step after the restart carries `restarted` on', async () => {
     const { db } = recording();
     expect(await persistStep(db, inputOf(), { from: 0, perStep: 1, restarted: true })).toEqual({
@@ -690,6 +717,34 @@ describe('supabasePersistDb', () => {
           ? `is(${JSON.stringify([column, null])})`
           : `eq(${JSON.stringify([column, value])})`,
       );
+  });
+
+  // QA's re-gate on #219: the counts the finishing call waits on are of this check's rows only.
+  it('storedRows reads the check’s status, then counts each table’s rows filtered on the check id', async () => {
+    const calls: unknown[][] = [];
+    const counts: Record<string, number> = { page_results: 7, link_edges: 11 };
+    const sb = {
+      from: (table: string) => ({
+        select: (columns: string, options?: unknown) => ({
+          eq: async (column: string, value: string) => {
+            calls.push([table, columns, options ?? null, column, value]);
+            return table === 'checks'
+              ? { data: [{ status: 'running' }], error: null }
+              : { count: counts[table], data: null, error: null };
+          },
+        }),
+      }),
+    } as unknown as SupabaseClient;
+    expect(await supabasePersistDb(sb).storedRows(built.check.id)).toEqual({
+      status: 'running',
+      page_results: 7,
+      link_edges: 11,
+    });
+    expect(calls).toEqual([
+      ['checks', 'status', null, 'id', built.check.id],
+      ['page_results', 'check_id', { count: 'exact', head: true }, 'check_id', built.check.id],
+      ['link_edges', 'check_id', { count: 'exact', head: true }, 'check_id', built.check.id],
+    ]);
   });
 
   it('insertPageResults writes one piece as an insert that skips a row already written', async () => {
