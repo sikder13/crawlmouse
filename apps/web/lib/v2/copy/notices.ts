@@ -8,7 +8,7 @@ import { CONFIRM_MAILS_PER_DAY, REASK_WINDOW_DAYS } from '../agency/confirm-boun
 import { sitesFullMessage } from '../agency/gates';
 import { ALERTS_SENDER } from '../../auth/constants';
 import type { Addition } from '../copy-registry';
-import { dayDate, weekdayTime } from '../format';
+import { dayDate, weekdayTimeZoned } from '../format';
 import { noticeOf, type NoticeCode } from '../account/route';
 import { SUPPORT_EMAIL } from './support';
 
@@ -196,7 +196,7 @@ export function noticeLine(
   const at = n.next
     ? DATED.has(n.code)
       ? dayDate(n.next, zone)
-      : weekdayTime(n.next, zone)
+      : weekdayTimeZoned(n.next, zone)
     : null;
   return { code: n.code, text: NOTICE_LINES[n.code](at) };
 }

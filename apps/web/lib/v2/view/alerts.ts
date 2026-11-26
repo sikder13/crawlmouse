@@ -11,7 +11,7 @@ import { ALERTS_COPY as COPY, ALERT_PILLS, GRADE_SHORT } from '../copy/alerts';
 import { TRIAL_DAYS } from '../copy/account';
 import { ALERT_LABELS } from '../copy/site';
 import { findCheck } from '../fixtures';
-import { dayDate, dayMonth, hourMinute, weekday, weekdayTime } from '../format';
+import { dayDate, dayMonth, hourMinuteZoned, weekday, weekdayTimeZoned } from '../format';
 import {
   primarySite,
   primarySites,
@@ -108,7 +108,7 @@ const at = (ts: string) => instant(ts);
 export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
   const v = viewAt(d, viewer);
   const zone = v.account.timezone;
-  const when = (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}`;
+  const when = (ts: string) => `${dayDate(ts, zone)} ${hourMinuteZoned(ts, zone)}`;
   const siteOf = new Map(v.d.sites.map((s) => [s.id, s]));
   const siteOfCheck = (checkId: string) => siteOf.get(findCheck(v.d, checkId).site_id)!;
   const changes = accountChanges(v); // notifications not yet sent at `now` are dropped here
@@ -138,7 +138,7 @@ export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
         ? COPY.allPages
         : COPY.pages(c.pages_affected);
     const cause = c.cause?.changed_at
-      ? COPY.causeChanged(c.where, weekdayTime(c.cause.changed_at, zone))
+      ? COPY.causeChanged(c.where, weekdayTimeZoned(c.cause.changed_at, zone))
       : null;
     if (c.subject === 'crawler_access' && c.ua)
       return [`${c.ua}, ${pages}`, cause].filter(Boolean).join(' · ');
@@ -260,7 +260,7 @@ export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
   // ── the footnote, built from the messages ──
   const emailClauses = [...new Set(emails.map((m) => m.sentAt))].map((t) =>
     COPY.emailsAt(
-      weekdayTime(t, zone),
+      weekdayTimeZoned(t, zone),
       emails.filter((m) => m.sentAt === t).map((m) => COPY.emailFor(m.host, m.emailRows)),
     ),
   );

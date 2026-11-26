@@ -752,7 +752,7 @@ describe('the reports sent', () => {
       {
         key: SENT_REPORT,
         // 14:00 UTC on 26 Oct is 10:00 in the account's zone.
-        sent: 'Mon 26 Oct 10:00',
+        sent: 'Mon 26 Oct 10:00 EDT',
         host: 'granitepeak.example',
         to: 'ops@granitepeak.example',
         open: null,
