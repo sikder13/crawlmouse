@@ -65,11 +65,12 @@ describe('the Changes log, rendered', () => {
       ['Any time', `${CHANGES_LOG_PATH}?kind=opened`],
     ]);
     expect(html.slice(html.indexOf('<main'))).not.toMatch(/<form /);
-    expect(html).toContain('2 of 8 entries match: opened.');
+    expect(html).toContain('2 of 14 entries match: opened.');
   });
 
   it('says so in place of the table when nothing matches', () => {
-    const html = render({ site: '50000000-0000-4000-8000-000000000004' });
+    // drivepei.ca has one scheduled check that changed nothing (F-214) and no opened change.
+    const html = render({ site: '50000000-0000-4000-8000-000000000004', kind: 'opened' });
     expect(html).toContain('No change matches these filters.');
     expect(html).not.toContain('<table');
   });

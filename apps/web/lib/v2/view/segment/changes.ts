@@ -12,7 +12,15 @@ type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
 type CheckTrigger = Check['trigger'];
 import { findCheck, siteOf } from '../../dataset-lookups';
-import { dateTimeUtc, listOf, weekdayTime, weekdayTimeZoned } from '../../format';
+import {
+  dateTimeUtc,
+  dayDate,
+  hourMinute,
+  hourMinuteZoned,
+  listOf,
+  weekdayTime,
+  weekdayTimeZoned,
+} from '../../format';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { ANONYMOUS_VISIBLE_MS, type DoorView } from '../result';
 
@@ -24,7 +32,8 @@ export interface ChangeRowView {
   /** The site's host, on a list that spans an account's sites (the Changes log); absent here. */
   site?: string;
   when: string;
-  kind: ChangeKind;
+  /** `checked`: a Changes log entry for a re-check that recorded no change (F-214), not a change. */
+  kind: ChangeKind | 'checked';
   pill: DoorView['pill'];
   summary: string;
   /** Null on the example rows, which the locked page writes without one. */
@@ -78,7 +87,7 @@ export const GRADES: Record<GradeName, string> = {
   ai_readability: 'AI readability',
 };
 
-const TRIGGERS: Record<CheckTrigger, string> = {
+export const TRIGGERS: Record<CheckTrigger, string> = {
   first_audit: 'First audit',
   manual: 'Re-run',
   scheduled: 'Scheduled check',
@@ -144,32 +153,83 @@ function clockOf(d: ViewDataset, check: Check) {
     account ? weekdayTimeZoned(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
 }
 
-/**
- * "First observed after robots.txt changed Thu 19:40: …": when we saw it, and what we found. A grade
- * change with no cause found, between checks that read different numbers of pages, says so (D-08):
- * the grade moved with what was read.
- */
-function causeOf(c: Change, check: Check, previous: Check | null): string {
-  const now = check.coverage?.pages_crawled;
-  const before = previous?.coverage?.pages_crawled;
-  if (!c.cause && c.grade_deltas.length && now != null && before != null && now !== before) {
-    return `First observed at this check, which read ${count(now)} ${plural(now, 'page', 'pages')}; the check before read ${count(before)}. The grade moved with the pages read, and we found no other cause.`;
-  }
-  if (!c.cause) return 'First observed at this check; we found no cause.';
-  const text = c.cause.text.replace(/\.$/, '');
-  return c.cause.changed_at
-    ? `First observed after ${text}.`
-    : `First observed at this check. What we found: ${text}.`;
+/** The same clock with the day of the month: "Sat 24 Oct 22:34 EDT". */
+function datedClockOf(d: ViewDataset, check: Check) {
+  const account = d.accounts.find((a) => a.id === siteOf(d, check).account_id);
+  const zone = account?.timezone ?? 'UTC';
+  // Named with its zone, as every time on this page is (D-17).
+  return (ts: string) =>
+    account
+      ? `${dayDate(ts, zone)} ${hourMinuteZoned(ts, zone)}`
+      : `${dayDate(ts, zone)} ${hourMinute(ts, zone)} UTC`;
 }
 
 /**
- * One change as a row: `check` is the check that found it, `at` the clock its times are read by, and
- * `previous` the check before it where the dataset holds it (its pages read, D-08).
+ * Where the fix an `opened` row reopened was first seen, when that was a check queued before the
+ * row's own (F-213): that check's finish, read by `dated`, a clock that names the day, since a
+ * reopened fix can be weeks old; or `'another'` when the dataset does not hold that check. Null for
+ * any other row, including a fix first seen at this check, which is what "first observed at this
+ * check" means.
+ */
+export type FirstSeen = { when: string } | 'another' | null;
+
+export function firstSeenOf(
+  d: Pick<ViewDataset, 'fixes' | 'checks'>,
+  c: Change,
+  dated: (ts: string) => string,
+): FirstSeen {
+  if (c.kind !== 'opened' || c.fix_id === null) return null;
+  const fix = d.fixes.find((f) => f.id === c.fix_id);
+  if (!fix || fix.first_seen_check_id === c.check_id) return null;
+  const seen = d.checks.find((x) => x.id === fix.first_seen_check_id);
+  if (!seen?.finished_at) return 'another';
+  const own = d.checks.find((x) => x.id === c.check_id);
+  if (own && Date.parse(seen.queued_at) >= Date.parse(own.queued_at)) return null;
+  return { when: dated(seen.finished_at) };
+}
+
+/**
+ * "First observed after robots.txt changed Thu 19:40: …": when we saw it, and what we found.
+ * - `seen`: where the fix an opened row reopened was first seen (F-213); its lead replaces "First
+ *   observed at this check".
+ * - A grade change with no cause found, between checks that read different numbers of pages, says so
+ *   (D-08): the grade moved with what was read. That is a row first observed here.
+ */
+function causeOf(c: Change, seen: FirstSeen, check: Check, previous: Check | null): string {
+  const now = check.coverage?.pages_crawled;
+  const before = previous?.coverage?.pages_crawled;
+  if (
+    seen === null &&
+    !c.cause &&
+    c.grade_deltas.length &&
+    now != null &&
+    before != null &&
+    now !== before
+  ) {
+    return `First observed at this check, which read ${count(now)} ${plural(now, 'page', 'pages')}; the check before read ${count(before)}. The grade moved with the pages read, and we found no other cause.`;
+  }
+  const lead =
+    seen === null
+      ? 'First observed at this check'
+      : seen === 'another'
+        ? 'First seen at another check'
+        : `First seen at the ${seen.when} check`;
+  if (!c.cause) return `${lead}; we found no cause.`;
+  const text = c.cause.text.replace(/\.$/, '');
+  if (c.cause.changed_at && seen === null) return `First observed after ${text}.`;
+  return `${lead}. What we found: ${text}.`;
+}
+
+/**
+ * One change as a row: `check` is the check that found it, `at` the clock its times are read by,
+ * `seen` where the fix it reopened was first seen (`firstSeenOf`), and `previous` the check before it
+ * where the dataset holds it (its pages read, D-08).
  */
 export function rowOf(
   c: Change,
   check: Check,
   at: (ts: string) => string,
+  seen: FirstSeen,
   previous: Check | null = null,
 ): ChangeRowView {
   const crawler = c.ua ? check.crawlers.find((x) => x.ua === c.ua) : undefined;
@@ -192,7 +252,7 @@ export function rowOf(
       ? c.grade_deltas.map((g) => `${GRADES[g.grade]} ${g.from_score} → ${g.to_score}`).join(', ')
       : 'none',
     verdict: crawler ? { verdict: crawler.verdict, evidence: crawler.evidence_class } : null,
-    cause: causeOf(c, check, previous),
+    cause: causeOf(c, seen, check, previous),
     diff: [
       ...(c.cause?.diff?.removed ?? []).map((line) => ({ sign: '−' as const, line })),
       ...(c.cause?.diff?.added ?? []).map((line) => ({ sign: '+' as const, line })),
@@ -242,6 +302,7 @@ export function changesView(
   const frame = segmentFrame(d, checkId, 'changes', options);
   const kept = frame.keptUntil === null;
   const at = clockOf(d, check);
+  const dated = datedClockOf(d, check);
   const audits = auditsUpTo(d, check);
   const history = audits.map((c) => ({
     key: c.id,
@@ -302,7 +363,15 @@ export function changesView(
 
   const rows = d.changes
     .filter((c) => c.check_id === check.id)
-    .map((c) => rowOf(c, check, at, d.checks.find((x) => x.id === c.previous_check_id) ?? null));
+    .map((c) =>
+      rowOf(
+        c,
+        check,
+        at,
+        firstSeenOf(d, c, dated),
+        d.checks.find((x) => x.id === c.previous_check_id) ?? null,
+      ),
+    );
   const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);
   return {
