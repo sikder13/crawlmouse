@@ -65,6 +65,7 @@ describe('one predicate decides a row’s label and the problem count (B1)', () 
             checkedAt: '2026-10-30T10:02:00Z',
             zone: 'America/New_York',
             unsubscribeUrl: 'https://crawlmouse.com/unsubscribe?t=x.y',
+            rules: [],
             changes,
           });
           const subject = counted(m.subject);
@@ -111,6 +112,7 @@ describe('one predicate decides a row’s label and the problem count (B1)', () 
       checkedAt: '2026-10-30T10:02:00Z',
       zone: 'America/New_York',
       unsubscribeUrl: 'https://crawlmouse.com/unsubscribe?t=x.y',
+      rules: [],
       changes: [
         {
           kind: 'changed',

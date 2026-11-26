@@ -7,7 +7,7 @@
       "maxDuration": 10
     },
     "api/sentinel.mjs": {
-      "includeFiles": "sites/sentinel/**",
+      "includeFiles": "sites/sentinel*/**",
       "maxDuration": 10
     },
     "api/large.mjs": {
@@ -99,6 +99,71 @@
         }
       ],
       "dest": "/sites/client-2/$1"
+    },
+    {
+      "src": "/check-ups/",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-3.lab.crawlmouse.com"
+        }
+      ],
+      "status": 301,
+      "headers": {
+        "Location": "https://client-3.lab.crawlmouse.com/treatments/check-ups/"
+      }
+    },
+    {
+      "src": "/hygiene/",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-3.lab.crawlmouse.com"
+        }
+      ],
+      "status": 301,
+      "headers": {
+        "Location": "https://client-3.lab.crawlmouse.com/hygienist/"
+      }
+    },
+    {
+      "src": "/hygienist/",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-3.lab.crawlmouse.com"
+        }
+      ],
+      "status": 301,
+      "headers": {
+        "Location": "https://client-3.lab.crawlmouse.com/treatments/hygienist-visits/"
+      }
+    },
+    {
+      "src": "/offers/",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-3.lab.crawlmouse.com"
+        }
+      ],
+      "status": 301,
+      "headers": {
+        "Location": "https://client-3.lab.crawlmouse.com/offers/winter/"
+      }
+    },
+    {
+      "src": "/offers/winter/",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-3.lab.crawlmouse.com"
+        }
+      ],
+      "status": 301,
+      "headers": {
+        "Location": "https://client-3.lab.crawlmouse.com/offers/winter-2025/"
+      }
     },
     {
       "src": "/(.*)",
@@ -196,6 +261,16 @@
         {
           "type": "host",
           "value": "sentinel.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/sentinel?path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "sentinel-b.lab.crawlmouse.com"
         }
       ],
       "dest": "/api/sentinel?path=/$1"

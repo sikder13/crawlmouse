@@ -4,16 +4,20 @@ import { describe, expect, it } from 'vitest';
 // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
 import * as lab from '../../fixtures/qa-lab/api/sentinel.mjs';
 
-const { answer, fileFor, gptbotBlockedAt, robotsAt } = lab;
+const { answer, fileFor, gptbotBlockedAt, gptbotBlockedOnDayAt, hostOf, robotsAt, HOSTS } = lab;
 const handler = lab.default;
 
-const SITE = join(__dirname, '..', '..', 'fixtures', 'qa-lab', 'sites', 'sentinel');
-const walk = (dir: string): string[] =>
+const SITES = join(__dirname, '..', '..', 'fixtures', 'qa-lab', 'sites');
+const SITE = join(SITES, 'sentinel');
+const SITE_B = join(SITES, 'sentinel-b');
+const walk = (root: string, dir = root): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? walk(join(dir, e.name)) : [relative(SITE, join(dir, e.name))],
+    e.isDirectory() ? walk(root, join(dir, e.name)) : [relative(root, join(dir, e.name))],
   );
 const files = walk(SITE);
 const read = (f: string) => readFileSync(join(SITE, f), 'utf8');
+const filesB = walk(SITE_B);
+const readB = (f: string) => readFileSync(join(SITE_B, f), 'utf8');
 const at = (iso: string) => Date.parse(iso);
 
 describe('the sentinel lab site', () => {
@@ -69,7 +73,13 @@ describe('the sentinel lab site', () => {
           this.body = b;
         },
       };
-      handler({ url: `/api/sentinel?path=${encodeURIComponent(path)}` }, res);
+      handler(
+        {
+          url: `/api/sentinel?path=${encodeURIComponent(path)}`,
+          headers: { host: 'sentinel.lab.crawlmouse.com' },
+        },
+        res,
+      );
       return { status: res.statusCode, headers, body: res.body };
     };
     const robots = served('/robots.txt');
@@ -80,5 +90,95 @@ describe('the sentinel lab site', () => {
     expect([home.status, home.headers['cache-control']]).toEqual([200, undefined]);
     expect(home.body).toBe(read('index.html'));
     expect(served('/nope/').status).toBe(404);
+  });
+});
+
+// Inbox c/025: a site's daily look falls in the same hour every day, so on the hourly host a site
+// whose look is in an even hour never meets a block. The daily host blocks on even UTC days instead.
+describe('the daily sentinel lab site (sentinel-b)', () => {
+  const B = 'sentinel-b.lab.crawlmouse.com';
+  const blockedLine = 'User-agent: GPTBot\nDisallow: /';
+
+  it('names its two hosts', () => {
+    expect(HOSTS).toEqual({ hourly: 'sentinel.lab.crawlmouse.com', daily: B });
+  });
+
+  it('disallows GPTBot on an even UTC day and on no odd one, whatever the hour', () => {
+    // Day numbers computed apart from the code: 1970-01-01 is day 0; 2026-11-25 is day 20782.
+    for (const [iso, blocked] of [
+      ['1970-01-01T00:00:00Z', true],
+      ['1970-01-02T12:00:00Z', false],
+      ['2026-11-25T00:00:00Z', true],
+      ['2026-11-25T14:29:00Z', true],
+      ['2026-11-25T23:59:59.999Z', true],
+      ['2026-11-26T00:00:00Z', false],
+      ['2026-11-26T15:00:00Z', false],
+      ['2026-11-27T06:00:00Z', true],
+    ] as const) {
+      expect([iso, gptbotBlockedOnDayAt(at(iso))]).toEqual([iso, blocked]);
+      expect([iso, robotsAt(at(iso), B).includes(blockedLine)]).toEqual([iso, blocked]);
+    }
+  });
+
+  it('holds one answer through all 24 hours of a day, so the hour a look falls in does not matter', () => {
+    for (let h = 0; h < 24; h++) {
+      expect([h, robotsAt(Date.UTC(2026, 10, 25, h, 30), B).includes(blockedLine)]).toEqual([
+        h,
+        true,
+      ]);
+      expect([h, robotsAt(Date.UTC(2026, 10, 26, h, 30), B).includes(blockedLine)]).toEqual([
+        h,
+        false,
+      ]);
+    }
+  });
+
+  it('writes its own host in robots.txt, and the hourly host keeps its rule', () => {
+    const evenHourOddDay = at('2026-11-26T14:29:00Z');
+    expect(robotsAt(evenHourOddDay, B)).toBe(
+      `User-agent: *\nAllow: /\n\nSitemap: https://${B}/sitemap.xml\n`,
+    );
+    expect(robotsAt(evenHourOddDay)).toBe(robotsAt(evenHourOddDay, HOSTS.hourly));
+    expect(robotsAt(evenHourOddDay).includes(blockedLine)).toBe(false);
+    expect(robotsAt(at('2026-11-26T15:29:00Z')).includes(blockedLine)).toBe(true);
+  });
+
+  it('serves its own folder, a different site from the hourly host', () => {
+    const now = at('2026-11-26T10:00:00Z');
+    const home = answer('/', { files: filesB, read: readB, now, host: B });
+    expect([home.status, home.body]).toEqual([200, readB('index.html')]);
+    expect(home.body).not.toBe(read('index.html'));
+    expect(readB('index.html')).toContain(`<link rel="canonical" href="https://${B}/" />`);
+    expect(readB('sitemap.xml')).not.toContain('https://sentinel.lab.crawlmouse.com/');
+  });
+
+  it('reads the host from Host, then X-Forwarded-Host, and refuses any other', () => {
+    expect(hostOf({ host: 'Sentinel-B.lab.crawlmouse.com:443' })).toBe(B);
+    expect(hostOf({ host: 'x.vercel.app', 'x-forwarded-host': B })).toBe(B);
+    expect(hostOf({ host: 'sentinel.lab.crawlmouse.com' })).toBe('sentinel.lab.crawlmouse.com');
+    expect(hostOf({ host: 'slow.lab.crawlmouse.com' })).toBeNull();
+    expect(hostOf({})).toBeNull();
+  });
+
+  it('serves through the handler by host, and answers 404 to a host it does not serve', () => {
+    const served = (host: string, path: string) => {
+      const res = {
+        statusCode: 0,
+        body: '',
+        setHeader: () => {},
+        end(b: string) {
+          this.body = b;
+        },
+      };
+      handler({ url: `/api/sentinel?path=${encodeURIComponent(path)}`, headers: { host } }, res);
+      return { status: res.statusCode, body: res.body };
+    };
+    expect(served(B, '/')).toEqual({ status: 200, body: readB('index.html') });
+    expect(served(B, '/robots.txt').body).toContain(`Sitemap: https://${B}/sitemap.xml`);
+    expect(served('sentinel.lab.crawlmouse.com', '/')).toEqual({
+      status: 200,
+      body: read('index.html'),
+    });
+    expect(served('other.lab.crawlmouse.com', '/').status).toBe(404);
   });
 });
