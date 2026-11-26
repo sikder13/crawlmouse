@@ -6,11 +6,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ReportsScreen } from '../../components/v2/screens/reports/ReportsScreen';
 import { REPORTS_PATHS, reportsPreview } from '../../app/(v2-preview)/v2-preview/_preview/screens';
 import { ACCOUNT_ACTIONS } from '../../lib/v2/view/account-actions';
 import { CC27B_ROUTES } from '../../lib/v2/view/settings';
+import { reportsView } from '../../lib/v2/view/reports';
+import { fixture } from '../../lib/v2/fixtures';
+import { ACCOUNT_VIEWERS } from '../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
 const render = (name: keyof typeof REPORTS_PATHS) =>
@@ -119,5 +123,46 @@ describe('Reports, Agency', () => {
         .at(-1)!;
       expect(region, label).toMatch(/class="[^"]*rowHeaded[^"]*"/);
     }
+  });
+});
+
+/**
+ * QA's re-walk (25 Nov): Reports showed 19 times with no zone (D-17's rule: every time on an account
+ * page names its zone). Read from each rendered Reports preview, not listed: every clock time on the
+ * page, rail and main alike, is followed by a zone.
+ */
+/** Each clock time in a rendered page, rail and main alike, and those with no zone after them. */
+function unzonedTimes(html: string): { times: number; unzoned: string[]; text: string } {
+  const doc = new JSDOM(html).window.document;
+  const text = (doc.body.textContent ?? '').replace(/\s+/g, ' ');
+  const found = [...text.matchAll(/(?<!\d)\d{2}:\d{2}(?!\d)(.{0,5})/g)];
+  const unzoned = found
+    .filter((m) => !/^ ?(?:[A-Z]{1,4}T|UTC|GMT[+-]\d)/.test(m[1]!))
+    .map((m) => m[0]);
+  return { times: found.length, unzoned, text };
+}
+
+describe('Reports, every time names its zone (D-17)', () => {
+  for (const name of Object.keys(REPORTS_PATHS) as (keyof typeof REPORTS_PATHS)[]) {
+    it(name, () => {
+      const { times, unzoned } = unzonedTimes(render(name));
+      expect(times, 'the page shows times').toBeGreaterThan(0);
+      expect(unzoned).toEqual([]);
+    });
+  }
+
+  // QA's B1 on #218: the sweep above reads each preview at its fixture's moment, so it never reached a
+  // trial's last day, when the rail's trial card shows a time ("ends today at"). bad-site's trial ends
+  // 8 Nov 02:41Z, Sat 7 Nov 21:41 EST in its zone; this reads Reports at 10:00 EST that day.
+  it('home, on the trial’s last day, when the rail’s trial card shows a time', () => {
+    const bad = fixture('bad-site');
+    expect(bad.accounts[0]!.trial_ends_at).toBe('2026-11-08T02:41:00Z');
+    const lastDay = { ...ACCOUNT_VIEWERS.home(), now: '2026-11-07T15:00:00.000Z' };
+    const html = renderToStaticMarkup(
+      <ReportsScreen data={reportsView(bad, lastDay, {}, REPORTS_PATHS.home)} />,
+    );
+    const { unzoned, text } = unzonedTimes(html);
+    expect(text).toContain('ends today at 21:41 EST');
+    expect(unzoned).toEqual([]);
   });
 });

@@ -29,7 +29,7 @@ describe('Reports, the header and Make a report', () => {
 
   it('makes reports for the primary site’s latest check by default', () => {
     const m = home().make;
-    expect(m.sub).toBe('For example-outfitter.com, latest check Fri 30 Oct 06:02');
+    expect(m.sub).toBe('For example-outfitter.com, latest check Fri 30 Oct 06:02 EDT');
     expect(m.sites.map((o) => o.label)).toEqual([
       'example-outfitter.com',
       'nahltech.com',
@@ -81,14 +81,14 @@ describe('Reports made', () => {
       ]),
     ).toEqual([
       [
-        'Fri 30 Oct 06:04',
+        'Fri 30 Oct 06:04 EDT',
         'example-outfitter.com',
         'PDF audit report',
         'check of Fri 30 Oct · made by the weekly check',
         ['Download · 1.2 MB', 'Link'],
       ],
       [
-        'Thu 29 Oct 09:40',
+        'Thu 29 Oct 09:40 EDT',
         'example-outfitter.com',
         'Compare',
         'Sat 24 Oct vs Thu 29 Oct',
@@ -96,7 +96,7 @@ describe('Reports made', () => {
       ],
       // The share link of 25 Oct 07:10Z expires 24 Nov 07:10Z, Tue 24 Nov 02:10 in Indiana (EST).
       [
-        'Sun 25 Oct 03:10',
+        'Sun 25 Oct 03:10 EDT',
         'example-outfitter.com',
         'CSV, all responses',
         'first audit',
@@ -241,29 +241,29 @@ describe('Reports, on Northwind’s Agency account (challenged-site)', () => {
   it('lists what was made and sent, and schedules the held and the coming client reports', () => {
     const v = northwind();
     expect(v.header.line).toBe('2 sites · exports and PDF on Agency');
-    expect(v.make.sub).toBe('For harborlight.example, latest check Fri 30 Oct 06:01');
+    expect(v.make.sub).toBe('For harborlight.example, latest check Fri 30 Oct 06:01 EDT');
     expect(v.make.pdf.text).toBe('Grades, crawler table, every open fix, the link map’s figures.');
     expect(v.made.rows.map((r) => [r.made, r.site, r.type, r.covers])).toEqual([
-      ['Sat 31 Oct 11:01', 'harborlight.example', 'Link map, edge list', 'check of Fri 30 Oct'],
-      ['Sat 31 Oct 11:00', 'harborlight.example', 'JSON, all responses', 'check of Fri 30 Oct'],
+      ['Sat 31 Oct 11:01 EDT', 'harborlight.example', 'Link map, edge list', 'check of Fri 30 Oct'],
+      ['Sat 31 Oct 11:00 EDT', 'harborlight.example', 'JSON, all responses', 'check of Fri 30 Oct'],
       [
-        'Mon 26 Oct 09:55',
+        'Mon 26 Oct 09:55 EDT',
         'granitepeak.example',
         'Client report',
         'first audit · sent to ops@granitepeak.example',
       ],
-      ['Sat 24 Oct 10:20', 'granitepeak.example', 'Prospect one-pager', 'first audit'],
+      ['Sat 24 Oct 10:20 EDT', 'granitepeak.example', 'Prospect one-pager', 'first audit'],
     ]);
     expect(v.scheduled.rows.map((r) => [r.when, r.site, r.type, r.to, r.status])).toEqual([
       [
-        'Mon 2 Nov 09:00',
+        'Mon 2 Nov 09:00 EST',
         'harborlight.example',
         'Client report',
         'hello@harborlight.example',
         'scheduled',
       ],
       [
-        'Mon 2 Nov 10:00',
+        'Mon 2 Nov 10:00 EST',
         'granitepeak.example',
         'Client report',
         'ops@granitepeak.example',

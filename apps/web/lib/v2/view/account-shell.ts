@@ -15,7 +15,7 @@ import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, usd } from '../../billing/p
 import { GATES, type Tier } from '../../entitlement-v2';
 import { ACCOUNT_COPY as COPY } from '../copy/account';
 import { AGENCY_RAIL_COPY as AGENCY } from '../copy/agency';
-import { calendarDays, dayDate, dayMonth, daysBefore, hourMinute } from '../format';
+import { calendarDays, dayDate, dayMonth, daysBefore, hourMinuteZoned } from '../format';
 import { count, plural } from '../words';
 import {
   PLAN_NAMES,
@@ -185,7 +185,7 @@ function trialCard(
   const title = `${PLAN_NAMES[tier]}, trial · ends ${dayDate(end, zone)}`;
   const left =
     days <= 0
-      ? `ends today at ${hourMinute(end, zone)}`
+      ? `ends today at ${hourMinuteZoned(end, zone)}`
       : `${days} ${plural(days, 'day', 'days')} left`;
   if (plan === 'page') {
     return {

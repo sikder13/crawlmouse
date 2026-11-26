@@ -26,7 +26,7 @@ describe('the notice line', () => {
     ]) {
       expect(count(html)).toBe(1);
       expect(html).toMatch(/<p[^>]*role="status"[^>]*data-v2-notice="capped"/);
-      expect(html).toContain('The next can run Tue 13:30.');
+      expect(html).toContain('The next can run Tue 13:30 UTC.');
     }
   });
 

@@ -571,7 +571,7 @@ describe('POST /api/reports: a refused form goes back to Reports with a line; JS
       ).searchParams.get('next');
       expect(next).toBe(new Date(windowStart.getTime() + windowMs).toISOString());
       expect(lineOf(form)).toMatch(
-        /^This account has made as many reports as it may for now, so none was made\. The next can be made \w{3} \d{2}:\d{2}\.$/,
+        /^This account has made as many reports as it may for now, so none was made\. The next can be made \w{3} \d{2}:\d{2} UTC\.$/,
       );
       expect(lineOf(form)).not.toContain('email');
       const json = await post(audit());
