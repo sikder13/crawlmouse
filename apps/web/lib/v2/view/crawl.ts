@@ -8,6 +8,8 @@ import { toneOf } from '../letters';
 import { mapIsComplete, type CheckPhase, type CrawlState, type FetchEvent } from '../progress';
 import { capitalise, count, numberWord, plural } from '../words';
 import { SITEMAP_URL_CAP } from '../sitemap-cap';
+import { layoutInput } from '../map-layout';
+import { drawnCount } from '../map-cap';
 import { FREE_FIXES } from './free-fixes';
 import type { GradeView } from './result';
 
@@ -412,7 +414,10 @@ export function liveNotices(state: CrawlState, live: LiveCondition): string[] {
       `The live view lost its connection, and is trying again. The audit keeps running; the counts here are the last received.`,
     );
   }
-  const drawn = state.nodes.length;
+  // What the map draws: the pages a link from the home page reaches (layoutInput), at most
+  // LIVE_MAP_MAX_NODES of them (map-cap.ts), not every page the screen holds: a page no link has
+  // reached yet is held and not drawn.
+  const drawn = drawnCount(layoutInput(state.nodes).length);
   if (state.pages_crawled > drawn) {
     notices.push(
       `The map shows ${count(drawn)} of the ${count(state.pages_crawled)} ${plural(state.pages_crawled, 'page', 'pages')} fetched so far.`,

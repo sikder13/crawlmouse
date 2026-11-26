@@ -5,11 +5,11 @@
  */
 import type { Check, FixSection } from '@crawlmouse/types/v2';
 import { SCREEN_SIGNALS, screenSignals } from '../screen-signals';
-import { findCheck, siteOf } from '../../fixtures';
+import { findCheck, siteOf } from '../../dataset-lookups';
 import { dayTimeUtc, percent } from '../../format';
 import { keptUntilOf } from '../result';
 import { linksFacts } from './links-facts';
-import type { ViewDataset } from '../../fixtures';
+import type { ViewDataset } from '../../dataset-lookups';
 import type { FixPlan } from '../free-fixes';
 
 export const SEGMENT_KEYS = [

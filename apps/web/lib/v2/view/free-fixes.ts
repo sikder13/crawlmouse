@@ -6,8 +6,8 @@
  * was first seen later), so the third free fix there has rank 4.
  */
 import type { Check, Fix } from '@crawlmouse/types/v2';
-import { fixesAsOf } from '../fixtures';
-import type { ViewDataset } from '../fixtures';
+import { fixesAsOf } from '../dataset-lookups';
+import type { ViewDataset } from '../dataset-lookups';
 
 /** How many of an audit's fixes Free opens (FACTS: "3 fixes per audit"). */
 export const FREE_FIXES = 3;

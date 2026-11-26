@@ -14,12 +14,12 @@ import type {
   GradeName,
   Verdict,
 } from '@crawlmouse/types/v2';
-import type { ViewDataset } from '../../fixtures';
+import type { ViewDataset } from '../../dataset-lookups';
 
 type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
 type CheckTrigger = Check['trigger'];
-import { findCheck, siteOf } from '../../fixtures';
+import { findCheck, siteOf } from '../../dataset-lookups';
 import { dateTimeUtc, listOf, weekdayTime, weekdayTimeZoned } from '../../format';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { ANONYMOUS_VISIBLE_MS, type DoorView } from '../result';
@@ -327,13 +327,7 @@ export function changesView(
   const rows = listedChanges(d.changes)
     .filter((c) => c.check_id === check.id)
     .map((c) =>
-      rowOf(
-        c,
-        check,
-        at,
-        d.checks.find((x) => x.id === c.previous_check_id) ?? null,
-        d.fix_events,
-      ),
+      rowOf(c, check, at, d.checks.find((x) => x.id === c.previous_check_id) ?? null, d.fix_events),
     );
   const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);

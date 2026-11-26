@@ -42,9 +42,17 @@ function Strip({ strip }: { strip: NonNullable<DashboardView['strip']> }) {
   return (
     <Card className={styles.strip}>
       <div className={styles.cell}>
-        <div className={styles.cellLabel}>Health, all sites · mean of both grades</div>
+        <div className={styles.cellLabel}>
+          {h.seoOnly ? (
+            <span data-v2-addition="">{h.seoOnly.label}</span>
+          ) : (
+            'Health, all sites · mean of both grades'
+          )}
+        </div>
         <div className={styles.cellRow}>
-          <span className={styles.big}>{h.value}</span>
+          <span className={styles.big} data-v2-health-value="">
+            {h.seoOnly ? h.seoOnly.value : h.value}
+          </span>
           {h.delta ? (
             <span className={h.deltaTone === 'bad' ? `${shared.mono} ${shared.bad}` : shared.mono}>
               {h.delta}
@@ -206,6 +214,12 @@ function CrawlersNow({ data }: Props) {
   return (
     <Card as="section" className={shared.panel}>
       <CardHead title="Crawler access now" />
+      {data.crawlersSite ? (
+        // Which site the two crawler panels read (D-09): the blocks on the others are listed apart.
+        <div className={shared.note} data-v2-addition="" data-v2-crawlers-site="">
+          {data.crawlersSite}
+        </div>
+      ) : null}
       <Table
         label="Crawler access"
         headersHidden
@@ -231,12 +245,57 @@ function CrawlersNow({ data }: Props) {
   );
 }
 
+/** AI crawlers blocked on the sites the crawler panels do not read (D-09). */
+function BlockedElsewhere({ data }: Props) {
+  return (
+    <Card as="section" className={shared.panel}>
+      <div
+        data-v2-addition=""
+        data-v2-blocked-elsewhere=""
+        // Every row is a blocking verdict, so the title's "blocked" is vouched for (FACTS I2).
+        data-v2-verdicts={data.blockedElsewhere.map((b) => b.verdict).join(' ')}
+      >
+        <CardHead title={data.blockedTitle} />
+        <Table
+          label={data.blockedTitle}
+          headersHidden
+          rowHeader={0}
+          // Two columns, so the card fits a phone: the crawler and its verdict share a cell and
+          // wrap onto two lines when the width runs out, and a long host breaks inside itself.
+          columns={[{ header: 'Site', mono: true }, { header: 'Crawler and access' }]}
+          rows={data.blockedElsewhere.map((b) => ({
+            key: b.key,
+            cells: [
+              // The site is named, not linked: the Sites table below links each site, and a link here
+              // would repeat that name for every blocked crawler of the site (account-control-names).
+              <span key="h" className={styles.blockedHost}>
+                {b.host}
+              </span>,
+              <span key="v" className={styles.blockedAccess}>
+                <span>{b.ua}</span>
+                <span data-v2-verdict={b.verdict}>
+                  <StatusPill state={VERDICTS[b.verdict].state}>
+                    {VERDICTS[b.verdict].label}
+                  </StatusPill>
+                </span>
+              </span>,
+            ],
+          }))}
+        />
+      </div>
+    </Card>
+  );
+}
+
 function Sites({ data }: Props) {
   const { sites } = data;
   return (
     <Card as="section" className={shared.panel}>
       <CardHead title="Sites">
-        <span className={shared.sub}>{sites.note}</span>
+        <span className={shared.sub}>
+          {sites.note}
+          {sites.apart ? <span data-v2-addition="">{` · ${sites.apart}`}</span> : null}
+        </span>
         {sites.upsell ? <ActionControl action={sites.upsell} /> : null}
       </CardHead>
       {sites.rows.length ? (
@@ -354,32 +413,44 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
   );
 }
 
+/**
+ * The set-up card. Its title counts the items left in the table; the weekly schedule is a link to
+ * change one that is set, not a thing left (Q8), so it sits under the table and is never "not done".
+ */
 function Setup({ setup }: { setup: NonNullable<DashboardView['setup']> }) {
-  const items = setup.schedule ? [...setup.items, setup.schedule] : setup.items;
+  const items = setup.items;
   return (
     <Card as="section" className={shared.panel}>
       <CardHead title={setup.title} />
-      <Table
-        label="Set-up"
-        headersHidden
-        columns={[{ header: 'Done' }, { header: 'What' }, { header: 'Action', numeric: true }]}
-        rows={items.map((i) => ({
-          key: i.key,
-          cells: [
-            i.done ? (
-              <StatusPill key="d" state="ok">
-                {SETUP_STATE.done}
-              </StatusPill>
-            ) : (
-              <StatusPill key="d" state="neutral">
-                {SETUP_STATE.notDone}
-              </StatusPill>
-            ),
-            i.label,
-            i.action ? <ActionControl key="a" action={i.action} /> : '',
-          ],
-        }))}
-      />
+      {items.length ? (
+        <Table
+          label="Set-up"
+          headersHidden
+          columns={[{ header: 'Done' }, { header: 'What' }, { header: 'Action', numeric: true }]}
+          rows={items.map((i) => ({
+            key: i.key,
+            cells: [
+              i.done ? (
+                <StatusPill key="d" state="ok">
+                  {SETUP_STATE.done}
+                </StatusPill>
+              ) : (
+                <StatusPill key="d" state="neutral">
+                  {SETUP_STATE.notDone}
+                </StatusPill>
+              ),
+              i.label,
+              i.action ? <ActionControl key="a" action={i.action} /> : '',
+            ],
+          }))}
+        />
+      ) : null}
+      {setup.schedule ? (
+        <div className={shared.foot} data-v2-setup-schedule="">
+          <span>{setup.schedule.label}</span>
+          {setup.schedule.action ? <ActionControl action={setup.schedule.action} /> : null}
+        </div>
+      ) : null}
       {setup.foot ? <div className={shared.foot}>{setup.foot}</div> : null}
     </Card>
   );
@@ -412,6 +483,7 @@ export function DashboardScreen({
       ) : null}
       {data.firstRun ? (
         <>
+          {data.blockedElsewhere.length ? <BlockedElsewhere data={data} /> : null}
           <Sites data={data} />
           {data.topFixes || data.setup ? (
             <section className={shared.two}>
@@ -438,6 +510,7 @@ export function DashboardScreen({
               <CrawlersNow data={data} />
             </section>
           ) : null}
+          {data.blockedElsewhere.length ? <BlockedElsewhere data={data} /> : null}
           <Sites data={data} />
           {data.setup ? (
             <section className={shared.two}>

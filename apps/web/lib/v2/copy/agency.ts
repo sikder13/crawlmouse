@@ -273,8 +273,8 @@ export const MATRIX_CHANGES: CopyChange[] = [
     locked:
       'example-outfitter.com Example Outfitter B 79 F 22 1 blocked Fri 06:00 weekly, report Mon holicfoods.com Holic Foods C+ 68 D 44 text −12 Fri 06:00 weekly, report Mon nahltech.com Nahl Technologies B+ 84 A 93 3 resolved Fri 06:00 weekly, report Mon ridgelineoutdoors.com Ridgeline Outdoors B- 72 C 61 no change Fri 06:00 weekly, report Mon redbirdaviation.com Redbird Aviation B- 74 B 78 no change Fri 06:00 monthly, first Mon drivepei.ca Drive PEI B- 73 C 66 no change Fri 06:00 weekly, report Mon bluebirdclinic.com Bluebird Clinic A- 90 B+ 83 no change Fri 06:00 monthly, first Mon maplerowbakery.ca Maple Row Bakery B 77 B- 72 no change Fri 06:00 weekly, report Mon northfieldlegal.com Northfield Legal A- 88 B 80 no change Fri 06:00 weekly, report Mon harborviewdental.com Harborview Dental B+ 83 B+ 84 no change Fri 06:00 weekly, report Mon cedarpointcabins.com Cedar Point Cabins C+ 69 C 64 no change Fri 06:00 monthly, first Mon lumenstudio.design Lumen Studio A 91 A- 89 no change Fri 06:00 weekly, report Mon',
     rendered:
-      'granitepeak.example Granite Peak Supply C+ 66 withheld 1 opened Wed 15:13 · latest check failed · check deferred weekly, Fri · report weekly, Mon harborlight.example Harbor Light Studio A 91 A- 89 no change Fri 06:01 weekly, Fri · report monthly, first Mon',
-    source: `${NORTHWIND}. Each row is the dashboard’s own site row; the last column gives the check’s schedule, then the report’s`,
+      'granitepeak.example Granite Peak Supply C+ 66 withheld 1 opened Wed 15:13 · partial · latest check failed · check deferred weekly, Fri · report weekly, Mon harborlight.example Harbor Light Studio A 91 A- 89 no change Fri 06:01 weekly, Fri · report monthly, first Mon',
+    source: `${NORTHWIND}. Each row is the dashboard’s own site row; the last column gives the check’s schedule, then the report’s. The fixture’s last finished check of granitepeak.example is partial, so its time is followed by "partial", as on the dashboard (QA’s dashboard walk, D-07)`,
   },
 ];
 
@@ -333,8 +333,8 @@ export const CLIENT_CHANGES: CopyChange[] = [
     locked:
       'Example Outfitter example-outfitter.com · Fri 30 Oct · last check today 06:00 · report goes Mon 2 Nov 08:00 Run a check now',
     rendered:
-      'Granite Peak Supply granitepeak.example · Mon 2 Nov · last check Wed 15:13 · latest check failed · check deferred · next Fri 6 Nov around 06:00 · 96 pages · 2 fixes Open the latest audit Run a check now Open the OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot packet · AI not yet estimated',
-    source: `${NORTHWIND}; the client is granitepeak.example. The line and the actions are the site page’s own (Final-Site), after the host; when the next report goes is on the report schedule, workstream B2’s`,
+      'Granite Peak Supply granitepeak.example · Mon 2 Nov · last check Wed 15:13 · latest check failed · check deferred · next Fri 6 Nov around 06:00 · 96 pages, partial check · 2 fixes Open the latest audit Run a check now Open the OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot packet · AI not yet estimated',
+    source: `${NORTHWIND}; the client is granitepeak.example. The line and the actions are the site page’s own (Final-Site), after the host; when the next report goes is on the report schedule, workstream B2’s. The fixture’s last finished check is partial, so the page count says so, as on the site page (QA’s dashboard walk, D-07)`,
   },
   {
     screen: 'agency-client',

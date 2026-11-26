@@ -13,10 +13,11 @@ import {
   type Verdict,
 } from '@crawlmouse/types/v2';
 import { GATES } from '../../entitlement-v2';
+import { ALL_SHOWN, type Features } from '../features';
 import { formatPlanPrice } from '../copy/plan-price';
 import { TRIAL_DAYS } from '../copy/account';
 import { DASHBOARD_COPY as COPY, SETUP_COPY } from '../copy/dashboard';
-import { fixesAsOf } from '../fixtures';
+import { fixesAsOf } from '../dataset-lookups';
 import {
   calendarDays,
   daysBefore,
@@ -67,7 +68,15 @@ import { nextCheckLine, type NextChecks } from './site';
 import { titleAmong } from './fix-title';
 import { GRADES, PILL, SUBJECTS, FOUND_AGAIN, foundAgain } from './segment/changes';
 import { effortText } from './segment/fixes';
-import { action, emailDeveloperAction, type ActionView } from './account-actions';
+import {
+  ACCOUNT_ACTIONS,
+  SITE_SETTINGS_ANCHOR,
+  action,
+  emailDeveloperAction,
+  type ActionKey,
+  type ActionView,
+} from './account-actions';
+import { CAPABILITIES, type CapabilityKey } from './capabilities';
 import { roleMay } from '../agency/guard';
 import {
   FREE_SCHEDULE,
@@ -111,6 +120,11 @@ export interface HealthView {
    * a new baseline since it), which the move leaves out (owner ruling 2026-11-08). Null when none is.
    */
   fresh: string | null;
+  /**
+   * When no site carries both grades, so `value` is "—": the mean of Technical SEO over the sites
+   * that carry it, named as that, so the tile shows a true figure under its own label. Null otherwise.
+   */
+  seoOnly: { label: string; value: string } | null;
 }
 
 export interface CountView {
@@ -197,6 +211,11 @@ export interface SiteRowView {
 
 export interface SitesView {
   note: string;
+  /**
+   * The rows the note's count leaves out, said beside it: "1 staging copy holds no slot" when the
+   * table lists a staging copy (F-097, owner ruling Q10). Null when every row holds a slot.
+   */
+  apart: string | null;
   upsell: ActionView | null;
   rows: SiteRowView[];
   foot: string | null;
@@ -264,6 +283,15 @@ export interface DashboardView {
   /** The legend under the by-check rows: each verdict they show, once. */
   legend: Verdict[];
   crawlersNow: CrawlerNowView[] | null;
+  /** The site the two crawler panels read (the first site), named on them; null without them. */
+  crawlersSite: string | null;
+  /**
+   * Each AI crawler blocked at the latest result of a site the crawler panels do not read, so a
+   * block on any site reaches the dashboard (D-09). Empty when there is none.
+   */
+  blockedElsewhere: { key: string; host: string; ua: string; verdict: Verdict }[];
+  /** That card's title: "on your other sites" beside the panels, "on your sites" without them. */
+  blockedTitle: string;
   sites: SitesView;
   topFixes: TopFixesView | null;
   setup: SetupView | null;
@@ -288,17 +316,21 @@ const previous = (v: AccountView, siteId: string) => resultChecks(v, siteId).at(
 function sinceCheck(v: AccountView): Check | null {
   const own = previous(v, primarySite(v).id);
   if (own) return own;
+  // Among the sites that hold a slot: a staging copy's check never names "since" (F-097).
   return (
-    v.d.sites
+    primarySites(v)
       .map((s) => previous(v, s.id))
       .filter((c): c is Check => c !== null)
       .sort((a, b) => instant(b.finished_at!) - instant(a.finished_at!))[0] ?? null
   );
 }
 
-/** The newest result of any site. */
+/**
+ * The newest result of any site that holds a slot: a staging copy is never counted (F-097; A1's
+ * rule for the header's "last check", D-05).
+ */
 const newestResult = (v: AccountView) =>
-  v.d.sites
+  primarySites(v)
     .map((s) => latest(v, s.id))
     .filter((c): c is Check => c !== null)
     .sort((a, b) => instant(b.finished_at!) - instant(a.finished_at!))[0] ?? null;
@@ -403,6 +435,9 @@ function lastCheck(v: AccountView, site: Site): string {
     .sort((a, b) => instant(a.finished_at!) - instant(b.finished_at!))
     .at(-1);
   const parts = [result ? weekdayTimeZoned(result.finished_at!, zone) : '—'];
+  // A check that stopped short is said to be partial, beside its time (D-07); its cause is not
+  // named here, because the record does not hold one.
+  if (result?.status === 'partial') parts.push('partial');
   if (ended && ended !== result && ended.status === 'failed') parts.push('latest check failed');
   for (const f of v.inFlight.filter((x) => x.siteId === site.id)) parts.push(`check ${f.status}`);
   return parts.join(' · ');
@@ -413,7 +448,9 @@ function healthAt(v: AccountView) {
   const values = new Map<string, [number, number]>();
   const left: Record<string, number> = {};
   const leave = (why: string) => (left[why] = (left[why] ?? 0) + 1);
-  for (const s of v.d.sites) {
+  // Over the sites that hold a slot, as the header counts them: a staging copy is neither averaged
+  // nor counted as left out (F-097, A1's rule).
+  for (const s of primarySites(v)) {
     const c = latest(v, s.id);
     if (!c) leave('no finished check yet');
     else if (c.ai_readability?.withheld) leave('AI readability withheld');
@@ -503,7 +540,36 @@ function health(d: AccountDataset, viewer: Viewer, v: AccountView): HealthView {
       fresh = newOnes.size ? `${newOnes.size} new` : null;
     }
   }
-  return { value: value === null ? '—' : String(value), delta, deltaTone, excluded, fresh };
+  // No site carries both grades: the tile shows the Technical SEO mean, labelled as that (D-10).
+  // Over the sites that hold a slot, as the header counts them: a staging copy is not averaged in.
+  const seoScores = primarySites(v).flatMap((s) => {
+    const c = latest(v, s.id);
+    const seo = c ? seoOf(c) : null;
+    return seo ? [seo.score] : [];
+  });
+  const seoOnly =
+    value === null && seoScores.length
+      ? {
+          label: COPY.healthSeoOnly(seoScores.length),
+          value: String(Math.round(seoScores.reduce((a, b) => a + b, 0) / seoScores.length)),
+        }
+      : null;
+  // Beside a Technical SEO mean, "N sites excluded" would read as left out of that mean: each reason
+  // is said on its own terms instead, withheld first ("AI readability withheld on 3 sites; no
+  // finished check yet on 1 site").
+  const onTerms = reasons
+    .map(([why, n]) =>
+      why === 'AI readability withheld' ? COPY.withheldOn(n) : COPY.reasonOn(why, n),
+    )
+    .join('; ');
+  return {
+    value: value === null ? '—' : String(value),
+    delta,
+    deltaTone,
+    excluded: seoOnly && reasons.length ? onTerms : excluded,
+    fresh,
+    seoOnly,
+  };
 }
 
 /** The grade moves recorded at a check, as "AI readability D → F" (FACTS row 98, Q12). */
@@ -634,12 +700,35 @@ function crawlersByCheck(v: AccountView, site: Site): CrawlerByCheckView[] | nul
     }));
 }
 
+/**
+ * Whether the dashboard may offer a set-up item (D-16): its capability is built and not hidden by
+ * the Goal 1 switch, and the page its control opens exists. An item with no capability row is not
+ * built. A done item is shown whatever its control, since it offers none.
+ */
+function offered(
+  capability: CapabilityKey | null,
+  control: ActionKey,
+  done: boolean,
+  features: Features,
+): boolean {
+  if (capability === null) return false;
+  const c = CAPABILITIES[capability];
+  if (c.status !== 'built') return false;
+  const risks = c.risk === undefined ? [] : typeof c.risk === 'string' ? [c.risk] : c.risk;
+  if (risks.some((r) => !features[r])) return false;
+  // Every account action has its page today (#167 served Integrations); the check stays so a route
+  // marked 'later' again is not offered.
+  const owner: string = ACCOUNT_ACTIONS[control].owner;
+  return done || owner !== 'later';
+}
+
 function setup(
   v: AccountView,
   site: Site,
   firstRun: boolean,
   trial: boolean,
-  next?: NextChecks,
+  next: NextChecks | undefined,
+  features: Features,
 ): SetupView | null {
   const g = v.gates;
   if (v.tier === 'free') return null;
@@ -656,10 +745,13 @@ function setup(
     todo: string,
     doneLabel: string,
     act: ActionView | null,
+    capability: CapabilityKey | null,
+    control: ActionKey,
   ) => {
     if (!todo.includes(subject)) {
       throw new Error(`set-up item ${key}: its row does not name its subject "${subject}"`);
     }
+    if (!offered(capability, control, done, features)) return;
     items.push({
       key,
       label: done ? doneLabel : todo,
@@ -668,7 +760,7 @@ function setup(
     });
   };
   const settings = (label: string) =>
-    action('sitePage', label, { id: site.id }, { query: '#settings' });
+    action('sitePage', label, { id: site.id }, { query: `#${SITE_SETTINGS_ANCHOR}` });
   if (g.slack) {
     item(
       'slack',
@@ -680,6 +772,8 @@ function setup(
       roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts')
         ? action('integrations', 'Connect')
         : null,
+      'slack_alerts',
+      'integrations',
     );
   }
   if (g.competitorsPerSite > 0) {
@@ -691,6 +785,8 @@ function setup(
       SETUP_COPY.competitor.todo(competitors),
       SETUP_COPY.competitor.done(n),
       settings('Add'),
+      'competitors',
+      'sitePage',
     );
   }
   if (g.stagingAndDeployHooks) {
@@ -702,6 +798,8 @@ function setup(
       SETUP_COPY.staging.todo,
       SETUP_COPY.staging.done,
       settings('Add'),
+      'staging',
+      'sitePage',
     );
   }
   const left = items.filter((i) => !i.done).length;
@@ -726,17 +824,31 @@ function setup(
       ? {
           key: 'schedule',
           label: SETUP_COPY.schedule(
+            site.host,
             `${['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][sch.iso_weekday!]} around ${time}`,
           ),
           done: false,
           action: settings('Set the day'),
         }
       : null;
+  // Nothing offered and no schedule to set: no card.
+  if (!items.length && !schedule) return null;
   return {
-    title: firstRun && trial ? COPY.setupTrialTitle : COPY.setupLeftTitle(left),
+    // A title claims only what the card lists: no row, the schedule's own title; every row done,
+    // "Everything is set up"; otherwise the rows left, or the trial's offer (M1, F-269).
+    title: !items.length
+      ? COPY.setupScheduleTitle
+      : left === 0
+        ? COPY.setupLeftTitle(0)
+        : firstRun && trial
+          ? COPY.setupTrialTitle
+          : COPY.setupLeftTitle(left),
     items,
     schedule,
-    foot: firstRun && trial ? COPY.setupTrialFoot(items.length, checkoutOpen(), site.paused) : null,
+    foot:
+      firstRun && trial && items.length
+        ? COPY.setupTrialFoot(items.length, checkoutOpen(), site.paused)
+        : null,
   };
 }
 
@@ -766,15 +878,27 @@ function addSiteAction(v: AccountView, primaryAction = false): ActionView[] {
   ];
 }
 
+/** Competitors as a plan's offer names them: the count, or 0 while not built or hidden (D-16). */
+function competitorsOffered(n: number, features: Features): number {
+  const c = CAPABILITIES.competitors;
+  const risks = c.risk === undefined ? [] : typeof c.risk === 'string' ? [c.risk] : c.risk;
+  return c.status === 'built' && risks.every((r) => features[r]) ? n : 0;
+}
+
 /** The one-time offer of a Pro trial: a Free account that never had a trial (H5). */
-function startPro(v: AccountView): DashboardView['startPro'] {
+function startPro(v: AccountView, features: Features): DashboardView['startPro'] {
   // Owner only: the route refuses any other seat.
   return readerRole(v) === 'owner' &&
     v.account.state === 'free' &&
     !v.account.state_history.some((h) => h.state.endsWith('_trial'))
     ? {
         title: COPY.startProHeading,
-        body: COPY.startProBody(TRIAL_DAYS, GATES.pro.competitorsPerSite, GATES.pro.sites),
+        body: COPY.startProBody(
+          TRIAL_DAYS,
+          competitorsOffered(GATES.pro.competitorsPerSite, features),
+          GATES.pro.sites,
+          offered('slack_alerts', 'integrations', false, features),
+        ),
         start: action(
           'startTrial',
           COPY.startProTitle(TRIAL_DAYS),
@@ -832,7 +956,11 @@ function earlierView(audits: readonly EarlierAudit[], zone: string): EarlierAudi
   };
 }
 
-function noSiteView(v: AccountView, earlier: EarlierAuditsView | null): DashboardView {
+function noSiteView(
+  v: AccountView,
+  earlier: EarlierAuditsView | null,
+  features: Features,
+): DashboardView {
   const zone = zoneOf(v);
   const adds = addsSites(v);
   const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
@@ -856,8 +984,12 @@ function noSiteView(v: AccountView, earlier: EarlierAuditsView | null): Dashboar
     crawlersByCheck: null,
     legend: [],
     crawlersNow: null,
+    crawlersSite: null,
+    blockedElsewhere: [],
+    blockedTitle: COPY.blockedElsewhereTitle(false),
     sites: {
       note: `0 of ${v.account.limits.sites} on ${PLAN_NAMES[v.tier]}`,
+      apart: null,
       upsell: null,
       rows: [],
       foot: !adds
@@ -867,16 +999,23 @@ function noSiteView(v: AccountView, earlier: EarlierAuditsView | null): Dashboar
               PLAN_NAMES[v.tier],
               dayDate(v.account.trial_ends_at!, zone),
               GATES[v.tier].schedule,
-              v.account.limits.competitors_per_site,
+              competitorsOffered(v.account.limits.competitors_per_site, features),
               v.account.limits.sites,
               !v.cardOnFile && v.account.renews_at === null,
+              // Slack is named only where the set-up card would offer it (M5, D-16): connected counts.
+              offered(
+                'slack_alerts',
+                'integrations',
+                v.account.integrations.some((i) => i.kind === 'slack' && i.connected),
+                features,
+              ),
             )} ${COPY.noSiteNote}`
           : COPY.noSiteNote,
     },
     topFixes: null,
     setup: null,
     threeKinds: null,
-    startPro: startPro(v),
+    startPro: startPro(v, features),
     earlier,
   };
 }
@@ -922,11 +1061,13 @@ export function dashboardView(
   viewer: Viewer,
   next?: NextChecks,
   earlier: readonly EarlierAudit[] = [],
+  /** The Goal 1 switch's record, from the server entry (`shownFeatures()`); nothing hidden by default. */
+  features: Features = ALL_SHOWN,
 ): DashboardView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
   const earlierLine = earlierView(earlier, zone);
-  if (primarySites(v).length === 0) return noSiteView(v, earlierLine);
+  if (primarySites(v).length === 0) return noSiteView(v, earlierLine, features);
   const primary = primarySite(v);
   const result = latest(v, primary.id);
   const firstRun = isFirstRun(v);
@@ -969,6 +1110,8 @@ export function dashboardView(
   const flight = v.inFlight.filter((f) => f.siteId === primary.id).map((f) => `check ${f.status}`);
   // The sites that hold a slot: a staging copy is not a sixth site (F-097).
   const slotsHeld = primarySites(v).length;
+  // The rows the table lists that hold no slot, counted from the same records as the slots.
+  const staging = v.d.sites.filter((s) => s.staging_of_site_id !== null);
   const sitesWord = `${slotsHeld} ${plural(slotsHeld, 'site', 'sites')}`;
   const prev = sinceCheck(v);
 
@@ -984,7 +1127,9 @@ export function dashboardView(
         line: [
           dayDate(v.now, zone),
           sitesWord,
-          result ? `audited ${hourMinuteZoned(result.finished_at!, zone)}` : null,
+          // The newest result of any primary site, with its day when not today (M3, D-05), and
+          // its zone named (D-17, through whenAgo).
+          newestResult(v) ? `audited ${whenAgo(newestResult(v)!.finished_at!, v)}` : null,
           ...flight,
           nextText,
           trialEnds,
@@ -1011,7 +1156,8 @@ export function dashboardView(
         line: [
           dayDate(v.now, zone),
           sitesWord,
-          `last check ${whenAgo((result ?? newestResult(v))!.finished_at!, v)}`,
+          // The newest result of any site, not the first site's (D-05).
+          `last check ${whenAgo(newestResult(v)!.finished_at!, v)}`,
           ...flight,
           nextText,
           trialEnds,
@@ -1059,6 +1205,10 @@ export function dashboardView(
       };
 
   const now = result && !firstRun ? crawlerOrder(result) : null;
+  const historyView = firstRun ? null : history(v, primary);
+  // The two crawler panels are drawn only beside the history chart (DashboardScreen): a first site
+  // with one result has neither, so its blocks are listed with the other sites' (M2, D-09).
+  const panels = now !== null && historyView !== null;
   const byCheck = firstRun ? null : crawlersByCheck(v, primary);
   const legendVerdicts = [
     ...new Set((byCheck ?? []).flatMap((r) => r.verdicts).filter((x): x is Verdict => x !== null)),
@@ -1082,9 +1232,24 @@ export function dashboardView(
     header,
     strip,
     changed,
-    history: firstRun ? null : history(v, primary),
+    history: historyView,
     crawlersByCheck: byCheck,
     legend: legendVerdicts,
+    crawlersSite: panels ? primary.host : null,
+    blockedTitle: COPY.blockedElsewhereTitle(panels),
+    blockedElsewhere: v.d.sites
+      .filter((s) => !(panels && s.id === primary.id))
+      .flatMap((s) => {
+        const c = latest(v, s.id);
+        return (c ? crawlerOrder(c) : [])
+          .filter((r) => isAi(r) && isBlocked(r.verdict))
+          .map((r) => ({
+            key: `${s.id}:${r.ua}`,
+            host: s.host,
+            ua: r.ua,
+            verdict: r.verdict,
+          }));
+      }),
     crawlersNow: now
       ? now.map((r) => ({
           ua: r.ua,
@@ -1094,6 +1259,7 @@ export function dashboardView(
       : null,
     sites: {
       note: firstRun && trial ? COPY.sitesFirstRun(free) : slotsNote,
+      apart: staging.length ? COPY.stagingApart(staging.length) : null,
       upsell:
         v.tier === 'pro' && slots >= limit
           ? action(
@@ -1133,7 +1299,7 @@ export function dashboardView(
             run: runCheck(false),
           }
         : null,
-    setup: setup(v, primary, firstRun, trial, next),
+    setup: setup(v, primary, firstRun, trial, next, features),
     threeKinds:
       firstRun && trial
         ? {
@@ -1142,7 +1308,7 @@ export function dashboardView(
             settings: action('emailSettings', 'Email settings'),
           }
         : null,
-    startPro: startPro(v),
+    startPro: startPro(v, features),
     earlier: earlierLine,
   };
 }

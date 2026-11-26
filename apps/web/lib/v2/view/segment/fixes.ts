@@ -12,7 +12,7 @@ import {
   type FixSection,
   type RecommendationClass,
 } from '@crawlmouse/types/v2';
-import { fixesAsOf } from '../../fixtures';
+import { fixesAsOf } from '../../dataset-lookups';
 import { listOf } from '../../format';
 import { oneLine } from '../../packet-text';
 import { numberWord, plural } from '../../words';
@@ -29,7 +29,7 @@ import {
 import { openFixes, type FixPlan } from '../free-fixes';
 import { noPacketLine } from '../no-packet';
 import { noPacketReason } from '../packet-reason';
-import type { ViewDataset } from '../../fixtures';
+import type { ViewDataset } from '../../dataset-lookups';
 import { titleAmong } from '../fix-title';
 
 /** A fix's packet; the contract names the schema, not the type. */
