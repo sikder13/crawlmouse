@@ -110,6 +110,11 @@ export interface MatrixView {
     line: string;
     /** "Add a client site · 2 of 25": the form, for a seat that may add one while a slot is free. */
     actions: ActionView[];
+    /**
+     * In the form's place, for a seat that may add one but every slot is in use and no more can be
+     * bought here: why (F-239). Null otherwise, including where the way to buy sites is shown.
+     */
+    full: string | null;
   };
   /** Null until a client has two results to compare. */
   strip: MatrixStripView | null;
@@ -412,6 +417,7 @@ function matrixView(
           : buys
             ? [link(`/seats#${BUY_ANCHOR}`, COPY.buySites)]
             : [],
+      full: adds && n >= limit && !buys ? COPY.full(n, limit) : null,
     },
     strip,
     next,
