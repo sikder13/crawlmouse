@@ -21,7 +21,7 @@ import { namesOnePage, templateNoun } from '../build/template-noun.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
 import type { RenderedRecord } from '../detectors/js-only-navigation.js';
 import type { RenderedDetection } from '../detectors/rendered.js';
-import type { Detection } from '../detectors/types.js';
+import type { Condition, Detection } from '../detectors/types.js';
 import { clean } from '../clean-text.js';
 import { PAGES_PER_FIX_TEMPLATE } from '../render/sample.js';
 import { effectsOf, type FixRecord } from './effects.js';
@@ -98,6 +98,12 @@ export type WriteFix = (fix: FixRecord) => Pick<FixDraft, 'packet' | 'effort' | 
 /** Nothing written: a grade computed without the check builder (the guard's example sites). */
 export const NOTHING_WRITTEN: WriteFix = () => ({ packet: null, effort: null, before_after: [] });
 
+/**
+ * The title of a redirect_chain fix whose redirects loop (the record's `redirect_loop` condition):
+ * there is no "where it redirects" to link to, so the change is to the redirects themselves (F-162).
+ */
+export const LOOP_TITLE = (s: string) => `Break the redirect loop at ${s}`;
+
 /** The longest title, in code points. A title names a crawled URL or template, so it is bounded. */
 export const MAX_TITLE_CHARS = 300;
 
@@ -106,8 +112,16 @@ export const MAX_TITLE_CHARS = 300;
  * crawled text, and the title is the first line of the packet's prompt. A title past
  * MAX_TITLE_CHARS is cut and ends in an ellipsis.
  */
-export function titleOf(type: FixType, subject: string): string {
-  const points = [...clean(TITLES[type]!(subject))];
+export function titleOf(
+  type: FixType,
+  subject: string,
+  conditions: readonly Condition[] = [],
+): string {
+  const title =
+    type === 'redirect_chain' && conditions.includes('redirect_loop')
+      ? LOOP_TITLE(subject)
+      : TITLES[type]!(subject);
+  const points = [...clean(title)];
   return points.length <= MAX_TITLE_CHARS
     ? points.join('')
     : `${points.slice(0, MAX_TITLE_CHARS).join('')}…`;
@@ -179,7 +193,7 @@ function draft(
     ...base,
     type,
     section: FIX_SECTION[type],
-    title: titleOf(type, subjectOfKey(r.key)),
+    title: titleOf(type, subjectOfKey(r.key), r.conditions),
     recommendation_class: STRUCTURE_CLASS[type]!,
     confidence: CRAWL_CONFIDENCE,
     affected_pages: r.affected_urls.length,
