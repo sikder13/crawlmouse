@@ -160,6 +160,29 @@ describe('the daily sentinel lab site (sentinel-b)', () => {
     expect(hostOf({})).toBeNull();
   });
 
+  // QA's gate on #211, M6: a forwarded host the function does not serve is refused, so the handler
+  // answers 404 rather than reaching for a folder it has not got.
+  it('refuses a forged X-Forwarded-Host, and the handler answers 404, not an error', () => {
+    expect(hostOf({ host: 'x.vercel.app', 'x-forwarded-host': 'evil.test' })).toBeNull();
+    expect(hostOf({ host: B, 'x-forwarded-host': 'evil.test' })).toBe(B);
+    const res = {
+      statusCode: 0,
+      body: '',
+      setHeader: () => {},
+      end(b: string) {
+        this.body = b;
+      },
+    };
+    handler(
+      {
+        url: '/api/sentinel?path=%2F',
+        headers: { host: 'x.vercel.app', 'x-forwarded-host': 'evil.test' },
+      },
+      res,
+    );
+    expect(res.statusCode).toBe(404);
+  });
+
   it('serves through the handler by host, and answers 404 to a host it does not serve', () => {
     const served = (host: string, path: string) => {
       const res = {

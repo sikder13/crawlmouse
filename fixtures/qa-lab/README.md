@@ -63,27 +63,28 @@ _grades_ it is measured, not written here; to read it:
 pnpm smoke -- --url=https://healthy.lab.crawlmouse.com
 ```
 
-| Host                  | Built to show                                                                                                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `healthy`             | a well-linked guide site: no orphans, depth ≤ 3, varied anchors, sitemap, `llms.txt`, JSON-LD                                                                                   |
-| `app-shell`           | a client-rendered app: the HTML is an empty `<div id="root">` and a script                                                                                                      |
-| `cf-blocked`          | a firewall block: 403 to a user agent containing `Crawlmouse`, 200 to a browser                                                                                                 |
-| `client-1`            | sitemap-only orphan pages; one repeated anchor into each section; no JSON-LD                                                                                                    |
-| `client-2`            | a deep chain of pages; "Read more" links; a few orphans                                                                                                                         |
-| `client-3`            | two broken internal links (404); three redirected links (301: one hop to a page, two hops to a page, two hops to a 404); a deep chain; no sitemap; robots.txt disallows GPTBot  |
-| `client-4`            | a larger, mostly sound site whose text nav links three sections with the same words on every page                                                                               |
-| `client-5`            | many orphans, generic anchors and deep pages on a small site; no JSON-LD                                                                                                        |
-| `client-6`            | a five-item text nav on every page, deep pages, orphans; robots.txt disallows GPTBot                                                                                            |
-| `trial-client-1`      | a middling site for the Agency trial: some orphans, "Learn more" links                                                                                                          |
-| `demo-1` … `3`        | polished fictional businesses with a few fixes that read well                                                                                                                   |
-| `slow`                | an ordinary small site whose HTML pages each answer after 3 seconds (`api/slow.mjs`, journey J0.8g)                                                                             |
-| `sentinel`            | a small site whose robots.txt disallows GPTBot in odd UTC hours (`api/sentinel.mjs`, journey J2.4i)                                                                             |
-| `sentinel-b`          | the same function's twin: robots.txt disallows GPTBot on even UTC days (days since 1970-01-01), so a watch on an even day finds a block that a full check on an odd day did not |
-| `large`               | about 2,500 pages of an invented garden shop, answered at once (`api/large.mjs`)                                                                                                |
-| `large-slow`          | the same pages, each HTML page answered after 1 second                                                                                                                          |
-| `large-throttle`      | the same pages; 429 with `Retry-After` above the throttle rule below                                                                                                            |
-| `large-throttle-bare` | the same pages; 429 without `Retry-After` above the same rule                                                                                                                   |
-| `dense`               | 2,000 pages, about 100 links each, about 200,000 edges, the same on every check (`api/dense.mjs`)                                                                               |
+| Host                  | Built to show                                                                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `healthy`             | a well-linked guide site: no orphans, depth ≤ 3, varied anchors, sitemap, `llms.txt`, JSON-LD                                                                                         |
+| `app-shell`           | a client-rendered app: the HTML is an empty `<div id="root">` and a script                                                                                                            |
+| `cf-blocked`          | a firewall block: 403 to a user agent containing `Crawlmouse`, 200 to a browser                                                                                                       |
+| `client-1`            | sitemap-only orphan pages; one repeated anchor into each section; no JSON-LD                                                                                                          |
+| `client-2`            | a deep chain of pages; "Read more" links; a few orphans                                                                                                                               |
+| `client-3`            | two broken internal links (404); three redirected links (301: one hop to a page, two hops to a page, two hops to a 404); a deep chain; no sitemap; robots.txt disallows GPTBot        |
+| `client-4`            | a larger, mostly sound site whose text nav links three sections with the same words on every page                                                                                     |
+| `client-5`            | many orphans, generic anchors and deep pages on a small site; no JSON-LD                                                                                                              |
+| `client-6`            | a five-item text nav on every page, deep pages, orphans; robots.txt disallows GPTBot                                                                                                  |
+| `trial-client-1`      | a middling site for the Agency trial: some orphans, "Learn more" links                                                                                                                |
+| `demo-1` … `3`        | polished fictional businesses with a few fixes that read well                                                                                                                         |
+| `slow`                | an ordinary small site whose HTML pages each answer after 3 seconds (`api/slow.mjs`, journey J0.8g)                                                                                   |
+| `sentinel`            | a small site whose robots.txt disallows GPTBot in odd UTC hours (`api/sentinel.mjs`, journey J2.4i)                                                                                   |
+| `sentinel-b`          | the same function's twin: robots.txt disallows GPTBot on even UTC days (days since 1970-01-01), so a watch on an even day finds a block that a full check on an odd day did not       |
+| `large`               | about 2,500 pages of an invented garden shop, answered at once (`api/large.mjs`)                                                                                                      |
+| `large-slow`          | the same pages, each HTML page answered after 1 second                                                                                                                                |
+| `large-throttle`      | the same pages; 429 with `Retry-After` above the throttle rule below                                                                                                                  |
+| `large-throttle-bare` | the same pages; 429 without `Retry-After` above the same rule                                                                                                                         |
+| `dense`               | 2,000 pages, about 100 links each, about 200,000 edges, the same on every check (`api/dense.mjs`)                                                                                     |
+| `fixme`               | a small blog whose article byline is gone on even UTC days and back on odd ones, so a check raises `missing_author_date` and the next day's proves it fixed (`api/fixme.mjs`, row 22) |
 
 Check every host answers:
 
@@ -220,3 +221,15 @@ prints 200s then 429s once a window passes 18, if the 22 requests reach one inst
 ```bash
 curl -s -o /dev/null -A "CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)" -w "%{http_code}\n" https://dense.lab.crawlmouse.com/p/0001/
 ```
+
+## The fixme lab (row 22)
+
+`fixme.lab.crawlmouse.com` is served by `api/fixme.mjs`: a home page, an articles index, six articles and an about page. It exists so that "Fixed, and proven" can be shown on a real check (c/043).
+
+- **On an even UTC day** (days since 1970-01-01), each article carries an Article JSON-LD node with a description, but no author and no `datePublished`, and no byline markup at all. A check opens **`missing_author_date`** on the article template: all six fail, and the template rule detects at 2 or more failing and half of those decided.
+- **On an odd UTC day,** the same pages name an author and a date, in the JSON-LD and in a visible byline. A check finds the template passing, and the fix verified.
+- **The day turns at 00:00 UTC** (19:00 ET in winter). Mark the fix done after an even-day check, then re-check after midnight UTC.
+- **Nothing else changes between the days:** the prose, the links and the Article's description, so no other fix opens or closes.
+- **The figures** are read through the engine's own reader and aggregator in `scripts/qa/fixme-lab.test.ts`.
+
+**Domain.** Add the host to the Vercel project `crawlmouse-qa-lab` before it answers, as with `dense` and `sentinel-b`.
