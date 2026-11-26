@@ -39,6 +39,7 @@ import type { RowTarget } from '../types';
 
 const persisted = vi.hoisted(() => [] as unknown[]);
 vi.mock('../persist', () => ({
+  PIECE_CUT: { rows: 2_000, bytes: 1024 * 1024, perStep: 50 },
   pageVantage: (pages: { url: string; outcome: string; identity_sent: string }[]) =>
     new Map(
       pages
@@ -69,6 +70,9 @@ const UNUSED_DB = {
     throw new Error('persistDb is not called in this test');
   },
   insertPageResults: async (): Promise<void> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  storedRows: async (): Promise<{ status: string; page_results: number; link_edges: number }> => {
     throw new Error('persistDb is not called in this test');
   },
   insertEdges: async (): Promise<void> => {

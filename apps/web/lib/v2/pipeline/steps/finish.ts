@@ -32,7 +32,7 @@ import type { CheckSteps } from '../../../../../../inngest/check';
 import { CheckFailure } from '../../../../../../inngest/check-events';
 import { storeLedgerDraft } from '../../ledger/draft-step';
 import { getJson, putJson } from '../evidence';
-import { pageVantage, persistStep, readOfFixes } from '../persist';
+import { PIECE_CUT, pageVantage, persistStep, readOfFixes, type PieceCut } from '../persist';
 import type { FixRead, PageVantage } from '../types';
 import type { StepDeps } from './deps';
 import { renderEndsAt } from './time';
@@ -53,6 +53,11 @@ interface StoredBuilt {
   vantage: [string, PageVantage][];
   /** What the build read of the site's fixes, for persist's watermark (CC-26b D5). */
   read: FixRead[];
+  /**
+   * The build's release's piece cut (QA B3 on #219), which every persist step of the check cuts
+   * by; absent on a check built before it was stored.
+   */
+  cut?: PieceCut;
 }
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -164,6 +169,7 @@ export function finishSteps(
         built: JSON.parse(serialiseBuilt(built)),
         vantage: [...vantage],
         read: readOfFixes(fixes, events),
+        cut: PIECE_CUT,
       };
       await putJson(deps.evidence, pathOf(event, 'built'), stored);
       await storeLedgerDraft(deps.ledger, deps.env, {
@@ -176,7 +182,7 @@ export function finishSteps(
     },
 
     // One step of rows from piece `from`; the last step finishes the check (F-330, persistStep).
-    async persist(event, from = 0) {
+    async persist(event, from = 0, restarted = false) {
       const stored = (await getJson(deps.evidence, pathOf(event, 'built'))) as StoredBuilt;
       const step = await persistStep(
         deps.persistDb,
@@ -185,12 +191,13 @@ export function finishSteps(
           vantage: new Map(stored.vantage),
           map_path: pathOf(event, 'map'),
           read: stored.read,
+          ...(stored.cut === undefined ? {} : { cut: stored.cut }),
         },
-        from,
+        { from, restarted },
       );
       return step.next === null
         ? { written: step.outcome.written, next: null }
-        : { written: false, next: step.next };
+        : { written: false, next: step.next, restarted: step.restarted };
     },
 
     async finalize(event) {

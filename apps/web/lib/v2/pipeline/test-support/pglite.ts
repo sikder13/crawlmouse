@@ -83,6 +83,17 @@ export function pglitePersistDb(db: Db): PersistDb {
       if (lineage.length !== 1) throw new Error('rowTarget: not one lineage');
       return { running: true, lineageId: lineage[0]!.id, checkMonth };
     },
+    async storedRows(checkId) {
+      const { rows } = await db.query<{ status: string; page_results: number; link_edges: number }>(
+        `select c.status,
+                (select count(*)::int from public.page_results p where p.check_id = c.id) as page_results,
+                (select count(*)::int from public.link_edges e where e.check_id = c.id) as link_edges
+           from public.checks c where c.id = $1`,
+        [checkId],
+      );
+      if (rows.length !== 1) throw new Error(`storedRows: check ${checkId} not found`);
+      return rows[0]!;
+    },
     // The columns persist_built_check inserts (migration 20261112000001, step 4), from the rows.
     async insertPageResults(rows) {
       await db.query(

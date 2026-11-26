@@ -154,6 +154,7 @@ function timed(db: PersistDb) {
     rowTarget: time('row_target', db.rowTarget),
     insertPageResults: time('pages', db.insertPageResults),
     insertEdges: time('edges', db.insertEdges),
+    storedRows: time('count', db.storedRows),
   };
   return { port, calls };
 }
@@ -274,7 +275,7 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
         while (from !== null) {
           const { port, calls } = timed(pglitePersistDb(asDb(sql)));
           const t = performance.now();
-          const step = await persistStep(port, input, from, undefined, PER_STEP);
+          const step = await persistStep(port, input, { from, perStep: PER_STEP });
           stepMs.push(performance.now() - t);
           for (const c of calls) expect(c.ms, c.kind).toBeLessThan(TIMEOUT_MS);
           if (step.next === null) {

@@ -27,6 +27,7 @@ import type { RowTarget } from '../types';
 // steps and the orchestration. The persist stand-in records what the persist step hands it.
 const persisted = vi.hoisted(() => [] as unknown[]);
 vi.mock('../persist', () => ({
+  PIECE_CUT: { rows: 2_000, bytes: 1024 * 1024, perStep: 50 },
   pageVantage: (pages: { url: string; outcome: string; identity_sent: string }[]) =>
     new Map(
       pages
@@ -64,6 +65,9 @@ const UNUSED_DB = {
     throw new Error('persistDb is not called in this test');
   },
   insertPageResults: async (): Promise<void> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  storedRows: async (): Promise<{ status: string; page_results: number; link_edges: number }> => {
     throw new Error('persistDb is not called in this test');
   },
   insertEdges: async (): Promise<void> => {
@@ -445,6 +449,16 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     expect([...input.vantage.keys()].sort()).toEqual(
       input.built.page_results.map((p) => p.url).sort(),
     );
+  });
+
+  // QA B3 on #219: the build stores its release's piece cut, and persist cuts by the stored one.
+  it('hands persistence the piece cut the build stored with the built check', async () => {
+    await runRecorded();
+    expect((persisted[0] as { cut: unknown }).cut).toEqual({
+      rows: 2_000,
+      bytes: 1024 * 1024,
+      perStep: 50,
+    });
   });
 
   it('hands persistence what the build read of the site’s fixes, for the watermark (CC-26b D5)', async () => {

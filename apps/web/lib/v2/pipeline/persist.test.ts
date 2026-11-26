@@ -13,6 +13,7 @@ import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tab
 import {
   CHUNK_BYTES,
   PIECES_PER_STEP,
+  PIECE_CUT,
   chunked,
   edgePieces,
   pageVantage,
@@ -65,6 +66,8 @@ function recording(
   answer: unknown = { written: true, counts: {} },
   staged: unknown = true,
   target: RowTarget = { running: true, lineageId: LINEAGE, checkMonth: '2026-11-01' },
+  /** What `storedRows` answers, in turn; the built check's own counts, running, when left out. */
+  storedAnswers: { status: string; page_results: number; link_edges: number }[] = [],
 ) {
   const sent: unknown[] = [];
   const stages: [string, string, number, readonly unknown[]][] = [];
@@ -96,6 +99,16 @@ function recording(
     async insertEdges(rows) {
       order.push('edges');
       pieces.push(rows);
+    },
+    async storedRows() {
+      order.push('count');
+      return (
+        storedAnswers.shift() ?? {
+          status: 'running',
+          page_results: built.page_results.length,
+          link_edges: built.link_edges.length,
+        }
+      );
     },
   };
   return { db, sent, stages, order, pieces, pagePieces, identities };
@@ -146,6 +159,7 @@ describe('persistBuiltCheck: what it sends', () => {
       'target',
       ...pagePieces.map(() => 'pages'),
       ...pieces.map(() => 'edges'),
+      'count',
       ...stages.map(() => 'stage'),
       'persist',
     ]);
@@ -329,7 +343,7 @@ describe('persistStep: the rows across steps', () => {
     let from: number | null = 0;
     while (from !== null) {
       const before = order.length;
-      const step = await persistStep(db, inputOf(), from, undefined, 1);
+      const step = await persistStep(db, inputOf(), { from: from, perStep: 1 });
       seen.push(order.slice(before));
       if (step.next === null) {
         expect(step.outcome.written).toBe(true);
@@ -356,8 +370,8 @@ describe('persistStep: the rows across steps', () => {
     const calls = persistCalls(inputOf());
     const last = calls.pieces.length - 1;
     const { db, pieces, pagePieces, sent } = recording();
-    await persistStep(db, inputOf(), last - 1, undefined, 1);
-    await persistStep(db, inputOf(), last - 1, undefined, 1);
+    await persistStep(db, inputOf(), { from: last - 1, perStep: 1 });
+    await persistStep(db, inputOf(), { from: last - 1, perStep: 1 });
     const sentRows = [...pagePieces, ...pieces];
     expect(sentRows).toHaveLength(2);
     for (const rows of sentRows) expect(rows).toHaveLength(calls.pieces[last - 1]!.rows.length);
@@ -371,7 +385,7 @@ describe('persistStep: the rows across steps', () => {
     [0, 1.5],
   ])('refuses from %d and perStep %d before any call', async (from, perStep) => {
     const { db, order } = recording();
-    await expect(persistStep(db, inputOf(), from, undefined, perStep)).rejects.toThrow(
+    await expect(persistStep(db, inputOf(), { from: from, perStep: perStep })).rejects.toThrow(
       /not a step/,
     );
     expect(order).toEqual([]);
@@ -380,9 +394,97 @@ describe('persistStep: the rows across steps', () => {
   it('a step from past the last piece writes no row and finishes the check', async () => {
     const calls = persistCalls(inputOf());
     const { db, order } = recording();
-    const step = await persistStep(db, inputOf(), calls.pieces.length);
+    const step = await persistStep(db, inputOf(), { from: calls.pieces.length });
     expect(step.next).toBeNull();
-    expect(order.filter((o) => o !== 'stage')).toEqual(['persist']);
+    expect(order.filter((o) => o !== 'stage')).toEqual(['count', 'persist']);
+  });
+
+  // QA B3 on #219: the finishing call is made only when the stored rows are the built check's.
+  const short = () => ({
+    status: 'running',
+    page_results: built.page_results.length - 1,
+    link_edges: built.link_edges.length,
+  });
+
+  it('a last step whose stored rows fall short starts again from piece 0, and asks no last call', async () => {
+    const n = persistCalls(inputOf()).pieces.length;
+    const { db, sent, stages } = recording(undefined, true, undefined, [short()]);
+    expect(await persistStep(db, inputOf(), { from: n - 1, perStep: 1 })).toEqual({
+      next: 0,
+      restarted: true,
+    });
+    expect(sent).toEqual([]);
+    expect(stages).toEqual([]);
+  });
+
+  it('a shortfall after the restart fails the persist, naming both counts', async () => {
+    const n = persistCalls(inputOf()).pieces.length;
+    const { db, sent } = recording(undefined, true, undefined, [short()]);
+    await expect(
+      persistStep(db, inputOf(), { from: n - 1, perStep: 1, restarted: true }),
+    ).rejects.toThrow(
+      new RegExp(
+        `stores ${built.page_results.length - 1} of ${built.page_results.length} page_results and ` +
+          `${built.link_edges.length} of ${built.link_edges.length} link_edges after a restart`,
+      ),
+    );
+    expect(sent).toEqual([]);
+  });
+
+  it('a step after the restart carries `restarted` on', async () => {
+    const { db } = recording();
+    expect(await persistStep(db, inputOf(), { from: 0, perStep: 1, restarted: true })).toEqual({
+      next: 1,
+      restarted: true,
+    });
+  });
+
+  it('persistBuiltCheck writes every piece again after a shortfall, then finishes once the counts agree', async () => {
+    const { db, sent, pagePieces, pieces } = recording(
+      { written: true, counts: {} },
+      true,
+      undefined,
+      [short()],
+    );
+    expect((await persistBuiltCheck(db, inputOf())).written).toBe(true);
+    expect(pagePieces.flat()).toHaveLength(2 * built.page_results.length);
+    expect(pieces.flat()).toHaveLength(2 * built.link_edges.length);
+    expect(sent).toHaveLength(1);
+  });
+
+  it('persistBuiltCheck fails on a second shortfall, and asks no last call', async () => {
+    const { db, sent } = recording(undefined, true, undefined, [short(), short()]);
+    await expect(persistBuiltCheck(db, inputOf())).rejects.toThrow(/after a restart from piece 0/);
+    expect(sent).toEqual([]);
+  });
+
+  it('a check that is not running is not counted against the built check', async () => {
+    const { db, sent } = recording(
+      { written: false, counts: {} },
+      false,
+      {
+        running: false,
+        status: 'finished',
+      },
+      [{ status: 'finished', page_results: 0, link_edges: 0 }],
+    );
+    await persistBuiltCheck(db, inputOf());
+    expect(sent).toHaveLength(1);
+  });
+
+  it('cuts the pieces by the stored cut, not this release’s', () => {
+    const calls = persistCalls({ ...inputOf(), cut: { rows: 7, bytes: 1024 * 1024, perStep: 3 } });
+    expect(calls.cut).toEqual({ rows: 7, bytes: 1024 * 1024, perStep: 3 });
+    expect(Math.max(...calls.pieces.map((p) => p.rows.length))).toBe(7);
+    // A check built before the cut was stored takes this release's.
+    expect(persistCalls(inputOf()).cut).toEqual(PIECE_CUT);
+  });
+
+  it('a step takes its pieces a step from the stored cut', async () => {
+    const { db, order } = recording();
+    const input = { ...inputOf(), cut: { rows: 7, bytes: 1024 * 1024, perStep: 3 } };
+    expect(await persistStep(db, input, { from: 0 })).toEqual({ next: 3, restarted: false });
+    expect(order.filter((o) => o === 'pages' || o === 'edges')).toHaveLength(3);
   });
 
   /**
@@ -812,7 +914,7 @@ describe('persist_built_check, through persistBuiltCheck', () => {
 
   it.each([
     ['start time', `started_at = started_at + interval '1 microsecond'`],
-    ['queue time', `queued_at = queued_at - interval '1 second'`],
+    ['queue time', `queued_at = queued_at - interval '1 microsecond'`],
     ['trigger', `trigger = 'manual'`],
     ['grade version', `grade_version = '1.9.9'`],
   ])('refuses a built check whose %s differs from the row', async (_label, change) => {
@@ -862,6 +964,55 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     ).rejects.toThrow(/an edge names check/);
     expect(await count('link_edges')).toBe(0);
     expect(await staged()).toEqual([]);
+  });
+
+  // QA B1 on #219: page rows are written by row before the RPC too, so the app refuses one naming
+  // another check, before any call. The foreign key alone would let it land under any check of the
+  // same month.
+  it('refuses a page row naming another check before any call', async () => {
+    const other = { ...site(), id: randomUUID(), host: 'other.test' };
+    const theirs = { ...checkOf(), id: randomUUID(), site_id: other.id };
+    await seedRunningCheck(db, other, theirs);
+    await seedRunningCheck(db, site(), checkOf());
+    const input = inputOf();
+    const pages = [...input.built.page_results];
+    pages[3] = { ...pages[3]!, check_id: theirs.id };
+    await expect(
+      persistBuiltCheck(pglitePersistDb(db), {
+        ...input,
+        built: { ...input.built, page_results: pages },
+      }),
+    ).rejects.toThrow(/a page names check/);
+    expect(await count('page_results')).toBe(0);
+    expect(await count('page_results', 'check_id', theirs.id)).toBe(0);
+  });
+
+  // QA B3 on #219: a deploy between persist steps that cuts the pieces otherwise.
+  it('a cut that moves between steps leaves rows out, which the count catches and the restart writes', async () => {
+    await seedRunningCheck(db, site(), checkOf());
+    const pdb = pglitePersistDb(db);
+    const small = { ...inputOf(), cut: { rows: 30, bytes: 1024 * 1024, perStep: 1 } };
+    const large = { ...inputOf(), cut: { rows: 2_000, bytes: 1024 * 1024, perStep: 1 } };
+    // The first step by one cut writes pages 0–29; every later step cuts pages 0–59 as piece 0.
+    expect(await persistStep(pdb, small, { from: 0 })).toEqual({ next: 1, restarted: false });
+    let at: { from: number; restarted: boolean } = { from: 1, restarted: false };
+    const seen: unknown[] = [];
+    for (;;) {
+      const step = await persistStep(pdb, large, at);
+      seen.push(step.next === null ? 'finished' : step);
+      if (step.next === null) break;
+      at = { from: step.next, restarted: step.restarted };
+    }
+    // The last piece's step found pages 30–59 missing and started again from piece 0, once.
+    expect(seen).toContainEqual({ next: 0, restarted: true });
+    expect(seen.at(-1)).toBe('finished');
+    expect(await count('page_results')).toBe(built.page_results.length);
+    expect(await count('link_edges')).toBe(built.link_edges.length);
+    const { rows } = await db.query<{ status: string }>(
+      `select status from public.checks where id = $1`,
+      [built.check.id],
+    );
+    expect(rows[0]!.status).toBe(built.check.status);
   });
 
   it('the finished write leaves no staging behind', async () => {
@@ -1030,7 +1181,7 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     const pdb = pglitePersistDb(db);
     const n = persistCalls(inputOf()).pieces.length;
     for (let from = 0; from < n - 1; from++) {
-      const step = await persistStep(pdb, inputOf(), from, undefined, 1);
+      const step = await persistStep(pdb, inputOf(), { from: from, perStep: 1 });
       expect(step.next).toBe(from + 1);
       const { rows } = await db.query<{ status: string }>(
         `select status from public.checks where id = $1`,
@@ -1038,7 +1189,7 @@ describe('persist_built_check, through persistBuiltCheck', () => {
       );
       expect(rows[0]!.status).toBe('running');
     }
-    const last = await persistStep(pdb, inputOf(), n - 1, undefined, 1);
+    const last = await persistStep(pdb, inputOf(), { from: n - 1, perStep: 1 });
     expect(last.next).toBeNull();
     expect(await count('page_results')).toBe(built.page_results.length);
     expect(await count('link_edges')).toBe(built.link_edges.length);
@@ -1392,6 +1543,7 @@ describe('a built check at the page cap (Q11)', () => {
         return answer;
       },
       rowTarget: (checkId, fetching, identity) => pdb.rowTarget(checkId, fetching, identity),
+      storedRows: (checkId) => pdb.storedRows(checkId),
       async insertPageResults(rows) {
         const t = performance.now();
         await pdb.insertPageResults(rows);

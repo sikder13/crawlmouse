@@ -54,6 +54,11 @@ export interface PersistInput {
   map_path: string | null;
   /** What the build read of each fix (`readOfFixes`): persist withholds a fix that moved since. */
   read: readonly FixRead[];
+  /**
+   * How the rows are cut into pieces and steps, as the build step stored it (persist.ts PieceCut).
+   * Left out for a check built before it was stored: the persist then takes its release's cut.
+   */
+  cut?: { rows: number; bytes: number; perStep: number };
 }
 
 /** One fix the build read, and the last of its events the build read (null when it had none). */
@@ -106,6 +111,10 @@ export interface PersistDb {
   insertPageResults(rows: readonly Record<string, unknown>[]): Promise<void>;
   /** F-330: one piece of a check's link edges; a row already written is skipped, not an error. */
   insertEdges(rows: readonly Record<string, unknown>[]): Promise<void>;
+  /** QA B3 on #219: the check's status, and how many page rows and edges it stores. */
+  storedRows(
+    checkId: string,
+  ): Promise<{ status: string; page_results: number; link_edges: number }>;
 }
 
 /** The columns persist_built_check holds a built check to, as its row has them. */

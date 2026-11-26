@@ -734,6 +734,25 @@ describe('runCheck: failures in build and persist', () => {
     expect(step.ids.slice(at, at + 4)).toEqual(['persist', 'persist-1', 'persist-2', 'emit']);
   });
 
+  it('a persist that restarts from piece 0 says so, and every later step is told', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock);
+    const calls: [number | undefined, boolean | undefined][] = [];
+    fake.steps.persist = async (_e, from, restarted) => {
+      calls.push([from, restarted]);
+      if (calls.length === 1) return { written: false, next: 0, restarted: true };
+      if (calls.length === 2) return { written: false, next: 1, restarted: true };
+      return { written: true, next: null };
+    };
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(calls).toEqual([
+      [undefined, undefined],
+      [0, true],
+      [1, true],
+    ]);
+  });
+
   it('a persist output with no `next`, as a release before stored it, ends the persist steps', async () => {
     const clock = { now: T0 };
     const step = fakeStep(clock);
