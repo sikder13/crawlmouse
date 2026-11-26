@@ -588,6 +588,14 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'not be up to date with main to merge, so the merge commit a run tested can differ from the one that merges.',
     allowedIn: [],
   },
+  {
+    text: 'The pieces already written are skipped',
+    withdrawnIn: 'the #214 description (F-330), corrected 2026-11-25 (V2R inbox 120)',
+    truth:
+      'A retried persist re-sends every piece, and Postgres ignores the rows already written ' +
+      '(on conflict do nothing); a retry is idempotent, and its time was not measured.',
+    allowedIn: [],
+  },
 ];
 
 /**

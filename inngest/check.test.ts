@@ -6,6 +6,7 @@ import {
   CHECK_FN_ID,
   FIRST_ACCEPT_BY_S,
   PACE,
+  PERSIST_STEPS_MAX,
   QUEUE_WAIT_MAX_S,
   type DiscoverOutput,
   type RunSoFar,
@@ -714,6 +715,62 @@ describe('runCheck: failures in build and persist', () => {
     await expect(
       runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps),
     ).rejects.toThrow('check failed: persist_failed');
+  });
+
+  // F-330: the rows of a check past PIECES_PER_STEP pieces take further persist steps.
+  it('a persist that leaves rows runs persist-1, persist-2, … from where it stopped, then emit', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock);
+    const froms: (number | undefined)[] = [];
+    fake.steps.persist = async (_e, from) => {
+      froms.push(from);
+      const at = from ?? 0;
+      return at < 100 ? { written: false, next: at + 50 } : { written: true, next: null };
+    };
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(froms).toEqual([undefined, 50, 100]);
+    const at = step.ids.indexOf('persist');
+    expect(step.ids.slice(at, at + 4)).toEqual(['persist', 'persist-1', 'persist-2', 'emit']);
+  });
+
+  it('a persist that restarts from piece 0 says so, and every later step is told', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock);
+    const calls: [number | undefined, boolean | undefined][] = [];
+    fake.steps.persist = async (_e, from, restarted) => {
+      calls.push([from, restarted]);
+      if (calls.length === 1) return { written: false, next: 0, restarted: true };
+      if (calls.length === 2) return { written: false, next: 1, restarted: true };
+      return { written: true, next: null };
+    };
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(calls).toEqual([
+      [undefined, undefined],
+      [0, true],
+      [1, true],
+    ]);
+  });
+
+  it('a persist output with no `next`, as a release before stored it, ends the persist steps', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock);
+    fake.steps.persist = async () => ({ written: true });
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(step.ids.filter((id) => id.startsWith('persist'))).toEqual(['persist']);
+  });
+
+  it(`a check whose rows take more than PERSIST_STEPS_MAX further steps is persist_failed`, async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock);
+    fake.steps.persist = async (_e, from) => ({ written: false, next: (from ?? 0) + 1 });
+    await expect(
+      runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps),
+    ).rejects.toThrow('check failed: persist_failed');
+    expect(step.ids.filter((id) => id.startsWith('persist'))).toHaveLength(1 + PERSIST_STEPS_MAX);
   });
 
   it('a CheckFailure keeps its own reason', async () => {

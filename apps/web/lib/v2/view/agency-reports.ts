@@ -20,7 +20,7 @@ import { agencyGateMessage, gateMessage } from '../agency/gates';
 import { roleMay } from '../agency/guard';
 import { CLIENT_COPY } from '../copy/agency';
 import { CLIENT_REPORTS_COPY as COPY } from '../copy/client-reports';
-import { dayDate, hourMinute } from '../format';
+import { dayDate, hourMinute, hourMinuteZoned } from '../format';
 import {
   primarySites,
   readerRole,
@@ -517,7 +517,7 @@ function reportsView(
       title: COPY.sentTitle,
       sub: total ? COPY.sentSub(shown.length, total) : '',
       rows: shown.map((r) => {
-        const when = `${dayDate(r.sent_at!, zone)} ${hourMinute(r.sent_at!, zone)}`;
+        const when = `${dayDate(r.sent_at!, zone)} ${hourMinuteZoned(r.sent_at!, zone)}`;
         const site = host.get(r.site_id) ?? '';
         return {
           key: r.id,

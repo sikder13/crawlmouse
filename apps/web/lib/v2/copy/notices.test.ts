@@ -11,15 +11,15 @@ describe('noticeLine', () => {
   it.each([
     [
       'capped',
-      'This site has used its re-checks for the last 24 hours on your plan. The next can run Tue 13:30.',
+      'This site has used its re-checks for the last 24 hours on your plan. The next can run Tue 13:30 UTC.',
     ],
     [
       'adds_capped',
-      'This account has added as many sites in the last 24 hours as its plan allows. The next can be added Tue 13:30.',
+      'This account has added as many sites in the last 24 hours as its plan allows. The next can be added Tue 13:30 UTC.',
     ],
     [
       'domain_capped',
-      'That address has been audited too often in the last hour. It can be added again Tue 13:30.',
+      'That address has been audited too often in the last hour. It can be added again Tue 13:30 UTC.',
     ],
     ['paused', 'Checks are paused for maintenance, so nothing was started. Try again later.'],
     ['unavailable', 'Checks are not running yet, so nothing was started.'],
@@ -27,7 +27,7 @@ describe('noticeLine', () => {
     ['check_running', 'A check of this site is already running. Ask for another once it ends.'],
     [
       'recently_checked',
-      'A check of this site was asked for in the last few minutes, so no new one was started. Ask again from Tue 13:30.',
+      'A check of this site was asked for in the last few minutes, so no new one was started. Ask again from Tue 13:30 UTC.',
     ],
     ['confirm_required', 'The site was not removed: tick the box to confirm, then remove it.'],
     ['site_paused', 'Checks of this site are paused, so it was not checked.'],
@@ -59,7 +59,7 @@ describe('noticeLine', () => {
     ['marked_done', 'Marked done. A re-check is queued; it confirms the fix or reopens it.'],
     [
       'marked_done_capped',
-      'Marked done. This site has used its re-checks for the last 24 hours, so none was queued; the next check confirms the fix or reopens it. A re-check can be asked from Tue 13:30.',
+      'Marked done. This site has used its re-checks for the last 24 hours, so none was queued; the next check confirms the fix or reopens it. A re-check can be asked from Tue 13:30 UTC.',
     ],
     [
       'marked_done_check_running',
@@ -67,7 +67,7 @@ describe('noticeLine', () => {
     ],
     [
       'marked_done_recently_checked',
-      'Marked done. A check of this site was asked for in the last few minutes, so no re-check was queued; the next check confirms the fix or reopens it. A re-check can be asked from Tue 13:30.',
+      'Marked done. A check of this site was asked for in the last few minutes, so no re-check was queued; the next check confirms the fix or reopens it. A re-check can be asked from Tue 13:30 UTC.',
     ],
     [
       'marked_done_capacity',
@@ -88,11 +88,11 @@ describe('noticeLine', () => {
     ['invalid_email', 'That is not an email address, so nothing was recorded.'],
     [
       'rate_limited',
-      'Too many emails were asked for in a short time, so nothing was recorded. Ask again from Tue 13:30.',
+      'Too many emails were asked for in a short time, so nothing was recorded. Ask again from Tue 13:30 UTC.',
     ],
     [
       'reports_capped',
-      'This account has made as many reports as it may for now, so none was made. The next can be made Tue 13:30.',
+      'This account has made as many reports as it may for now, so none was made. The next can be made Tue 13:30 UTC.',
     ],
     [
       'fix_not_verified',
@@ -142,7 +142,7 @@ describe('noticeLine', () => {
   it('the time is in the account’s zone', () => {
     expect(
       noticeLine({ notice: 'capped', next: NEXT }, 'America/Indiana/Indianapolis')!.text,
-    ).toMatch(/run Tue 08:30\.$/);
+    ).toMatch(/run Tue 08:30 EST\.$/);
   });
 
   it('on a page that names the account’s tier, a refused add is told the sites its plan keeps and the plan that lifts it', () => {

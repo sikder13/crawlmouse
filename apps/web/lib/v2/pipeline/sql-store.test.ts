@@ -486,7 +486,7 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       waitingSince: null,
       discovered: null,
     });
-    expect(await steps.persist(event)).toEqual({ written: true });
+    expect(await steps.persist(event)).toEqual({ written: true, next: null });
 
     const row = await db.query<{ previous_check_id: string | null }>(
       `select previous_check_id from public.checks where id = $1`,

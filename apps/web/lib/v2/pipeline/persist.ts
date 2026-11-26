@@ -5,11 +5,14 @@
  * carried, before anything is sent.
  *
  * A built check at the page cap measured 5.00 MiB as one request, over the 2 MB bound the owner set
- * (Q11), so the bulk rows (page results, link edges, access tests) are staged first, in chunks of at
- * most CHUNK_BYTES of JSON (stage_check_rows), and one call to persist_built_check (migration 008)
- * then writes the whole check, staged rows included, in one transaction. Once the check is written,
- * staging answers false and persist_built_check {written: false}, so a retried persist step changes
- * nothing.
+ * (Q11). Its page rows and link edges are written first, in pieces of at most PIECE_ROWS rows and
+ * CHUNK_BYTES of JSON, each piece its own request and statement (F-330: one statement for all of them
+ * passed production's 8 s `statement_timeout`). The access tests are staged in chunks
+ * (stage_check_rows), and one call to persist_built_check (migration 008) then writes the rest of the
+ * check and marks it finished, in one transaction. A persist step writes at most PIECES_PER_STEP
+ * pieces (`persistStep`), so a dense site's rows take several steps, none near the route's time.
+ * A piece skips a row already written, and once the check is written the pieces write nothing,
+ * staging answers false and persist_built_check {written: false}: a retried step changes nothing.
  *
  * The watermark (CC-26b D5, migration 20261112000001): the build reads the site's fixes and their
  * events minutes before persist runs, and a member can mark a fix done in between. The payload's
@@ -57,6 +60,7 @@ import type {
   PageVantage,
   PersistDb,
   PersistInput,
+  CheckIdentity,
   PersistOutcome,
   StagedCollection,
 } from './types';
@@ -68,17 +72,50 @@ export const STAGE_RPC = 'stage_check_rows';
 /** The most JSON one staged chunk carries: half the 2 MB request bound (Q11). */
 export const CHUNK_BYTES = 1024 * 1024;
 /**
- * The collections staged for persist_built_check. Link edges are not (F-330): a 2,000-page check
- * holds tens of thousands, and their insert inside persist_built_check, one PostgREST statement,
- * passed production's 8 s `statement_timeout`. They are written first, in pieces (`EDGE_PIECE_ROWS`).
+ * The collections staged for persist_built_check. Page rows and link edges are not (F-330): their
+ * insert inside persist_built_check, one PostgREST statement, passed production's 8 s
+ * `statement_timeout` for the edges, and took 3,460 ms of it for 2,000 page rows on production's
+ * first 2,000-page save. They are written first, in pieces (`PIECE_ROWS`).
  */
-const STAGED: readonly StagedCollection[] = ['page_results', 'access_tests'];
+const STAGED: readonly StagedCollection[] = ['access_tests'];
 /**
- * The most link edges one request writes (F-330), each request its own statement under PostgREST's
- * 8 s timeout. A piece is also bounded by CHUNK_BYTES of JSON. Measured in
- * scripts/db/persist-edges.test.ts against a real Postgres with an 8 s `statement_timeout`.
+ * The most rows one piece writes (F-330), each piece its own request and statement under
+ * PostgREST's 8 s timeout. A piece is also bounded by CHUNK_BYTES of JSON. Production's first
+ * 2,000-page save wrote its edges in 21 pieces, the slowest 2,257 ms (a2/evidence/prod-2000).
+ * Measured on CI in scripts/db/persist-edges.test.ts against a real Postgres with an 8 s timeout.
  */
-export const EDGE_PIECE_ROWS = 2_000;
+export const PIECE_ROWS = 2_000;
+/**
+ * The most pieces one persist step writes. At production's slowest piece measured (2,257 ms), 50 are
+ * 113 s of inserts, which leaves at least 180 s of the Inngest route's 300 s (`maxDuration`,
+ * app/api/webhooks/inngest/route.ts) for reading the built check from Storage and the finishing
+ * call. At production's mean piece (509 ms) they are 25 s. A check whose rows are more pieces than
+ * this takes further steps (inngest/check.ts), and a retry repeats one step's pieces, not all.
+ */
+export const PIECES_PER_STEP = 50;
+
+/**
+ * How a check's rows are cut into pieces and steps. The build step stores the cut of its release
+ * with the built check (steps/finish.ts), and every persist step cuts by the stored one, so a deploy
+ * between persist steps cannot move a piece's boundaries (QA B3 on #219). A check built before the
+ * cut was stored has none and takes this release's; the count before the finishing call
+ * (`finishCheck`) catches any row a moved boundary left out.
+ */
+export interface PieceCut {
+  rows: number;
+  bytes: number;
+  perStep: number;
+}
+export const PIECE_CUT: PieceCut = {
+  rows: PIECE_ROWS,
+  bytes: CHUNK_BYTES,
+  perStep: PIECES_PER_STEP,
+};
+const CutSchema = z.strictObject({
+  rows: z.int().min(1),
+  bytes: z.int().min(1),
+  perStep: z.int().min(1),
+});
 
 /** page_results' vantage columns, in the crawl row's own shapes. */
 const VantageSchema = z.strictObject({
@@ -132,17 +169,30 @@ export interface StageCall {
   rows: unknown[];
 }
 
+/** One request's rows: a piece of the page rows or of the link edges. */
+export type Piece =
+  | { table: 'page_results'; rows: Record<string, unknown>[] }
+  | { table: 'link_edges'; rows: LinkEdge[] };
+
 /**
- * The calls that persist a built check: its staged chunks, in order; its link edges, in pieces,
- * written before the finishing payload; then the finishing payload.
+ * The calls that persist a built check: its page rows and link edges, in pieces, written before
+ * the finishing payload; its staged chunks, in order; then the finishing payload.
  */
 export interface PersistCalls {
   checkId: string;
+  /** The cut the pieces were made by: the stored one, or this release's for a check built before. */
+  cut: PieceCut;
   stages: StageCall[];
-  /** The edges, cut into pieces of at most EDGE_PIECE_ROWS rows and CHUNK_BYTES of JSON. */
+  /** The page rows, then the edges, each cut into pieces of at most PIECE_ROWS rows and CHUNK_BYTES. */
+  pieces: Piece[];
+  /** The edges' pieces alone, as `pieces` holds them. */
   edges: LinkEdge[][];
-  /** The lineage every edge names (persist_built_check's `fetching`). */
+  /** The lineage every page row and edge names (persist_built_check's `fetching`). */
   fetching: unknown;
+  /** What persist_built_check holds the built check to; asked before any row is written. */
+  identity: CheckIdentity;
+  /** The built check's page rows and edges: what the check must store before it is finished. */
+  counts: { page_results: number; link_edges: number };
   payload: Record<string, unknown>;
 }
 
@@ -170,16 +220,24 @@ export function chunked(rows: readonly unknown[], maxBytes = CHUNK_BYTES): unkno
   return out;
 }
 
-/** `edges` cut into pieces of at most `maxRows` rows and CHUNK_BYTES of JSON, in order. */
-export function edgePieces(edges: readonly LinkEdge[], maxRows = EDGE_PIECE_ROWS): LinkEdge[][] {
-  return chunked(edges).flatMap((chunk) => {
-    const out: LinkEdge[][] = [];
+/** `rows` cut into pieces of at most `maxRows` rows and CHUNK_BYTES of JSON, in order. */
+export function rowPieces<T>(
+  rows: readonly T[],
+  maxRows = PIECE_ROWS,
+  maxBytes = CHUNK_BYTES,
+): T[][] {
+  return chunked(rows, maxBytes).flatMap((chunk) => {
+    const out: T[][] = [];
     for (let i = 0; i < chunk.length; i += maxRows) {
-      out.push(chunk.slice(i, i + maxRows) as LinkEdge[]);
+      out.push(chunk.slice(i, i + maxRows) as T[]);
     }
     return out;
   });
 }
+
+/** `edges` cut into pieces of at most `maxRows` rows and CHUNK_BYTES of JSON, in order. */
+export const edgePieces = (edges: readonly LinkEdge[], maxRows = PIECE_ROWS): LinkEdge[][] =>
+  rowPieces(edges, maxRows);
 
 /**
  * The built check's rows, each parsed with its contract schema and every page with its vantage, as
@@ -212,15 +270,39 @@ export function persistCalls(input: PersistInput): PersistCalls {
   const fetching = MeasurementLineageSchema.parse(built.lineages.fetching);
   // The edges are written by row, before persist_built_check reads anything (F-330): one naming
   // another check is refused here, as persist_built_check refused a staged row naming another.
+  // Page rows too (QA B1 on #219): a row naming another check would land under any check of the
+  // same month, as the foreign key is (check_id, check_month).
+  const otherPage = page_results.find((p) => p.check_id !== check.id);
+  if (otherPage) {
+    throw new Error(`persistBuiltCheck: a page names check ${otherPage.check_id}, not ${check.id}`);
+  }
   const other = link_edges.find((e) => e.check_id !== check.id);
   if (other) {
     throw new Error(`persistBuiltCheck: an edge names check ${other.check_id}, not ${check.id}`);
   }
+  const cut = CutSchema.parse(input.cut ?? PIECE_CUT);
+  const edges = rowPieces(link_edges, cut.rows, cut.bytes);
   return {
     checkId: check.id,
+    cut,
     stages,
-    edges: edgePieces(link_edges),
+    pieces: [
+      ...rowPieces(page_results, cut.rows, cut.bytes).map((rows) => ({
+        table: 'page_results' as const,
+        rows,
+      })),
+      ...edges.map((rows) => ({ table: 'link_edges' as const, rows })),
+    ],
+    edges,
     fetching,
+    counts: { page_results: page_results.length, link_edges: link_edges.length },
+    identity: {
+      site_id: check.site_id,
+      trigger: check.trigger,
+      grade_version: check.grade_version,
+      queued_at: check.queued_at,
+      started_at: check.started_at,
+    },
     payload: {
       check,
       fixes: z.array(FixSchema).parse(built.fixes),
@@ -234,7 +316,7 @@ export function persistCalls(input: PersistInput): PersistCalls {
       diff_inputs: DiffInputsSchema.parse(built.diff_inputs),
       map_path: z.string().min(1).nullable().parse(input.map_path),
       read: ReadSchema.parse(input.read),
-      // Link edges are written before this call (F-330), so none is staged for it to move.
+      // Page rows and link edges are written before this call (F-330), so none is staged for it.
       staged: {
         ...Object.fromEntries(
           STAGED.map((collection) => [
@@ -245,6 +327,7 @@ export function persistCalls(input: PersistInput): PersistCalls {
             },
           ]),
         ),
+        page_results: { chunks: 0, rows: 0 },
         link_edges: { chunks: 0, rows: 0 },
       },
     },
@@ -255,45 +338,80 @@ export function persistCalls(input: PersistInput): PersistCalls {
 const FIX_CLOSED = 'fix_closed' satisfies (typeof SERVER_EVENTS)[number];
 
 /**
- * Persists the built check, then sends `fix_closed` for each verification the call wrote, as
- * `account:<id>` of the usage event's account (a site no account keeps has none, and sends nothing),
- * through the product's server sender. A repeated call answers no verifications, so a retried step
- * does not send them twice. No request reaches this step, so no consent cookie can be read here.
+ * Writes pieces [from, to) of `calls`, a request each (F-330). Asks first whether the check may be
+ * written: one that does not exist, or that the built check does not match, throws before any row;
+ * one that is not running writes nothing (written already, or refused by the finishing call). Each
+ * piece skips a row already written, so a retried step repeats its pieces safely. The check is
+ * finished only by persist_built_check, after the last piece, and until then the read-back refuses
+ * it (load.ts: finished or partial).
  */
-export async function persistBuiltCheck(
+async function writePieces(db: PersistDb, calls: PersistCalls, from: number, to: number) {
+  if (from >= to) return;
+  const target = await db.rowTarget(calls.checkId, calls.fetching, calls.identity);
+  if (!target.running) return;
+  const named = { check_month: target.checkMonth, lineage_id: target.lineageId };
+  for (let i = from; i < to; i++) {
+    const piece = calls.pieces[i]!;
+    const rows = piece.rows.map((r) => ({ ...r, ...named }));
+    if (piece.table === 'page_results') await db.insertPageResults(rows);
+    else await db.insertEdges(rows);
+  }
+}
+
+/** What the check's stored rows must number before the finishing call: the built check's. */
+interface Shortfall {
+  stored: { page_results: number; link_edges: number };
+  built: { page_results: number; link_edges: number };
+}
+
+/**
+ * Whether the rows the pieces wrote are all stored (QA B3 on #219): for a running check, the
+ * stored `page_results` and `link_edges` of the check against the built check's. Null when they
+ * agree, or when the check is not running (written already, or refused by the finishing call).
+ */
+async function shortfallOf(db: PersistDb, calls: PersistCalls): Promise<Shortfall | null> {
+  const stored = await db.storedRows(calls.checkId);
+  if (stored.status !== 'running') return null;
+  const built = { page_results: calls.counts.page_results, link_edges: calls.counts.link_edges };
+  const same = stored.page_results === built.page_results && stored.link_edges === built.link_edges;
+  return same
+    ? null
+    : { stored: { page_results: stored.page_results, link_edges: stored.link_edges }, built };
+}
+
+/** The error a shortfall that a restart did not mend fails the persist with, naming both counts. */
+const shortfallError = (checkId: string, { stored, built }: Shortfall) =>
+  new Error(
+    `persistBuiltCheck: check ${checkId} stores ${stored.page_results} of ${built.page_results} ` +
+      `page_results and ${stored.link_edges} of ${built.link_edges} link_edges after a restart ` +
+      'from piece 0',
+  );
+
+/**
+ * The staged chunks, then persist_built_check, then `fix_closed` for each verification the call
+ * wrote, as `account:<id>` of the usage event's account (a site no account keeps has none, and
+ * sends nothing), through the product's server sender. A repeated call answers no verifications, so
+ * a retried step does not send them twice. No request reaches this step, so no consent cookie can be
+ * read here.
+ */
+async function finishCheck(
   db: PersistDb,
+  calls: PersistCalls,
   input: PersistInput,
-  send: Sender = sendWithoutRequest,
+  send: Sender,
 ): Promise<PersistOutcome> {
-  const calls = persistCalls(input);
-  let written = false;
   for (const s of calls.stages) {
     const staged = z
       .boolean()
       .parse(await db.stageCheckRows(calls.checkId, s.collection, s.chunk, s.rows));
     // False: the check is written already, and persist_built_check will say so.
-    if (!staged) {
-      written = true;
-      break;
-    }
-  }
-  // F-330: the edges, a piece a request, each its own statement and well inside PostgREST's 8 s;
-  // each skips a row already written, so a retried step repeats them safely. Only then does
-  // persist_built_check write the rest and mark the check finished, so a check is never finished
-  // with part of its edges. Until it is, the read-back refuses it (load.ts: finished or partial).
-  if (!written && calls.edges.length > 0) {
-    const { lineageId, checkMonth } = await db.edgeTarget(calls.checkId, calls.fetching);
-    for (const piece of calls.edges) {
-      await db.insertEdges(
-        piece.map((e) => ({ ...e, check_month: checkMonth, lineage_id: lineageId })),
-      );
-    }
+    if (!staged) break;
   }
   const answered = OutcomeSchema.parse(await db.persistBuiltCheck(calls.payload));
-  // persist_built_check moved no edge (none was staged), so its count is the edges written here.
-  const edges = calls.edges.reduce((n, piece) => n + piece.length, 0);
+  // persist_built_check moved no page row or edge (none was staged): its counts are the rows
+  // stored, which shortfallOf held equal to the built check's before this call.
   const outcome = answered.written
-    ? { ...answered, counts: { ...answered.counts, link_edges: edges } }
+    ? { ...answered, counts: { ...answered.counts, ...calls.counts } }
     : answered;
   const accountId = input.built.usage_event?.account_id ?? null;
   if (accountId !== null) {
@@ -306,6 +424,70 @@ export async function persistBuiltCheck(
     }
   }
   return outcome;
+}
+
+/**
+ * Persists the built check whole: every piece, then the finishing call (`finishCheck`). When the
+ * stored rows fall short of the built check's, every piece is written once more; a second shortfall
+ * fails, naming both counts.
+ */
+export async function persistBuiltCheck(
+  db: PersistDb,
+  input: PersistInput,
+  send: Sender = sendWithoutRequest,
+): Promise<PersistOutcome> {
+  const calls = persistCalls(input);
+  for (let attempt = 0; ; attempt++) {
+    await writePieces(db, calls, 0, calls.pieces.length);
+    const short = await shortfallOf(db, calls);
+    if (short === null) return finishCheck(db, calls, input, send);
+    if (attempt > 0) throw shortfallError(calls.checkId, short);
+  }
+}
+
+/**
+ * What one persist step did: more pieces to write from `next` (from piece 0 again, `restarted`, when
+ * the stored rows fell short), or the check's outcome.
+ */
+export type PersistStep =
+  | { next: number; restarted: boolean }
+  | { next: null; outcome: PersistOutcome };
+
+/** Where a persist step starts: its first piece, and whether the persist has restarted once. */
+export interface StepAt {
+  from: number;
+  restarted?: boolean;
+  /** Pieces a step; the stored cut's when left out. */
+  perStep?: number;
+}
+
+/**
+ * One persist step (F-330): pieces [from, from + perStep), then, when no piece is left, the count
+ * of the stored rows and the finishing call. The pieces are cut again from the stored built check
+ * on every step, by its stored cut, so a step names where the next one starts and nothing else.
+ * When the stored rows fall short of the built check's, the persist starts again from piece 0
+ * (every piece skips a row already written); a second shortfall fails, naming both counts.
+ */
+export async function persistStep(
+  db: PersistDb,
+  input: PersistInput,
+  at: StepAt,
+  send: Sender = sendWithoutRequest,
+): Promise<PersistStep> {
+  const calls = persistCalls(input);
+  const { from, restarted = false, perStep = calls.cut.perStep } = at;
+  if (!Number.isInteger(from) || from < 0 || !Number.isInteger(perStep) || perStep < 1) {
+    throw new Error(`persistStep: from ${from} and perStep ${perStep} are not a step`);
+  }
+  const to = Math.min(calls.pieces.length, from + perStep);
+  await writePieces(db, calls, from, to);
+  if (to < calls.pieces.length) return { next: to, restarted };
+  const short = await shortfallOf(db, calls);
+  if (short !== null) {
+    if (restarted) throw shortfallError(calls.checkId, short);
+    return { next: 0, restarted: true };
+  }
+  return { next: null, outcome: await finishCheck(db, calls, input, send) };
 }
 
 /**
@@ -347,13 +529,37 @@ export function supabasePersistDb(sb: SupabaseClient): PersistDb {
       ),
     persistBuiltCheck: async (payload) =>
       answer(PERSIST_RPC, await sb.rpc(PERSIST_RPC, { p: payload })),
-    async edgeTarget(checkId, fetching) {
+    async rowTarget(checkId, fetching, identity) {
       const l = MeasurementLineageSchema.parse(fetching);
-      const month = z
-        .array(z.object({ check_month: z.string() }))
-        .length(1)
-        .parse(answer('checks', await sb.from('checks').select('check_month').eq('id', checkId)));
-      const checkMonth = month[0]!.check_month;
+      const found = z
+        .array(z.object({ status: z.string(), check_month: z.string() }))
+        .max(1)
+        .parse(
+          answer('checks', await sb.from('checks').select('status, check_month').eq('id', checkId)),
+        );
+      if (found.length === 0) throw new Error(`persistBuiltCheck: check ${checkId} not found`);
+      // In persist_built_check's order: a check that is not running first, then the comparison.
+      const { status, check_month: checkMonth } = found[0]!;
+      if (status !== 'running') return { running: false, status };
+      // persist_built_check's own test of the built check against its row, asked here before any
+      // row is written. PostgREST compares the times as timestamptz, to the microsecond.
+      let same = sb
+        .from('checks')
+        .select('id')
+        .eq('id', checkId)
+        .eq('site_id', identity.site_id)
+        .eq('trigger', identity.trigger)
+        .eq('grade_version', identity.grade_version)
+        .eq('queued_at', identity.queued_at);
+      same =
+        identity.started_at === null
+          ? same.is('started_at', null)
+          : same.eq('started_at', identity.started_at);
+      if (z.array(z.unknown()).parse(answer('checks', await same)).length !== 1) {
+        throw new Error(
+          `persistBuiltCheck: the built check's site, trigger, grade version, queue time or start time differs from check ${checkId}`,
+        );
+      }
       // The month's partitions, as persist_built_check makes them before its first row.
       answer(
         PARTITIONS_RPC,
@@ -394,7 +600,35 @@ export function supabasePersistDb(sb: SupabaseClient): PersistDb {
         .array(z.object({ id: z.uuid() }))
         .length(1)
         .parse(answer('measurement_lineages', await q));
-      return { lineageId: lineage[0]!.id, checkMonth };
+      return { running: true, lineageId: lineage[0]!.id, checkMonth };
+    },
+    async storedRows(checkId) {
+      const status = z
+        .array(z.object({ status: z.string() }))
+        .length(1)
+        .parse(answer('checks', await sb.from('checks').select('status').eq('id', checkId)));
+      const counted = async (table: 'page_results' | 'link_edges') => {
+        const { count, error } = await sb
+          .from(table)
+          .select('check_id', { count: 'exact', head: true })
+          .eq('check_id', checkId);
+        if (error) throw new Error(`${table}: ${error.code} ${error.message}`);
+        return z.int().min(0).parse(count);
+      };
+      return {
+        status: status[0]!.status,
+        page_results: await counted('page_results'),
+        link_edges: await counted('link_edges'),
+      };
+    },
+    async insertPageResults(rows) {
+      answer(
+        'page_results',
+        await sb.from('page_results').upsert([...rows], {
+          onConflict: 'check_id,url_hash,check_month',
+          ignoreDuplicates: true,
+        }),
+      );
     },
     async insertEdges(rows) {
       answer(
