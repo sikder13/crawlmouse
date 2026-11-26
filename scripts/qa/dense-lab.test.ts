@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
+import handler, {
   answer,
   hostOf,
   linksOf,
@@ -111,5 +111,26 @@ describe('the dense lab (c/038)', () => {
     expect((answer({ host: 'large.lab.crawlmouse.com', path: '/' }) as Answer).status).toBe(404);
     expect(hostOf({ host: 'Dense.lab.crawlmouse.com:443' })).toBe(HOST);
     expect(hostOf({ host: 'x.vercel.app', 'x-forwarded-host': HOST })).toBe(HOST);
+  });
+
+  // QA's gate on #220, M4: a forwarded host must not win over a Host that names this site, and a
+  // forged one must reach a 404, never a page or an error.
+  it('prefers its own Host to any X-Forwarded-Host, and answers a forged one 404 through the handler', () => {
+    expect(hostOf({ host: HOST, 'x-forwarded-host': 'evil.test' })).toBe(HOST);
+    const served = (headers: Record<string, string>) => {
+      const res = {
+        statusCode: 0,
+        body: '',
+        setHeader: () => {},
+        end(b: string) {
+          this.body = b;
+        },
+      };
+      handler({ url: '/api/dense?path=%2Fp%2F0001%2F', headers }, res);
+      return res.statusCode;
+    };
+    expect(served({ host: HOST, 'x-forwarded-host': 'evil.test' })).toBe(200);
+    expect(served({ host: 'x.vercel.app', 'x-forwarded-host': 'evil.test' })).toBe(404);
+    expect(served({ host: 'evil.test' })).toBe(404);
   });
 });
