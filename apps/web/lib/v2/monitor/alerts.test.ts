@@ -299,6 +299,82 @@ describe('email (D5, D7)', () => {
     expect(h.sent[0]!.subject).toBe('shop.example: 2 changes, 1 problem');
   });
 
+  it('names the rules that sent the email, and when a fix found again was marked done (F-254)', async () => {
+    const FIX = 'f0000000-0000-4000-8000-000000000001';
+    const regressed: StoredChange = {
+      ...block,
+      id: '90000000-0000-4000-8000-000000000003',
+      subject: 'orphans',
+      severity: 'warn',
+      summary: '3 orphan pages',
+      where: '/blog/*',
+      ua: null,
+      fix_id: FIX,
+    };
+    const h = harness({
+      data: data({
+        changes: [regressed, content],
+        rules: [
+          {
+            id: '70000000-0000-4000-8000-000000000005',
+            site_id: null,
+            kind: 'fix_regressed',
+            enabled: true,
+            threshold_points: null,
+            channels: ['email'],
+          },
+          { ...data().rules[1]! },
+        ],
+        fixEvents: [
+          { fix_id: FIX, kind: 'marked_done', at: '2026-11-10T15:00:00.000Z', check_id: null },
+          { fix_id: FIX, kind: 'reopened', at: '2026-11-13T10:58:00.000Z', check_id: CHECK },
+        ],
+      }),
+    });
+    expect(await deliverAlert(h.deps, CHECK, 'email')).toEqual({ status: 'sent', reason: null });
+    const text = h.sent[0]!.text;
+    expect(text).toContain(
+      'Sent for your alert rules: “A fix you marked done regresses”, “Any change at all, including content”.',
+    );
+    // The account's zone is UTC here; 2026-11-10 is a Tuesday.
+    expect(text).toContain('Marked done Tue 10 Nov; found again at this check.');
+    expect(text.match(/Marked done/g)).toHaveLength(1);
+  });
+
+  it('names only the rules that fired for email, each with its threshold (F-254)', async () => {
+    const drop: StoredChange = {
+      ...block,
+      id: '90000000-0000-4000-8000-000000000004',
+      subject: 'text_without_js',
+      summary: 'Product pages ship no text without JavaScript',
+      where: '/products/*',
+      ua: null,
+    };
+    const h = harness({
+      data: data({
+        changes: [block, drop],
+        rules: [
+          // Fires on the GPTBot row, for Slack only: the email does not name it.
+          { ...data().rules[0]!, channels: ['slack'] },
+          {
+            id: '70000000-0000-4000-8000-000000000002',
+            site_id: null,
+            kind: 'text_drop',
+            enabled: true,
+            threshold_points: 10,
+            channels: ['email'],
+          },
+        ],
+        textShare: { before: 0.8, now: 0.5 },
+      }),
+    });
+    expect(await deliverAlert(h.deps, CHECK, 'email')).toEqual({ status: 'sent', reason: null });
+    expect(h.sent[0]!.text).toContain(
+      'Sent for your alert rule: “Text without JavaScript drops more than 10 points”.',
+    );
+    expect(h.sent[0]!.text).not.toContain('A crawler becomes blocked');
+  });
+
   it('asks for the seats whose client scope covers this site (review r1, security S1)', async () => {
     const h = harness();
     await deliverAlert(h.deps, CHECK, 'email');
