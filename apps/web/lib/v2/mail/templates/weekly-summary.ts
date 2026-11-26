@@ -57,7 +57,11 @@ export interface GradeMovement {
   toScore: number;
 }
 
-/** Each grade's move over the week: its first delta's start to its last delta's end, by time. */
+/**
+ * Each grade's move over the week: its first delta's start to its last delta's end, by time. Listed
+ * only when its letter moved over the week (N9, CTO ruling): a letter held in a row, or one that
+ * moved and came back, is left out.
+ */
 export function gradeMovement(changes: readonly SummaryChange[]): GradeMovement[] {
   const timed = [...changes].sort((a, b) => Date.parse(a.detected_at) - Date.parse(b.detected_at));
   const out = new Map<GradeName, GradeMovement>();
@@ -73,7 +77,9 @@ export function gradeMovement(changes: readonly SummaryChange[]): GradeMovement[
       });
     }
   }
-  return (['technical_seo', 'ai_readability'] as const).flatMap((g) => out.get(g) ?? []);
+  return (['technical_seo', 'ai_readability'] as const)
+    .flatMap((g) => out.get(g) ?? [])
+    .filter((m) => m.from !== m.to);
 }
 
 export const SUMMARY_COPY = {
