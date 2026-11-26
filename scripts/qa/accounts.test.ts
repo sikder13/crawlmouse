@@ -27,6 +27,12 @@ import {
   paths as largePaths,
   // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
 } from '../../fixtures/qa-lab/api/large.mjs';
+import {
+  answer as denseAnswer,
+  HOSTS as DENSE,
+  paths as densePaths,
+  // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
+} from '../../fixtures/qa-lab/api/dense.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LAB = join(REPO, 'fixtures', 'qa-lab');
@@ -62,7 +68,14 @@ const label = (host: string): string => host.slice(0, -LAB_ZONE.length);
 
 /** The large lab's four hosts: one function renders their pages (api/large.mjs), so they have no folder. */
 const largeHosts = (): string[] => Object.values(LARGE as Record<string, string>);
-const staticHosts = (): string[] => labHosts().filter((h) => !largeHosts().includes(h));
+/** The dense lab's host: its function renders its pages (api/dense.mjs), so it has no folder either. */
+const denseHosts = (): string[] => Object.values(DENSE as Record<string, string>);
+/** The hosts a function renders, with no folder of their own. */
+const renderedHosts = (): string[] => [...largeHosts(), ...denseHosts()];
+const staticHosts = (): string[] => labHosts().filter((h) => !renderedHosts().includes(h));
+/** A rendered host's pages, as its function lists them. */
+const renderedPaths = (host: string): string[] =>
+  denseHosts().includes(host) ? (densePaths() as string[]) : (largePaths() as string[]);
 /** A large host's robots.txt, as its function answers it. */
 const largeRobots = async (host: string): Promise<string> =>
   (
@@ -156,7 +169,7 @@ const taggedUserAgents = (): string[] => [
 ];
 
 describe('QA_HOSTS', () => {
-  it('names the twenty lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
+  it('names the twenty-one lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
     expect(allHosts()).toEqual([
       'nahltech.com',
       'crawlmouse.com',
@@ -180,6 +193,7 @@ describe('QA_HOSTS', () => {
       'large-slow.lab.crawlmouse.com',
       'large-throttle.lab.crawlmouse.com',
       'large-throttle-bare.lab.crawlmouse.com',
+      'dense.lab.crawlmouse.com',
     ]);
   });
 
@@ -190,7 +204,7 @@ describe('QA_HOSTS', () => {
 });
 
 describe('the lab serves every lab host', () => {
-  it('has a site folder with an index page for each lab host but the large four, and no folder no host names', () => {
+  it('has a site folder with an index page for each lab host but the five a function renders, and no folder no host names', () => {
     expect(largeHosts().sort()).toEqual(
       [
         QA_HOSTS.large,
@@ -199,6 +213,7 @@ describe('the lab serves every lab host', () => {
         QA_HOSTS.largeThrottleBare,
       ].sort(),
     );
+    expect(denseHosts()).toEqual([QA_HOSTS.dense]);
     const folders = readdirSync(SITES).filter((f) => statSync(join(SITES, f)).isDirectory());
     expect(folders.sort()).toEqual(staticHosts().map(label).sort());
     for (const host of staticHosts()) {
@@ -213,7 +228,7 @@ describe('the lab serves every lab host', () => {
           status: undefined,
           // The slow and sentinel sites are served by their functions, which read the same folders
           // (api/slow.mjs; api/sentinel.mjs for both sentinel hosts); the large four by one function
-          // that renders them (api/large.mjs).
+          // that renders them (api/large.mjs); dense by its own (api/dense.mjs).
           dest:
             host === QA_HOSTS.slow
               ? `/api/slow?path=${path}`
@@ -221,7 +236,9 @@ describe('the lab serves every lab host', () => {
                 ? `/api/sentinel?path=${path}`
                 : largeHosts().includes(host)
                   ? `/api/large?path=${path}`
-                  : `/sites/${label(host)}${path}`,
+                  : denseHosts().includes(host)
+                    ? `/api/dense?path=${path}`
+                    : `/sites/${label(host)}${path}`,
         });
       }
     }
@@ -389,6 +406,8 @@ describe('the lab serves every lab host', () => {
         'api/slow.mjs',
         'api/large',
         'api/large.mjs',
+        'api/dense',
+        'api/dense.mjs',
       ]) {
         expect(routeFor(host, `/${f}`, CONTROL.userAgent)?.status, `${host}/${f}`).toBe(404);
       }
@@ -423,10 +442,12 @@ describe('the lab serves every lab host', () => {
     // The two clients built to block GPTBot (README).
     const blocksGptbot = new Set(['client-3', 'client-6']);
     for (const host of labHosts()) {
-      const large = largeHosts().includes(host);
-      const text = large
+      const rendered = renderedHosts().includes(host);
+      const text = largeHosts().includes(host)
         ? await largeRobots(host)
-        : readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8');
+        : denseHosts().includes(host)
+          ? (denseAnswer({ host, path: '/robots.txt' }) as { body: string }).body
+          : readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8');
       // Structural: every non-empty Disallow, with the user agents of the group it sits in.
       const disallows: string[] = [];
       let agents: string[] = [];
@@ -457,7 +478,7 @@ describe('the lab serves every lab host', () => {
               ? [at]
               : [],
         );
-      const paths = large ? (largePaths() as string[]) : pages(join(SITES, label(host)), '/');
+      const paths = rendered ? renderedPaths(host) : pages(join(SITES, label(host)), '/');
       expect(paths).toContain('/');
       const tokens = [
         ...CRAWLER_REGISTRY_V2.map((e) => e.robots_token ?? e.token),
@@ -473,18 +494,20 @@ describe('the lab serves every lab host', () => {
     }
   });
 
-  // The large lab's four hosts exist to be crawled past 500 pages, so they alone are exempt, each held
-  // to 2,600 (scripts/qa/large-lab.test.ts holds the 2,400 floor). Every other host stays under 500 in all.
-  it('holds under 500 pages across every host but the large four, and each of those to 2,600', () => {
+  // The large lab's four hosts and the dense lab exist to be crawled past 500 pages, so they alone are
+  // exempt, each held to 2,600 (scripts/qa/large-lab.test.ts holds large's 2,400 floor,
+  // scripts/qa/dense-lab.test.ts dense's 2,000). Every other host stays under 500 in all.
+  it('holds under 500 pages across every host but the five rendered ones, and each of those to 2,600', () => {
     const pages = (dir: string): number =>
       readdirSync(dir, { withFileTypes: true }).reduce(
         (n, e) =>
           n + (e.isDirectory() ? pages(join(dir, e.name)) : e.name.endsWith('.html') ? 1 : 0),
         0,
       );
-    const exempt = new Set(largeHosts());
+    const exempt = new Set(renderedHosts());
     expect([...exempt].sort()).toEqual(
       [
+        'dense.lab.crawlmouse.com',
         'large.lab.crawlmouse.com',
         'large-slow.lab.crawlmouse.com',
         'large-throttle.lab.crawlmouse.com',
@@ -492,9 +515,9 @@ describe('the lab serves every lab host', () => {
       ].sort(),
     );
     const served = (host: string): number =>
-      exempt.has(host) ? (largePaths() as string[]).length : pages(join(SITES, label(host)));
+      exempt.has(host) ? renderedPaths(host).length : pages(join(SITES, label(host)));
     const others = labHosts().filter((h) => !exempt.has(h));
-    expect(others.length).toBe(labHosts().length - 4);
+    expect(others.length).toBe(labHosts().length - 5);
     expect(others.reduce((n, h) => n + served(h), 0)).toBeLessThan(500);
     // Nothing else under sites/ escapes the count: the folders are the other hosts' and no more.
     expect(pages(SITES)).toBe(others.reduce((n, h) => n + served(h), 0));
