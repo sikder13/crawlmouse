@@ -6,6 +6,9 @@
 import { DASHBOARD_COPY } from '../copy/dashboard';
 import { RESTORE_DAYS } from '../copy/restore-window';
 
+/** The id of the site page's settings card, which the dashboard's set-up rows link to (D-15). */
+export const SITE_SETTINGS_ANCHOR = 'settings';
+
 type Verb = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 export interface RouteSpec {

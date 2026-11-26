@@ -41,9 +41,12 @@ const row = (data: unknown) => {
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({ from: () => row({ id: AUDIT_ID, url: 'https://example.com/' }) }),
 }));
+// Signed in, except on `/login`, which sends a signed-in person on (D-38) and draws its form only
+// for someone signed out.
+const session = vi.hoisted(() => ({ user: { id: 'user-1' } as { id: string } | null }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
-    auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
+    auth: { getUser: async () => ({ data: { user: session.user } }) },
     from: () =>
       row({
         id: VERIFY_ID,
@@ -248,6 +251,10 @@ beforeEach(() => vi.stubEnv('V2_CHECKS_PUBLIC', '1'));
 afterEach(() => vi.unstubAllEnvs());
 
 describe.each(PAGES)('the kept page $from', (p) => {
+  beforeEach(() => {
+    session.user = p.from === '/login' ? null : { id: 'user-1' };
+  });
+
   it('is a 404 with V2_CHECKS_PUBLIC off', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
     const target = await p.target();

@@ -4,6 +4,7 @@ import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import type { ShellView } from '../../../../lib/v2/view/account-shell';
+import { SITE_SETTINGS_ANCHOR } from '../../../../lib/v2/view/account-actions';
 import type { GradeCardView, SiteView } from '../../../../lib/v2/view/site';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
@@ -204,7 +205,8 @@ export function SiteScreen({
       </Card>
 
       <section className={`${shared.two} ${shared.twoWide} ${styles.panels}`}>
-        <Card as="section" className={shared.panel}>
+        {/* The dashboard's set-up rows link here (D-15). */}
+        <Card as="section" className={shared.panel} id={SITE_SETTINGS_ANCHOR}>
           <CardHead title="Settings for this site" />
           <Table
             shade

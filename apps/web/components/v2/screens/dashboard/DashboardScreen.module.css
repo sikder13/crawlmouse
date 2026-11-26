@@ -300,3 +300,15 @@
     font-size: var(--v2-text-micro);
   }
 }
+
+/* The blocked-crawlers card (D-09): the crawler and its verdict share a cell and wrap on a phone. */
+.blockedAccess {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.blockedHost {
+  overflow-wrap: anywhere;
+}
