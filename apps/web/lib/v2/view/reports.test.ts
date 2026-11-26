@@ -188,7 +188,7 @@ describe('Reports made, a compare of two checks on one day (QA dashboard walk D-
       '2026-10-25T03:30:00Z';
     const v = reportsView(copy, ACCOUNT_VIEWERS.home(), {}, BASE);
     expect(v.made.rows.find((r) => r.type === 'Compare')!.covers).toBe(
-      'Sat 24 Oct 22:34 vs Sat 24 Oct 23:30',
+      'Sat 24 Oct 22:34 EDT vs Sat 24 Oct 23:30 EDT',
     );
   });
 });
@@ -209,7 +209,7 @@ describe('Reports made, a compare’s days read in the account’s zone, not UTC
 
   it('two UTC days, one day in Indiana: times', () => {
     expect(covers('2026-10-24T23:00:00Z', '2026-10-25T01:00:00Z')).toBe(
-      'Sat 24 Oct 19:00 vs Sat 24 Oct 21:00',
+      'Sat 24 Oct 19:00 EDT vs Sat 24 Oct 21:00 EDT',
     );
   });
 });
