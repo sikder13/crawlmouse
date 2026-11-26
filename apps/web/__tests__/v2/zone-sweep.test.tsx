@@ -14,6 +14,9 @@ import {
   type ClientReportsPreview,
 } from '../../app/(v2-preview)/v2-preview/_preview/agency-reports';
 import { alertsPreview, trialEndPreview } from '../../app/(v2-preview)/v2-preview/_preview/screens';
+import { ACCOUNT_VIEWERS } from '../../app/(v2-preview)/v2-preview/_preview/accounts';
+import { fixture } from '../../lib/v2/fixtures';
+import { alertsView } from '../../lib/v2/view/alerts';
 import { ClientReportsScreen } from '../../components/v2/screens/agency/ReportsScreen';
 import { AlertsScreen } from '../../components/v2/screens/alerts/AlertsScreen';
 import { TrialEndScreen } from '../../components/v2/screens/trial-end/TrialEndScreen';
@@ -22,6 +25,16 @@ const PAGES: Record<string, () => ReactElement> = {
   'Alerts (home)': () => <AlertsScreen data={alertsPreview('home')} />,
   'Alerts (clean)': () => <AlertsScreen data={alertsPreview('clean')} />,
   'Trial ending': () => <TrialEndScreen data={trialEndPreview()} />,
+  // On the trial's last day the rail's trial card shows a time ("ends today at", QA's B1 on #218):
+  // bad-site's trial ends Sat 7 Nov 21:41 EST, read here at 10:00 EST that day.
+  'Alerts (home), on the trial’s last day': () => (
+    <AlertsScreen
+      data={alertsView(fixture('bad-site'), {
+        ...ACCOUNT_VIEWERS.home(),
+        now: '2026-11-07T15:00:00.000Z',
+      })}
+    />
+  ),
   ...Object.fromEntries(
     (Object.keys(CLIENT_REPORTS_PREVIEWS) as ClientReportsPreview[]).map((path) => [
       `Client reports ${path}`,
@@ -59,6 +72,10 @@ describe('every time on these pages names its zone (D-17)', () => {
     );
     expect(counts['Alerts (home)']).toBeGreaterThan(0);
     expect(counts['Trial ending']).toBeGreaterThan(0);
+    const lastDay = new JSDOM(
+      renderToStaticMarkup(PAGES['Alerts (home), on the trial’s last day']!()),
+    ).window.document.body.textContent;
+    expect(lastDay).toContain('ends today at 21:41 EST');
     expect(Object.values(counts).reduce((a, b) => a + b, 0)).toBeGreaterThan(5);
   });
 });
