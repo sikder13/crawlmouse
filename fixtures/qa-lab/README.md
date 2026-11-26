@@ -83,6 +83,7 @@ pnpm smoke -- --url=https://healthy.lab.crawlmouse.com
 | `large-slow`          | the same pages, each HTML page answered after 1 second                                                                                                                          |
 | `large-throttle`      | the same pages; 429 with `Retry-After` above the throttle rule below                                                                                                            |
 | `large-throttle-bare` | the same pages; 429 without `Retry-After` above the same rule                                                                                                                   |
+| `dense`               | 2,000 pages, about 100 links each, about 200,000 edges, the same on every check (`api/dense.mjs`)                                                                               |
 
 Check every host answers:
 
@@ -201,3 +202,21 @@ done; echo
 
 The first loop prints 200 for each host, `large-slow` about a second slower than the rest. The second
 prints 200s then 429s once a window passes 18, if the 22 requests reach one instance inside one window.
+
+## The dense lab
+
+`dense.lab.crawlmouse.com` is served by `api/dense.mjs`, for the persist work (c/038). It is 2,000 pages, each built from its path and fixed tables with a seeded generator, so the site is the same on every request and between checks.
+
+- **The shape:** a home page, 20 sections and 1,979 notes.
+  - The home page links to the 20 sections and the first 80 notes.
+  - A section links to the home page and each of its notes.
+  - A note links to the home page, its section, its neighbours in the section and seeded others, 100 in all.
+- **Depth:** every note is two clicks from the home page.
+- **Sitemap and robots:** `sitemap.xml` lists all 2,000 pages, and `robots.txt` allows everything.
+- **The figures** are held by `scripts/qa/dense-lab.test.ts`: the page count, the links per page, the edge total and the depth.
+
+**Domain.** The host must be added to the Vercel project `crawlmouse-qa-lab` before it answers, like the large four. The `*.lab` DNS record already covers it.
+
+```bash
+curl -s -o /dev/null -A "CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)" -w "%{http_code}\n" https://dense.lab.crawlmouse.com/p/0001/
+```

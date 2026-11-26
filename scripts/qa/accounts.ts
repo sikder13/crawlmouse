@@ -47,6 +47,9 @@ export const QA_HOSTS = {
   largeSlow: 'large-slow.lab.crawlmouse.com',
   largeThrottle: 'large-throttle.lab.crawlmouse.com',
   largeThrottleBare: 'large-throttle-bare.lab.crawlmouse.com',
+  // No account holds this one either: 2,000 pages of about 100 links each, about 200,000 edges,
+  // rendered by one function (fixtures/qa-lab/api/dense.mjs), for the persist work (c/038).
+  dense: 'dense.lab.crawlmouse.com',
 } as const;
 
 /** Where the person's work lives: their own account, a second (agency) account, or a seat on one. */
