@@ -1,6 +1,6 @@
 /**
- * F-296 (D-33 b): a change row for a fix that was done and is found again is labelled "found again",
- * not "opened". What marks it is the record's own: a `reopened` fix event for that fix at the check
+ * F-296 (D-33 b; CTO ruling, inbox 102): a change row for a fix that was done and came back is
+ * labelled "reopened", not "opened"; "found again at this check" is a cause sentence, never a label. What marks it is the record's own: a `reopened` fix event for that fix at the check
  * that wrote the row. A fix opened for the first time keeps "opened".
  */
 import type { Change, FixtureDataset } from '@crawlmouse/types/v2';
@@ -35,11 +35,11 @@ function regressed(): { d: FixtureDataset; row: Change; plain: Change } {
 }
 
 describe('a fix found again, on the Changes log', () => {
-  it('reads "found again"; a fix opened for the first time still reads "opened"', () => {
+  it('reads "reopened"; a fix opened for the first time still reads "opened"', () => {
     const { d, row, plain } = regressed();
     const v = changesLogView(d, { accountId: ACCOUNT, now: d.as_of }, {}, BASE);
     const pill = (c: Change) => v.rows.find((r) => r.key === c.id)?.pill.label;
-    expect(pill(row)).toBe('found again');
+    expect(pill(row)).toBe('reopened');
     if (plain !== row) expect(pill(plain)).toBe('opened');
   });
 
@@ -53,17 +53,17 @@ describe('a fix found again, on the Changes log', () => {
 });
 
 describe('a fix found again, on the audit’s Changes segment', () => {
-  it('reads "found again" there too', async () => {
+  it('reads "reopened" there too', async () => {
     const { changesView } = await import('./segment/changes');
     const { d, row } = regressed();
     const v = changesView(d, row.check_id, {});
     if (v.state !== 'changes') throw new Error(`segment state ${v.state}`);
-    expect(v.rows.find((r) => r.key === row.id)?.pill.label).toBe('found again');
+    expect(v.rows.find((r) => r.key === row.id)?.pill.label).toBe('reopened');
   });
 });
 
 describe('a fix found again, on the dashboard (QA N2)', () => {
-  it('its change row reads "found again"; no other row does', async () => {
+  it('its change row reads "reopened"; no other row does', async () => {
     const { dashboardView } = await import('./dashboard');
     const { d, row } = regressed();
     // The dashboard lists a site's latest check's opened rows; this one is not a crawler block.
@@ -76,9 +76,9 @@ describe('a fix found again, on the dashboard (QA N2)', () => {
     const v = dashboardView(d, { accountId: ACCOUNT, now: d.as_of });
     const shown = v.changed.find((r) => r.key === target.id);
     expect(shown, 'the dashboard lists the row').toBeDefined();
-    expect(shown!.pill.label).toBe('found again');
+    expect(shown!.pill.label).toBe('reopened');
     for (const r of v.changed.filter((x) => x.key !== target.id)) {
-      expect(r.pill.label).not.toBe('found again');
+      expect(r.pill.label).not.toBe('reopened');
     }
   });
 });

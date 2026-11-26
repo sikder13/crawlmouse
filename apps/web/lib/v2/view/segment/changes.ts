@@ -174,14 +174,14 @@ function datedClockOf(d: ViewDataset, check: Check) {
 
 export { lettersUnmoved } from '../listed-changes';
 
-/** The pill of an `opened` row for a fix that was done and is found again (F-296). */
-export const FOUND_AGAIN = 'found again';
+/** The pill of an `opened` row for a fix that came back (D-33, F-296; CTO ruling, inbox 102). */
+export const REOPENED = 'reopened';
 
 /**
- * Whether `c` opened a fix that was done before: its own record says so, a `reopened` event for that
- * fix at the check that wrote the row.
+ * Whether `c` opened a fix that came back: its own record says so, a `reopened` event for that fix
+ * at the check that wrote the row.
  */
-export const foundAgain = (c: Change, events: readonly FixEvent[]): boolean =>
+export const reopenedHere = (c: Change, events: readonly FixEvent[]): boolean =>
   c.kind === 'opened' &&
   c.fix_id !== null &&
   events.some((e) => e.kind === 'reopened' && e.fix_id === c.fix_id && e.check_id === c.check_id);
@@ -246,7 +246,7 @@ function causeOf(c: Change, seen: FirstSeen, check: Check, previous: Check | nul
  * One change as a row: `check` is the check that found it, `at` the clock its times are read by,
  * `seen` where the fix it reopened was first seen (`firstSeenOf`), `previous` the check before it
  * where the dataset holds it (its pages read, D-08), and `events` the fix events that say whether an
- * opened fix was found again (F-296).
+ * opened fix came back (F-296).
  */
 export function rowOf(
   c: Change,
@@ -267,7 +267,10 @@ export function rowOf(
     key: c.id,
     when: at(c.detected_at),
     kind: c.kind,
-    pill: { state: PILL[c.kind], label: foundAgain(c, events) ? FOUND_AGAIN : c.kind },
+    // A fix that came back reads "reopened" (D-33, F-296), by its record: a `reopened` event for the
+    // fix at this row's check. The kind stays `opened`, so a filter by kind and the counts read it
+    // as before.
+    pill: { state: PILL[c.kind], label: reopenedHere(c, events) ? REOPENED : c.kind },
     summary: c.summary,
     subject: SUBJECTS[c.subject],
     where: c.where,

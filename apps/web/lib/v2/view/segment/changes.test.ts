@@ -150,6 +150,21 @@ describe('changesView: a check that found changes', () => {
             fix_id: `80000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`,
           }),
         );
+        // An opened row for a fix first seen earlier came back: the engine records a `reopened` event
+        // for it at this check (diff/lifecycle.ts), which is what the pill reads.
+        d.fix_events = specs.flatMap((s, i) =>
+          s.seenEarlier && s.kind === 'opened'
+            ? [
+                {
+                  id: `e0000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`,
+                  fix_id: `80000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`,
+                  at: base.detected_at,
+                  kind: 'reopened' as const,
+                  check_id: HISTORY,
+                },
+              ]
+            : [],
+        );
         const view = changesView(d, HISTORY);
         return (
           view.rows.length === specs.length &&
@@ -158,7 +173,13 @@ describe('changesView: a check that found changes', () => {
               // Seen earlier only for an opened row: a resolved or changed one was observed here.
               (specs[i]!.seenEarlier && specs[i]!.kind === 'opened'
                 ? /^First seen at the Sat 24 Oct 22:34 EDT check[.;]/.test(r.cause)
-                : /^First observed /.test(r.cause)) && !/\bcaused by\b/i.test(r.cause),
+                : /^First observed /.test(r.cause)) &&
+              !/\bcaused by\b/i.test(r.cause) &&
+              // D-33: the pill says "reopened" exactly when the fix came back at this check.
+              r.pill.label ===
+                (specs[i]!.seenEarlier && specs[i]!.kind === 'opened'
+                  ? 'reopened'
+                  : specs[i]!.kind),
           )
         );
       }),
@@ -195,6 +216,16 @@ describe('changesView: a fix found again (F-213)', () => {
     const change = d.changes.find((c) => c.id === OPENED)!;
     change.cause = cause;
     d.fixes.find((f) => f.id === change.fix_id)!.first_seen_check_id = seenAt;
+    // A fix first seen earlier came back here: the engine records its `reopened` event at this check.
+    if (seenAt !== HISTORY) {
+      d.fix_events.push({
+        id: 'e0000000-0000-4000-8000-0000000000fa',
+        fix_id: change.fix_id!,
+        at: change.detected_at,
+        kind: 'reopened',
+        check_id: HISTORY,
+      } as (typeof d.fix_events)[number]);
+    }
     return changesView(d, HISTORY).rows.find((r) => r.key === OPENED)!;
   }
 
@@ -232,6 +263,21 @@ describe('changesView: a fix found again (F-213)', () => {
     expect(changesView(d, HISTORY).rows.find((r) => r.key === OPENED)!.cause).toBe(
       'First observed at this check. What we found: Marked done on 2026-10-28, and found again on this check.',
     );
+  });
+
+  // D-33 (QA's dashboard walk): a fix marked done and found again was labelled "opened".
+  it('labels the row "reopened" when the fix came back at this check (D-33)', () => {
+    expect(reopened(FIRST_AUDIT).pill).toEqual({ state: 'bad', label: 'reopened' });
+    expect(reopened('c0000000-0000-4000-8000-0000000000ff').pill).toEqual({
+      state: 'bad',
+      label: 'reopened',
+    });
+    // First seen at this check: a new fix, "opened" as before.
+    expect(reopened(HISTORY).pill).toEqual({ state: 'bad', label: 'opened' });
+  });
+
+  it('keeps the row\'s kind "opened", so a filter by kind still finds it (D-33)', () => {
+    expect(reopened(FIRST_AUDIT).kind).toBe('opened');
   });
 
   it('reads as before for a fix first seen at this check', () => {

@@ -3,7 +3,7 @@
  * where the reopened fix was first seen 4th, the check before 5th and the fix events 6th. Passing
  * `null` type-checks in either of the first two places, so this renders rows that need all three,
  * through both callers, the Changes log and the audit's Changes tab:
- * - a fix found again, first seen at the first audit: "found again" (the events) and "First seen at
+ * - a fix that came back, first seen at the first audit: "reopened" (the events) and "First seen at
  *   the Sat 24 Oct … check" (the first-seen note);
  * - a grade row with no cause, between checks that read 214 and 200 pages: the pages-read cause
  *   (the check before).
@@ -48,7 +48,7 @@ describe('rowOf’s three trailing arguments, from both callers', () => {
     const { d, reopened } = vector();
     const rows = changesLogView(d, { accountId: ACCOUNT, now: d.as_of }, {}, '/changes').rows;
     const found = rows.find((r) => r.key === reopened)!;
-    expect(found.pill.label).toBe('found again');
+    expect(found.pill.label).toBe('reopened');
     expect(found.cause).toMatch(/^First seen at the Sat 24 Oct /);
     expect(rows.find((r) => r.key === GRADE_ROW)!.cause).toBe(PAGES_READ);
   });
@@ -58,7 +58,7 @@ describe('rowOf’s three trailing arguments, from both callers', () => {
     const v = changesView(d, LATEST, {});
     if (v.state !== 'changes') throw new Error(`segment state ${v.state}`);
     const found = v.rows.find((r) => r.key === reopened)!;
-    expect(found.pill.label).toBe('found again');
+    expect(found.pill.label).toBe('reopened');
     expect(found.cause).toMatch(/^First seen at the Sat 24 Oct /);
     expect(v.rows.find((r) => r.key === GRADE_ROW)!.cause).toBe(PAGES_READ);
   });
