@@ -29,6 +29,12 @@ function Header({ header }: { header: MatrixView['header'] }) {
         {header.actions.map((a) => (
           <ActionControl key={a.label} action={a} size={a.primary ? 'md' : 'sm'} />
         ))}
+        {/* In the form's place when every slot is in use and none can be bought here (F-239). */}
+        {header.full ? (
+          <p className={shared.line} data-v2-addition="" data-v2-full="">
+            {header.full}
+          </p>
+        ) : null}
       </div>
     </header>
   );

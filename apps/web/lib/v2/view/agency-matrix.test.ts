@@ -303,6 +303,60 @@ describe('the matrix, adding a client', () => {
     expect(matrix(full, northwind).header.line).toContain('2 client sites, 0 of 2 unused');
   });
 
+  // F-239 (row 9): at the plan's limit, where no more sites can be bought (Northwind is past due at
+  // the fixture's as_of; a trial or billing off is the same), the matrix said "0 of 25 unused" and
+  // nothing about why the add control was gone. It now says so in its place.
+  describe('at 24, 25 and 26 client sites of Agency’s 25 (F-239)', () => {
+    /** Northwind with `k` client sites: its two, and copies of Harbor Light under new hosts. */
+    const withClients = (k: number) =>
+      edit((x) => {
+        const base = x.sites.find((s) => s.id === HARBORLIGHT_SITE)!;
+        const extra = Array.from({ length: k - 2 }, (_, i) => ({
+          ...base,
+          id: `50000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`,
+          host: `client-${i + 3}.example`,
+          client_name: null,
+        }));
+        return {
+          sites: [...x.sites, ...extra],
+          accounts: x.accounts.map((a) =>
+            a.id === NORTHWIND_ACCOUNT_ID
+              ? { ...a, limits: { ...a.limits, sites: GATES.agency.sites } }
+              : a,
+          ),
+        };
+      });
+
+    it('offers the form at 24, and says nothing of a limit', () => {
+      const v = matrix(withClients(24), northwind);
+      expect(GATES.agency.sites).toBe(25);
+      expect(v.clients.rows).toHaveLength(24);
+      expect(v.header.actions.map((a) => a.label)).toEqual(['Add a client site · 24 of 25']);
+      expect(v.header.full).toBeNull();
+    });
+
+    it('at 25 says why no client can be added, where the form was', () => {
+      const v = matrix(withClients(25), northwind);
+      expect(v.header.actions).toEqual([]);
+      expect(v.header.line).toContain('25 client sites, 0 of 25 unused');
+      expect(v.header.full).toBe(
+        'This plan holds 25 client sites, and 25 are kept. To add a client, remove one first.',
+      );
+    });
+
+    it('at 26, after the plan has changed, counts how many to remove', () => {
+      const v = matrix(withClients(26), northwind);
+      expect(v.header.actions).toEqual([]);
+      expect(v.header.full).toBe(
+        'This plan holds 25 client sites, and 26 are kept. To add a client, remove 2 first.',
+      );
+    });
+
+    it('says nothing to a seat that could not add one anyway', () => {
+      expect(matrix(withClients(25), { ...northwind, seatId: LEE }).header.full).toBeNull();
+    });
+  });
+
   it('at the plan’s limit, where seats and sites are sold, the owner is shown the way to buy sites; nobody else is, and nobody below the limit', () => {
     const full = edit((x) => ({
       accounts: x.accounts.map((a) =>
@@ -316,6 +370,10 @@ describe('the matrix, adding a client', () => {
     };
     // Northwind is past due at the fixture's as_of; `paid` reads it the day before, on the plan.
     expect(actions(full, paid, true)).toEqual([['Add sites to the plan', '/seats#buy', 'get']]);
+    // Where the way to buy is shown, the F-239 sentence is not: the link is the answer.
+    const paidView = agencyHomeView(full, paid, { billing: true });
+    if (paidView.kind !== 'matrix') throw new Error('not the matrix');
+    expect(paidView.header.full).toBeNull();
     // Past due, or in its Agency trial: /seats draws no buy form (the purchase route refuses the
     // change), so there is nothing to link.
     expect(actions(full, northwind, true)).toEqual([]);

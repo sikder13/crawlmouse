@@ -35,6 +35,12 @@ export const MATRIX_COPY = {
   add: (n: number, limit: number) => `Add a client site · ${count(n)} of ${count(limit)}`,
   /** At the plan's site limit, for a reader who may buy: the way to the buy form on Seats. */
   buySites: 'Add sites to the plan',
+  /**
+   * At the plan's site limit with no way to buy more here (F-239): why the add control is gone, in
+   * its place. `kept` can pass `limit` when the plan changed under the account.
+   */
+  full: (kept: number, limit: number) =>
+    `This plan holds ${count(limit)} client ${plural(limit, 'site', 'sites')}, and ${count(kept)} ${kept === 1 ? 'is' : 'are'} kept. To add a client, remove ${kept - limit + 1 === 1 ? 'one' : count(kept - limit + 1)} first.`,
   addField: { label: 'Client site address', placeholder: 'example.com' },
   strip: {
     label: 'Since each client’s last check',
