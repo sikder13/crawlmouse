@@ -137,7 +137,7 @@ function unzonedTimes(html: string): { times: number; unzoned: string[]; text: s
   const text = (doc.body.textContent ?? '').replace(/\s+/g, ' ');
   const found = [...text.matchAll(/(?<!\d)\d{2}:\d{2}(?!\d)(.{0,5})/g)];
   const unzoned = found
-    .filter((m) => !/^ ?(?:[A-Z]{2,5}(?![a-z])|GMT[+-]\d)/.test(m[1]!))
+    .filter((m) => !/^ ?(?:[A-Z]{1,4}T|UTC|GMT[+-]\d)/.test(m[1]!))
     .map((m) => m[0]);
   return { times: found.length, unzoned, text };
 }

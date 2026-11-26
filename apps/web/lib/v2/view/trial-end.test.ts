@@ -19,6 +19,13 @@ describe('the trial-ending moment', () => {
 });
 
 describe('Trial ending, the header and banner', () => {
+  // QA's N6 on #218: the "today" form of the last check, with its zone. bad-site's last check
+  // finished 30 Oct 10:02Z, 06:02 EDT in its zone; this reads the page at 11:00 EDT that day.
+  it('names the last check “today” with its zone when it finished that day (D-17)', () => {
+    const viewer = { ...trialEndViewer(bad, BAD), now: '2026-10-30T15:00:00.000Z' };
+    expect(trialEndView(bad, viewer).header.line).toContain('last check today 06:02 EDT');
+  });
+
   it('counts the days left and names the last check', () => {
     const h = view().header;
     expect(h.title).toBe('Three days of Pro left');

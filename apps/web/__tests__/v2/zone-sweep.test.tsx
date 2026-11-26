@@ -44,11 +44,11 @@ const PAGES: Record<string, () => ReactElement> = {
 };
 
 /**
- * What may follow a time: an abbreviation ("EDT", read before the next word even where the markup
- * runs them together), a full zone name ("America/Denver"), or a client report's "their time", the
+ * What may follow a time: a zone abbreviation, which ends in T ("EDT", "BST", "AEDT", read even where
+ * the markup runs it into the next word) or is UTC; not any capitals, so "PDF" is no zone (QA's N3); a full zone name ("America/Denver"), or a client report's "their time", the
  * recipient's own zone, which the row's next run then names in full.
  */
-const ZONED = /^ ?(?:[A-Z]{2,5}(?![a-z])|GMT[+-]\d|[A-Z][a-z]+\/[A-Za-z_]+|their time)/;
+const ZONED = /^ ?(?:[A-Z]{1,4}T|UTC|GMT[+-]\d|[A-Z][a-z]+\/[A-Za-z_]+|their time)/;
 
 /** Each clock time in the page's text and the twenty characters after it. */
 function times(page: ReactElement): string[][] {
@@ -58,6 +58,13 @@ function times(page: ReactElement): string[][] {
 }
 
 describe('every time on these pages names its zone (D-17)', () => {
+  it('reads a zone, and not any capitals, after a time (QA’s N3)', () => {
+    for (const after of [' EDT', ' EDTexample', ' AEDT', ' UTC.', ' America/Denver', ' their time'])
+      expect(ZONED.test(after), after).toBe(true);
+    for (const after of [' PDF', ' CSV', ' Link', ' sent', '.'])
+      expect(ZONED.test(after), after).toBe(false);
+  });
+
   for (const [name, page] of Object.entries(PAGES)) {
     it(name, () => {
       const found = times(page());
