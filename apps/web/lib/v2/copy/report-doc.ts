@@ -43,6 +43,18 @@ export const REPORT_DOC_COPY = {
   status: 'Status',
   where: 'Where',
 
+  /** The broken links and page basics section, and its tables. */
+  links: 'Broken links and page basics',
+  brokenLinks: 'Broken links',
+  redirects: 'Redirects',
+  missingPage: 'Missing page',
+  linkedFrom: 'Linked from',
+  requestedAs: 'Requested as',
+  hops: 'Hops',
+  endsAt: 'Ends at',
+  page: 'Page',
+  sharedText: 'Shared text',
+
   /** A before-and-after pair, and the facts under a change. */
   before: 'Before',
   after: 'After',
@@ -57,3 +69,13 @@ export const REPORT_DOC_COPY = {
 /** The footer's line: who checked, and when (the check's date as its Result page writes it). */
 export const footerLine = (checkedAt: string): string =>
   `${REPORT_DOC_COPY.checkedWith} · ${checkedAt}`;
+
+/**
+ * Sentences the audit pages carry that only a screen can act on: selecting a cell, and verifying the
+ * site in Settings. The printed report leaves them out (F-126), so a reader of the PDF is not told to
+ * click something on paper.
+ */
+export const SCREEN_ONLY = [
+  'Select a cell to see the raw request and response.',
+  'Verify this site in Settings and we test with the exact strings.',
+] as const;

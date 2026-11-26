@@ -21,7 +21,9 @@ v2_tables(rel) as (
     ('public.reports'), ('public.seat_sites'), ('public.seats'), ('public.share_links'),
     ('public.site_fixes'), ('public.sites'), ('public.slack_sends'), ('public.subscriptions'), ('public.trial_ledger'),
     ('public.usage_events'), ('public.account_attribution'), ('public.check_ledger_drafts'),
-    ('public.founder_notices')
+    ('public.founder_notices'),
+    -- The daily render budget: no client role holds anything on either.
+    ('public.render_budget_days'), ('public.render_reservations')
 ),
 -- (relation, role, privilege, columns); null columns is a grant on the whole table.
 declared(rel, role, privilege, columns) as (

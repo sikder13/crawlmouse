@@ -14,6 +14,12 @@ const nextConfig = {
   ...(process.env.CRAWLMOUSE_VISUAL_HARNESS === '1'
     ? { onDemandEntries: { maxInactiveAge: 60 * 60 * 1000, pagesBufferLength: 100 } }
     : {}),
+  experimental: {
+    // Compile in Next's build worker. Next turns it on by default only without a custom webpack
+    // config (next 15.5 dist/build/index.js: `webpackBuildWorker === undefined && !config.webpack`),
+    // and this file has one, so it was off and every compilation shared one process (CTO 094).
+    webpackBuildWorker: true,
+  },
   typescript: { ignoreBuildErrors: SKIP_BUILD_CHECKS },
   eslint: { ignoreDuringBuilds: SKIP_BUILD_CHECKS },
   // typedRoutes graduated from `experimental` to a top-level key in Next 15.5; the app relies on it.

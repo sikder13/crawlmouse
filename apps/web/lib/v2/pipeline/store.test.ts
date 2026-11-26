@@ -215,6 +215,46 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
         },
       ],
     },
+    requeue: {
+      answers: [ok([{ id: C }])],
+      call: (s) => s.requeue(C, 'run-1', 'T'),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            [
+              'update',
+              [
+                {
+                  status: 'queued',
+                  started_at: null,
+                  progress: null,
+                  inngest_run_id: null,
+                  heartbeat_at: 'T',
+                },
+              ],
+            ],
+            ['eq', ['id', C]],
+            ['eq', ['status', 'running']],
+            ['eq', ['inngest_run_id', 'run-1']],
+            ['select', ['id']],
+          ],
+        },
+      ],
+    },
+    deleteBatches: {
+      answers: [ok(null)],
+      call: (s) => s.deleteBatches(C),
+      calls: [
+        {
+          root: ['from', 'crawl_batches'],
+          chain: [
+            ['delete', []],
+            ['eq', ['check_id', C]],
+          ],
+        },
+      ],
+    },
     progress: {
       answers: [ok(null)],
       call: (s) => s.progress(C, PROGRESS, 'T'),
@@ -267,6 +307,24 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
           chain: [
             ['select', ['id, account_id, host, next_check_at']],
             ['eq', ['id', S]],
+            ['single', []],
+          ],
+        },
+      ],
+    },
+    accountClock: {
+      // The keeping account's entitlement clock, which sets a check's page cap (row 16).
+      answers: [ok({ state: 'pro', tier: 'pro' })],
+      call: (s) => s.accountClock('acct'),
+      calls: [
+        {
+          root: ['from', 'accounts'],
+          chain: [
+            [
+              'select',
+              ['state, tier, past_due_tier, past_due_since, trial_variant, trial_ends_at'],
+            ],
+            ['eq', ['id', 'acct']],
             ['single', []],
           ],
         },
@@ -448,6 +506,22 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
     await c.call(supabasePipelineStore(sb));
     expect(calls).toEqual(c.calls);
   });
+  // F-260: a retried requeue step finds the check queued with no run, and deletes again.
+  it('requeue: true for a check already queued with no run (a retried step)', async () => {
+    const { sb, calls } = recorder(ok([]), ok([{ status: 'queued', inngest_run_id: null }]));
+    expect(await supabasePipelineStore(sb).requeue(C, 'run-1', 'T')).toBe(true);
+    expect(calls.map((c) => c.root[1])).toEqual(['checks', 'checks']);
+  });
+
+  it.each([
+    ['running under another run', { status: 'running', inngest_run_id: 'run-2' }],
+    ['ended', { status: 'failed', inngest_run_id: 'run-1' }],
+    ['queued for a run', { status: 'queued', inngest_run_id: 'run-9' }],
+  ])('requeue: false, changing nothing, for a check %s', async (_, row) => {
+    const { sb, calls } = recorder(ok([]), ok([row]));
+    expect(await supabasePipelineStore(sb).requeue(C, 'run-1', 'T')).toBe(false);
+    expect(calls.map((c) => c.root[1])).toEqual(['checks', 'checks']);
+  });
 });
 
 describe('supabasePipelineStore: answers', () => {
@@ -456,6 +530,27 @@ describe('supabasePipelineStore: answers', () => {
     const store = supabasePipelineStore(sb);
     expect(await store.fail(C, 'paused', null)).toBe(true);
     expect(await store.fail(null, 'canceled', 'run-9')).toBe(false);
+  });
+
+  it("reads an account's entitlement clock as effectiveTier reads it (row 16)", async () => {
+    const { sb } = recorder(
+      ok({
+        state: 'pro',
+        tier: 'pro',
+        past_due_tier: null,
+        past_due_since: null,
+        trial_variant: null,
+        trial_ends_at: null,
+      }),
+    );
+    expect(await supabasePipelineStore(sb).accountClock('acct')).toEqual({
+      state: 'pro',
+      tier: 'pro',
+      pastDueTier: null,
+      pastDueSince: null,
+      trialVariant: null,
+      trialEndsAt: null,
+    });
   });
 
   it('reads the site a check belongs to, or null when there is no such check', async () => {

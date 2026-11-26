@@ -23,7 +23,7 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 export interface SchedulePorts {
   rpc(fn: string, args: Record<string, unknown>): Promise<unknown>;
-  pipeline: Pick<PipelineStore, 'requestSite' | 'insertQueued'>;
+  pipeline: Pick<PipelineStore, 'requestSite' | 'accountClock' | 'insertQueued'>;
   send: RequestDeps['send'];
   /** Milliseconds since the epoch. */
   now(): number;
@@ -72,6 +72,7 @@ export function scheduleDeps(p: SchedulePorts): ScheduleDeps {
               ...(await p.pipeline.requestSite(id)),
               next_check_at: site.slot,
             }),
+            accountClock: (accountId) => p.pipeline.accountClock(accountId),
             insertQueued: (row) => p.pipeline.insertQueued(row),
           },
           send: p.send,

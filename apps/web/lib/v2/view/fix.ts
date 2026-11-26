@@ -35,11 +35,13 @@ import {
   NO_HREFS,
   SEGMENT_KEYS,
   SEGMENTS,
+  segmentTab,
   type SegmentHrefs,
   type SegmentKey,
   type SegmentLink,
 } from './segment/frame';
 import type { ViewDataset } from '../fixtures';
+import { titleAmong } from './fix-title';
 
 export type { FixPlan, PacketFramework };
 
@@ -71,7 +73,7 @@ export interface FixFrame {
   position: string;
   keptUntil: string | null;
   keepHref: string;
-  tabs: (SegmentLink & { current: boolean })[];
+  tabs: (SegmentLink & { current: boolean; added?: boolean })[];
   back: SegmentLink;
   /** The next live fix in order, with its effect; null on a resolved fix. */
   next: SegmentLink | null;
@@ -237,7 +239,7 @@ function headOf(f: Omit<Fix, 'packet'>, lede: string[], siteFixes: readonly Fix[
   }
   if (effort) tiles.push({ label: 'Effort', value: effort, note: null });
   return {
-    title: sentence(f.title),
+    title: sentence(titleAmong(f, siteFixes)),
     ...effectOf(f, siteFixes),
     recommendation: recommendation(f),
     lede,
@@ -564,11 +566,7 @@ export function fixView(
     keepHref,
     tabs: [
       { label: 'Overview', href: hrefs.overview, current: false },
-      ...SEGMENT_KEYS.map((k) => ({
-        label: SEGMENTS[k].tab,
-        href: hrefs.segment(k),
-        current: k === segment,
-      })),
+      ...SEGMENT_KEYS.map((k) => segmentTab(k, hrefs.segment(k), k === segment)),
     ],
     back: { label: `Back: ${SEGMENTS[segment].backName}`, href: hrefs.segment(segment) },
     next:

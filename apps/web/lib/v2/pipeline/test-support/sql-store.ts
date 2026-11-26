@@ -5,6 +5,7 @@
  * strings), and go through the same converters.
  */
 import type { CheckSide } from '@crawlmouse/engine/v2/pipeline';
+import { clockFromAccountRow } from '../load-for';
 import type { ReapedCheck } from '../../../../../../inngest/check-reaper';
 import { checkFromRow, fixEventFromRow, fixFromRow, siteFromRow } from '../rows';
 import {
@@ -47,6 +48,29 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
         [checkId, reason, runId],
       );
       return r[0]!.moved === true;
+    },
+
+    async requeue(checkId, runId, at) {
+      const { rows: moved } = await db.query(
+        `update public.checks
+            set status = 'queued', started_at = null, progress = null, inngest_run_id = null,
+                heartbeat_at = $3::timestamptz
+          where id = $1::uuid and status = 'running' and inngest_run_id = $2
+          returning id`,
+        [checkId, runId, at],
+      );
+      if (moved.length === 0) {
+        const { rows: now } = await db.query<{ status: string; inngest_run_id: string | null }>(
+          `select status, inngest_run_id from public.checks where id = $1::uuid`,
+          [checkId],
+        );
+        if (now[0]?.status !== 'queued' || now[0].inngest_run_id !== null) return false;
+      }
+      return true;
+    },
+
+    async deleteBatches(checkId) {
+      await db.query(`delete from public.crawl_batches where check_id = $1::uuid`, [checkId]);
     },
 
     async reap(cutoff) {
@@ -114,6 +138,18 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       );
       if (!r) throw new Error(`sql store: no site ${siteId}`);
       return r as unknown as RequestSite;
+    },
+
+    async accountClock(accountId) {
+      const r = await one(
+        `select jsonb_build_object('state', state, 'tier', tier, 'past_due_tier', past_due_tier,
+                                   'past_due_since', past_due_since, 'trial_variant', trial_variant,
+                                   'trial_ends_at', trial_ends_at) as row
+           from public.accounts where id = $1`,
+        [accountId],
+      );
+      if (!r) throw new Error(`sql store: no account ${accountId}`);
+      return clockFromAccountRow(r);
     },
 
     async previousGraded(siteId, checkId): Promise<CheckSide | null> {

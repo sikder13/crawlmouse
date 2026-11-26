@@ -164,16 +164,25 @@ describe('every name the code reads has a class', () => {
     const turbo = JSON.parse(readFileSync(join(REPO_ROOT, 'turbo.json'), 'utf8')) as {
       tasks: { build: { env: string[] } };
     };
-    // GLOBAL_AUDITS_PER_DAY is listed there but is a code constant (apps/web/lib/limits.ts), not read
-    // from the environment; NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY and INNGEST_ENV are read by nothing here.
-    const notRead = new Set([
-      'GLOBAL_AUDITS_PER_DAY',
-      'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
-      'INNGEST_ENV',
-    ]);
-    const missing = turbo.tasks.build.env.filter((n) => !notRead.has(n) && appClassOf(n) === null);
+    const missing = turbo.tasks.build.env.filter((n) => appClassOf(n) === null);
     expect(missing).toEqual([]);
-    for (const n of notRead) expect(names(appReads).has(n), n).toBe(false);
+  });
+
+  // c/036: two names turbo.json listed and nothing read. GLOBAL_AUDITS_PER_DAY is a code constant
+  // (apps/web/lib/limits.ts); NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is read by no code. Both left it.
+  it('lists neither name that nothing reads, and nothing reads them', () => {
+    const turbo = JSON.parse(readFileSync(join(REPO_ROOT, 'turbo.json'), 'utf8')) as {
+      tasks: { build: { env: string[] } };
+    };
+    for (const n of ['GLOBAL_AUDITS_PER_DAY', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY']) {
+      expect(turbo.tasks.build.env, n).not.toContain(n);
+      expect(names(appReads).has(n), n).toBe(false);
+    }
+  });
+
+  it('classes INNGEST_ENV, which turbo.json lists and the Inngest SDK reads', () => {
+    expect(appClassOf('INNGEST_ENV')).toBe('optional');
+    expect(Object.hasOwn(READ_BY_LIBRARIES, 'INNGEST_ENV')).toBe(true);
   });
 });
 

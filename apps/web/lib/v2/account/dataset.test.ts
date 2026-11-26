@@ -20,7 +20,7 @@ import {
   type CrawlPage,
   type FixtureDataset,
 } from '@crawlmouse/types/v2';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
@@ -215,6 +215,31 @@ describe('an account with no site', () => {
     expect(d.sites).toEqual([]);
     const v = dashboardView(d, { accountId, seatId, now: NOW.toISOString() });
     expect(v.header.title).toBe('Add the site to watch');
+  });
+});
+
+describe('an account whose brand has a stored logo', () => {
+  it('loads, and its branding carries the logo’s public URL', async () => {
+    const userId = await signUp(db, `logo-${randomUUID().slice(0, 8)}@example.com`);
+    const { accountId, seatId } = await personalAccount(db, userId);
+    const path = `agency/${accountId}/0123456789abcdef.png`;
+    await db.query(
+      `insert into public.agency_brands (account_id, agency_name, logo_path) values ($1, 'Northwind', $2)`,
+      [accountId, path],
+    );
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://proj.supabase.co');
+    try {
+      const d = await load(userId, accountId);
+      expect(d.accounts[0]?.branding?.agency_name).toBe('Northwind');
+      expect(d.accounts[0]?.branding?.logo_url).toBe(
+        `https://proj.supabase.co/storage/v1/object/public/report-logos/${path}`,
+      );
+      // The screens that read the dataset render from it.
+      const v = dashboardView(d, { accountId, seatId, now: NOW.toISOString() });
+      expect(v.header.title).toBe('Add the site to watch');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

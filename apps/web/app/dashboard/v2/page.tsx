@@ -2,17 +2,20 @@ import '../../../styles/v2/tokens.css';
 import * as Sentry from '@sentry/nextjs';
 import { notFound, redirect } from 'next/navigation';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { shownFeatures } from '@/lib/feature-switch';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { DashboardScreen } from '@/components/v2/screens/dashboard/DashboardScreen';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
+import { supabaseAlertRulePorts } from '@/lib/v2/account/alert-rules';
 import { readAccount } from '@/lib/v2/account/pages';
 import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { reachedByRewrite } from '@/lib/v2/rewrite-target';
 import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { dashboardView, withoutTrialOffer } from '@/lib/v2/view/dashboard';
+import { withSlackConnected } from '@/lib/v2/view/integrations';
 import { noticeLine } from '@/lib/v2/copy/notices';
 import { readEarlierAudits } from './earlier-audits';
 
@@ -45,7 +48,7 @@ export default async function V2Dashboard({
   const { account, seat, accounts, tier, userId } = r.viewer;
   const now = new Date();
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, now);
-  const [next, earlier] = await Promise.all([
+  const [next, earlier, slackLast4] = await Promise.all([
     // The scheduler's own column (CC-28 D8), for the sites the caller's session read.
     readNextChecks(
       supabaseAdmin(),
@@ -58,13 +61,31 @@ export default async function V2Dashboard({
       Sentry.captureException(cause);
       return [];
     }),
+    // Whether Slack is connected, for the set-up list. Only that it is set reaches the view. A
+    // failed read is reported and taken as not set: the list then offers Slack again.
+    supabaseAlertRulePorts(supabaseAdmin())
+      .slackLast4(account.id)
+      .catch((cause: unknown) => {
+        Sentry.captureException(cause);
+        return null;
+      }),
   ]);
   const query = await searchParams;
   return (
     <LiveActions>
       <DashboardScreen
         data={withSwitcher(
-          withoutTrialOffer(dashboardView(d, viewer, next, earlier), query),
+          // The Goal 1 switch's record: the set-up card offers nothing it hides (D-16).
+          withoutTrialOffer(
+            dashboardView(
+              withSlackConnected(d, account.id, slackLast4 !== null),
+              viewer,
+              next,
+              earlier,
+              shownFeatures(),
+            ),
+            query,
+          ),
           accounts,
           account.id,
         )}

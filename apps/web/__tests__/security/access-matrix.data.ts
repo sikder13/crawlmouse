@@ -71,7 +71,7 @@ const ROUTES: readonly Spec[] = [
     gate: 'seat_may',
     action: 'add_site',
     detail:
-      'Adds a client site through `add_site` with the service role, after `seat_may(add_site)` and an unscoped seat.',
+      'Adds a client site through `add_site` with the service role, after `seat_may(add_site)` and an unscoped seat; a repeat add’s re-send reads the account’s plan for the check’s page cap with the same client.',
     check: at('app/api/sites/route.ts', 'seat_may'),
     proof: by(
       'app/api/sites/route.test.ts',
@@ -291,6 +291,20 @@ const ROUTES: readonly Spec[] = [
       'Creates a new Agency-trial account owned by the caller’s user id; touches no other account.',
     check: at('app/api/agency-trial/route.ts', 'getUser'),
     proof: by('app/api/agency-trial/route.test.ts', '401 without a session, whatever the flag'),
+    calls: 1,
+  },
+  {
+    path: 'api/agency/brand',
+    v2: true,
+    identity: 'signed-in owner or account manager of the named account',
+    gate: 'member',
+    detail:
+      'Sets the named Agency account’s brand name and logo once `member_role` answers owner or account manager there; no seat and a developer seat get the same 403.',
+    check: at('app/api/agency/brand/route.ts', 'member_role'),
+    proof: by(
+      'app/api/agency/brand/route.test.ts',
+      'answers an account the caller is not a member of exactly as a developer seat, so it says nothing about the account',
+    ),
     calls: 1,
   },
   // v2: account
@@ -1208,9 +1222,24 @@ const ENTRIES: readonly Spec[] = [
     v2: true,
     identity: 'signed-in owner or account manager',
     gate: 'member',
-    detail: 'Settings of the viewer account; `member_role` decides the role, a developer is a 404.',
+    detail:
+      'Settings of the viewer account; `member_role` decides the role. A developer reads a page that says the owner or a manager changes them, with no account form (D-03).',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
+    proof: by(
+      SETTINGS_TEST,
+      'a developer gets a page that says Settings are not theirs to change, never the 404 (D-03)',
+    ),
+  },
+  {
+    path: 'apps/web/app/(account)/settings/integrations/page.tsx',
+    v2: true,
+    identity: 'signed-in owner or account manager',
+    gate: 'member',
+    detail:
+      'The Slack destination of the viewer account, as its last four characters; `member_role` decides the role, a developer is a 404.',
+    check: at('lib/v2/account/settings-pages.ts', 'member_role'),
+    proof: by(SETTINGS_TEST, 'Integrations is a 404 for a developer'),
+    calls: 1,
   },
   {
     path: 'apps/web/app/(account)/settings/plan/page.tsx',
@@ -1335,13 +1364,13 @@ const ENTRIES: readonly Spec[] = [
     identity: 'signed-in seat, in its viewer account',
     gate: 'member_for_site',
     detail:
-      'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session. Its two service-role clients read the next check time of those sites alone (`readNextChecks`) and the signed-in viewer’s own completed v1 audits, keyed by their user id (`readEarlierAudits`).',
+      'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session. Its three service-role clients read the next check time of those sites alone (`readNextChecks`), the signed-in viewer’s own completed v1 audits, keyed by their user id (`readEarlierAudits`), and whether the viewer account has a Slack destination (`account_slack_last4`, of which only set or not reaches the page).',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
     proof: by(
       PAGES_TEST,
       '/dashboard/v2: a developer sees the client their seat covers alone, and a stranger neither',
     ),
-    calls: 2,
+    calls: 3,
   },
   {
     path: 'apps/web/app/internal/page.tsx',
@@ -1374,6 +1403,18 @@ const ENTRIES: readonly Spec[] = [
     proof: by(
       KEPT_TEST,
       'the holder of an audit id sees that audit alone; an id that names none is sent to the v2 overview, and nothing is drawn',
+    ),
+  },
+  {
+    path: 'apps/web/app/(v2-kept)/v2-kept/login/page.tsx',
+    v2: true,
+    identity: 'anyone',
+    gate: 'public',
+    detail:
+      'v1’s sign-in form in the v2 shell, with V2_CHECKS_PUBLIC on. It reads only the caller’s own session: a signed-in person is sent to a same-origin `next` (`safeNextPath`) or the dashboard (D-38); anyone else gets the form.',
+    proof: by(
+      'app/(v2-kept)/v2-kept/login/page.test.tsx',
+      'never to another origin: an unsafe next goes to the dashboard',
     ),
   },
   {
@@ -1626,6 +1667,7 @@ const ENTRIES: readonly Spec[] = [
       'changes',
       'content',
       'fix/[fixId]',
+      'links',
       'map',
       'nojs',
       'overview',
@@ -1783,7 +1825,10 @@ const LIBS: readonly Spec[] = [
     detail:
       'The settings pages’ dataset by `member_role`; the card’s last four read with the service role after `member_role`, for the owner alone.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
+    proof: by(
+      SETTINGS_TEST,
+      'a developer gets a page that says Settings are not theirs to change, never the 404 (D-03)',
+    ),
     calls: 1,
   },
   {
@@ -1986,6 +2031,8 @@ const LIBS: readonly Spec[] = [
     callers: [
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/agency/brand/route.ts',
+      'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/notify/route.ts',
       'apps/web/app/api/audits/[id]/reaudit/route.ts',
       'apps/web/app/api/audits/[id]/stream/route.ts',
@@ -2074,6 +2121,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/(account)/account/email/page.tsx',
       'apps/web/app/(account)/account/restore/page.tsx',
       'apps/web/app/(account)/settings/delete/page.tsx',
+      'apps/web/app/(account)/settings/integrations/page.tsx',
       'apps/web/app/(account)/trial-ended/page.tsx',
       'apps/web/app/agency-trial/page.tsx',
       'apps/web/app/agency/clients/[siteId]/page.tsx',
@@ -2087,6 +2135,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/account/route.ts',
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/agency/brand/route.ts',
       'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/cancel/route.ts',
       'apps/web/app/api/audits/[id]/export/route.ts',

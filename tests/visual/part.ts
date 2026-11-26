@@ -59,6 +59,7 @@ export function routesNamedIn(source: string): string[] {
 export const ONCE_SPECS = [
   'changes-log-fit.spec.ts',
   'copy.spec.ts',
+  'site-settings-fit.spec.ts',
   'frames.spec.ts',
   'motion.spec.ts',
   'parity.spec.ts',

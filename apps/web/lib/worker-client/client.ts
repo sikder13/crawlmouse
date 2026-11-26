@@ -8,7 +8,16 @@ import type { KeyObject } from 'node:crypto';
 import { CountSchema, HttpStatusSchema, HttpUrlSchema } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import { loadPrivateKey, mintBatchJwt, PRIVATE_KEY_ENV } from './jwt';
-import { SIGNATURE_HEADER, TS_HEADER, signBody, signRead } from './sign';
+import {
+  BODY_BYTES_HEADER,
+  BODY_SHA256_HEADER,
+  SIGNATURE_HEADER,
+  TS_HEADER,
+  sha256Hex,
+  signBody,
+  signMeasure,
+  signRead,
+} from './sign';
 import {
   batchIdOf,
   WorkerError,
@@ -17,6 +26,7 @@ import {
   type WorkerClient,
   type WorkerErrorKind,
   type LiveProgress,
+  type RenderedReading,
 } from './types';
 
 /** The worker's text is checked here: these URLs reach a visitor's screen. */
@@ -49,6 +59,35 @@ export const SIGNING_SECRET_ENV = 'WORKER_SIGNING_SECRET';
 export const DEFAULT_TIMEOUT_MS = 30_000;
 /** How long one live-progress read may wait: one poll of the stream (`POLL_MS`, 1.5 s). */
 export const PROGRESS_TIMEOUT_MS = 1_500;
+/**
+ * One measure request, from sending it to reading the answer. The worker holds two signed requests at
+ * once (MEASURE_CONCURRENCY), so this one can wait behind one read before its own: two reader deadlines
+ * (READ_DEADLINE_MS, 20 s each); 5 s for a replacement thread to load after the read ahead was stopped,
+ * since a read's deadline starts only once its thread is ready (not measured on Fly); and 5 s for two
+ * pages of HTML each way.
+ */
+export const MEASURE_TIMEOUT_MS = 50_000;
+/**
+ * Waits before asking again, in milliseconds, after `measure_busy` or after the request failed on the
+ * network: a busy worker closes the connection without reading the body, which can reach the client as
+ * a reset while it is still sending. Then the page records it failed. A timeout is not asked again.
+ */
+export const MEASURE_BUSY_WAITS_MS = [1_000, 2_000, 4_000] as const;
+
+const MeasuredSchema = z.strictObject({
+  reading: z.strictObject({
+    raw_words: CountSchema,
+    rendered_words: CountSchema,
+    challenged: z.boolean(),
+    links: z
+      .strictObject({
+        js_only: z.array(z.string().max(2048)).max(200),
+        js_only_count: CountSchema,
+        truncated: z.boolean(),
+      })
+      .nullable(),
+  }),
+});
 
 /**
  * The worker's refusals (packages/worker/src/routes.ts REFUSALS, plus server.ts's 500 `internal`),
@@ -59,6 +98,8 @@ export const PROGRESS_TIMEOUT_MS = 1_500;
 export const WORKER_REFUSALS: ReadonlyMap<string, { status: number; kind: WorkerErrorKind }> =
   new Map([
     ['busy', { status: 429, kind: 'busy' }],
+    ['measure_busy', { status: 429, kind: 'busy' }],
+    ['reader_unavailable', { status: 503, kind: 'server' }],
     ['batch_exists', { status: 409, kind: 'batch_exists' }],
     ['nonce_replayed', { status: 409, kind: 'nonce_replayed' }],
     ['paused', { status: 503, kind: 'paused' }],
@@ -104,6 +145,8 @@ export interface WorkerClientOptions {
   now?: () => number;
   /** Per request, from sending it to reading the whole answer. */
   timeoutMs?: number;
+  /** How the client waits between tries; tests pass one that does not. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -151,6 +194,7 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
   const fetchImpl = opts.fetch ?? fetch;
   const now = opts.now ?? Date.now;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
   /** One request; its signal also bounds reading the answer's body. Redirects are not followed. */
   async function send(path: string, init: RequestInit, ms = timeoutMs): Promise<Response> {
@@ -308,7 +352,56 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     return metrics;
   }
 
-  return { postBatch, pollBatch, readProgress, readMetrics };
+  async function measureRendered(
+    staticHtml: string,
+    renderedHtml: string,
+    pageUrl: string,
+  ): Promise<RenderedReading | null> {
+    try {
+      const raw = new TextEncoder().encode(
+        JSON.stringify({ static_html: staticHtml, rendered_html: renderedHtml, url: pageUrl }),
+      );
+      const sha256 = sha256Hex(raw);
+      for (let tried = 0; ; tried++) {
+        const ts = String(now());
+        const wait = MEASURE_BUSY_WAITS_MS[tried];
+        let res: Response;
+        try {
+          res = await send(
+            '/render/measure',
+            {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                [TS_HEADER]: ts,
+                [BODY_SHA256_HEADER]: sha256,
+                [BODY_BYTES_HEADER]: String(raw.length),
+                [SIGNATURE_HEADER]: signMeasure(opts.signingSecret, ts, sha256, raw.length),
+              },
+              body: raw,
+            },
+            MEASURE_TIMEOUT_MS,
+          );
+        } catch (e) {
+          if (wait === undefined || !(e instanceof WorkerError) || e.kind !== 'network')
+            return null;
+          await sleep(wait);
+          continue;
+        }
+        if (res.status === 200) {
+          const answer = MeasuredSchema.safeParse(await bodyOf(res));
+          return answer.success ? answer.data.reading : null;
+        }
+        const refusal = await refusalOf(res);
+        if (wait === undefined || refusal.code !== 'measure_busy') return null;
+        await sleep(wait);
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return { postBatch, pollBatch, readProgress, readMetrics, measureRendered };
 }
 
 const present = (v: string | undefined): v is string => v !== undefined && v.trim() !== '';

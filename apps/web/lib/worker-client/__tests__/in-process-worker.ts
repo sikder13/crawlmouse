@@ -9,6 +9,7 @@ import { generateKeyPairSync, randomBytes, type KeyObject } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { loadConfig, type WorkerConfig } from '../../../../../packages/worker/src/config';
 import type { Fetcher } from '../../../../../packages/worker/src/fetch/fetcher';
+import type { MeasureReader } from '../../../../../packages/worker/src/reader/measure';
 import { createWorker, type Worker } from '../../../../../packages/worker/src/server';
 import { InstantClock } from '../../../../../packages/worker/src/test-support/clock';
 import { fakeFetcher } from '../../../../../packages/worker/src/test-support/fake-fetcher';
@@ -38,6 +39,8 @@ export const pageFetcher = (clock: InstantClock): Fetcher =>
 export async function startWorker(
   over: Partial<WorkerConfig> = {},
   fetcher?: (clock: InstantClock) => Fetcher,
+  /** The thread rendered pages are measured on; without one, POST /render/measure refuses. */
+  measureReader?: MeasureReader,
 ): Promise<InProcessWorker> {
   const clock = new InstantClock(1_800_000_000_000);
   const signingSecret = plantedSecret();
@@ -54,6 +57,7 @@ export async function startWorker(
     clock,
     fetcher: (fetcher ?? pageFetcher)(clock),
     log: () => undefined,
+    ...(measureReader && { measureReader }),
   });
   await new Promise<void>((r) => worker.server.listen(0, '127.0.0.1', r));
   return {

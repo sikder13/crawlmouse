@@ -77,6 +77,22 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
+    'apps/web/lib/v2/monitor/alert-rules.ts :: .slice(0, k)',
+    "ARRAY slice of a fix's events in time order, up to the one that reopened it, to find the last marking done before it (F-254); no string is cut.",
+  ],
+  [
+    'apps/web/lib/v2/pipeline/persist.ts :: out.push(chunk.slice(i, i + maxRows) as LinkEdge[]);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/v2/reports/file-name.ts :: .slice(0, 100);',
+    'Not crawled text: a site host we stored, already reduced to ASCII letters, digits, dots and hyphens on the line above, so the cut cannot split a character; it bounds a download file name (F-125).',
+  ],
+  [
+    'apps/web/lib/v2/reports/file-name.ts :: const day = Number.isNaN(at) ? null : new Date(at).toISOString().slice(0, 10);',
+    "Not crawled text: the date part of an ISO timestamp of our own clock (a report row's created_at), for a download file name (F-125).",
+  ],
+  [
     'apps/web/lib/analytics-server.ts :: parsed = JSON.parse(decodeURIComponent(pair.slice(name.length)));',
     "STRING slice of a cookie pair after its ASCII `name=` prefix: the cut is at the prefix's end, so it cannot split a surrogate pair, and the value is parsed and bounded before use; never crawled text (CC-41).",
   ],
@@ -145,6 +161,10 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'packages/engine/src/v2/build/plan.ts :: return { stage1, stage2_needed, stage2: picked.slice(stage1.length) };',
     'ARRAY slice of the sampled-page records: the ones taken after stage 1 (CC-20a). No string is indexed.',
+  ],
+  [
+    'packages/engine/src/v2/render/challenge.ts :: return close < 0 ? null : lower.slice(tagEnd + 1, close).trim();',
+    "STRING slice of a rendered page between its first `<title…>`'s `>` and the next `</title>`: it starts just after an ASCII `>` and ends at an ASCII `<`, so it cannot split a surrogate pair. The title is only compared with fixed challenge titles in challengeIn and is never persisted or shown (#150).",
   ],
   [
     'packages/engine/src/v2/build/record.ts :: const top = ranks.slice(0, hubs).reduce((n, v) => n + v, 0);',
@@ -232,6 +252,10 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'apps/web/app/api/audits/[id]/export/route.ts :: .slice()',
     'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "apps/web/app/api/agency/brand/route.ts :: const hash = createHash('sha256').update(logo.bytes).digest('hex').slice(0, 16);",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
     "apps/web/app/api/reports/[slug]/logo/route.ts :: const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);",

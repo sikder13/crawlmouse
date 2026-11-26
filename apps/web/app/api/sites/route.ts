@@ -5,6 +5,7 @@ import { scheduleFor } from '@/lib/auth/schedule';
 import { getClientIp } from '@/lib/client-ip';
 import { isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { accountPageCap } from '@/lib/v2/pipeline/page-cap';
 import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor, checkStarted } from '@/lib/v2/account/events';
 import {
@@ -42,8 +43,8 @@ export const dynamic = 'force-dynamic';
  * The add that made this site may have failed at its send, leaving its check queued with nothing to
  * run it. A repeat add recovers it. The reads run here, through the caller's own session; what they
  * answer is the work to do after the response, so a slow or failing send cannot hold back the 409.
- * It re-sends under `queuedEventId`'s id, and a check already sent runs once (`inngest/check.ts` is
- * idempotent on `checkId`). A paused site is left alone, as the other starts refuse one, and so is a
+ * It re-sends under `queuedEventId`'s id, and a check already sent runs once: Inngest drops an event
+ * whose id it has had within 24 hours, and `claim_check` lets one run claim a queued check. A paused site is left alone, as the other starts refuse one, and so is a
  * site whose row this session cannot read. A repeat is counted as the public start counts one, and
  * over that limit it sends nothing.
  */
@@ -51,6 +52,7 @@ async function strandedResend(
   sb: SupabaseClient,
   req: Request,
   site: Omit<ResendQueued, 'check'>,
+  capOf: (accountId: string) => Promise<number>,
 ): Promise<(() => Promise<void>) | null> {
   const row = await sb.from('sites').select('paused_reason').eq('id', site.siteId).maybeSingle();
   if (row.error) throw new Error('sites read failed');
@@ -69,7 +71,8 @@ async function strandedResend(
   return async () => {
     try {
       if (ip !== 'unknown' && !(await startLimits.replay(ip))) return;
-      await supabaseResendQueued()({ ...site, check });
+      // The re-sent check keeps the account's page cap (row 16).
+      await supabaseResendQueued(capOf)({ ...site, check });
     } catch {
       // A fixed sentence: an upstream error's text can echo the event it was sent.
       console.error('[api/sites] a repeat add could not re-send its check (send)');
@@ -141,7 +144,8 @@ export async function POST(req: Request) {
   if (live.error) throw new Error(`sites read failed: ${live.error.message}`);
   const now = new Date();
 
-  const added = await supabaseAddSite(supabaseAdmin())({
+  const admin = supabaseAdmin();
+  const added = await supabaseAddSite(admin)({
     accountId: account.id,
     ownerSeatId: seat.id,
     host: admitted.host,
@@ -167,12 +171,18 @@ export async function POST(req: Request) {
     }
     case 'exists':
       try {
-        const resend = await strandedResend(sb, req, {
-          siteId: added.siteId,
-          accountId: account.id,
-          host: admitted.host,
-          requestedByUserId: user.id,
-        });
+        const resend = await strandedResend(
+          sb,
+          req,
+          {
+            siteId: added.siteId,
+            accountId: account.id,
+            host: admitted.host,
+            requestedByUserId: user.id,
+          },
+          // The account's page cap, read with the service role, for the re-sent check (row 16).
+          (id) => accountPageCap(admin, id),
+        );
         if (resend) after(resend);
       } catch {
         // The answer is still that the site is there. A fixed sentence, as for the send.
