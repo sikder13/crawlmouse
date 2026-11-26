@@ -179,6 +179,41 @@ describe('Reports made', () => {
   });
 });
 
+describe('Reports made, a compare of two checks on one day (QA dashboard walk D-28)', () => {
+  it('names each check with its time, so the two do not read alike', () => {
+    const copy = structuredClone(bad);
+    // The compare's second check moved to 25 Oct 03:30Z, Sat 24 Oct 23:30 in Indiana: the day of
+    // its first (25 Oct 02:34Z, Sat 24 Oct 22:34).
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000005')!.finished_at =
+      '2026-10-25T03:30:00Z';
+    const v = reportsView(copy, ACCOUNT_VIEWERS.home(), {}, BASE);
+    expect(v.made.rows.find((r) => r.type === 'Compare')!.covers).toBe(
+      'Sat 24 Oct 22:34 vs Sat 24 Oct 23:30',
+    );
+  });
+});
+
+describe('Reports made, a compare’s days read in the account’s zone, not UTC (PR 2 review, item 3)', () => {
+  const covers = (first: string, second: string) => {
+    const copy = structuredClone(bad);
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000001')!.finished_at = first;
+    copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000005')!.finished_at = second;
+    return reportsView(copy, ACCOUNT_VIEWERS.home(), {}, BASE).made.rows.find(
+      (r) => r.type === 'Compare',
+    )!.covers;
+  };
+
+  it('one UTC day, two days in Indiana: no times', () => {
+    expect(covers('2026-10-25T02:00:00Z', '2026-10-25T12:00:00Z')).toBe('Sat 24 Oct vs Sun 25 Oct');
+  });
+
+  it('two UTC days, one day in Indiana: times', () => {
+    expect(covers('2026-10-24T23:00:00Z', '2026-10-25T01:00:00Z')).toBe(
+      'Sat 24 Oct 19:00 vs Sat 24 Oct 21:00',
+    );
+  });
+});
+
 describe('how long a share link works', () => {
   it('is the interval create_share_link adds to the moment it is made, in days', () => {
     const sql = readFileSync(
@@ -405,11 +440,16 @@ describe('Reports, with what a live page knows', () => {
     expect(labels(v, CSV)).toEqual(['Download · 310 KB']);
     expect(row(v, CSV).linkUntil).toBe('Link · until Tue 24 Nov');
     expect(labels(live({ role: 'account_manager' }), PDF)).toEqual(['Download · 1.2 MB', 'Link']);
-    expect(v.shell).toEqual(
-      reportsView(bad, ACCOUNT_VIEWERS.home(), {}, BASE, {
-        role: 'account_manager',
-      }).shell,
-    );
+    // A manager's frame without Integrations, which answers a developer with a 404 (F-335: this
+    // viewer names no seat, so the rail must read the role it is given).
+    const manager = reportsView(bad, ACCOUNT_VIEWERS.home(), {}, BASE, {
+      role: 'account_manager',
+    }).shell;
+    expect(manager.nav.map((n) => n.label)).toContain('Integrations');
+    expect(v.shell).toEqual({
+      ...manager,
+      nav: manager.nav.filter((n) => n.label !== 'Integrations'),
+    });
     expect(v.shell).not.toEqual(home().shell);
   });
 

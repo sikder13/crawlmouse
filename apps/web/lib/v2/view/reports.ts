@@ -212,6 +212,15 @@ export function reportsView(
   const made = v.d.reports
     .filter((r) => r.kind !== 'public_link' && (r.status === 'ready' || r.status === 'sent'))
     .sort((a, b) => at(b.created_at) - at(a.created_at) || a.id.localeCompare(b.id));
+  // Two checks of one day are told apart by their times: "Tue 24 Nov vs Tue 24 Nov" said nothing
+  // (QA dashboard walk D-28).
+  const pairOf = (a: string, b: string) =>
+    dayDate(a, zone) === dayDate(b, zone)
+      ? COPY.vs(
+          `${dayDate(a, zone)} ${hourMinute(a, zone)}`,
+          `${dayDate(b, zone)} ${hourMinute(b, zone)}`,
+        )
+      : COPY.vs(dayDate(a, zone), dayDate(b, zone));
   const coversOf = (r: Report): string => {
     const checks = r.covers_check_ids.map((id) => findCheck(v.d, id));
     const what =
@@ -220,7 +229,7 @@ export function reportsView(
           ? COPY.firstAudit
           : COPY.checkOf(dayDate(checks[0]!.finished_at!, zone))
         : checks.length === 2
-          ? COPY.vs(dayDate(checks[0]!.finished_at!, zone), dayDate(checks[1]!.finished_at!, zone))
+          ? pairOf(checks[0]!.finished_at!, checks[1]!.finished_at!)
           : COPY.span(
               checks.length,
               dayDate(checks[0]!.finished_at!, zone),

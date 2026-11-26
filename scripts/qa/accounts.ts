@@ -37,6 +37,9 @@ export const QA_HOSTS = {
   // The daily sentinel's journey step (J2.4i) keeps this one on new Pro and Free accounts it makes:
   // its robots.txt disallows GPTBot during odd UTC hours (fixtures/qa-lab/api/sentinel.mjs).
   sentinel: 'sentinel.lab.crawlmouse.com',
+  // The same function's daily twin: its robots.txt disallows GPTBot on even UTC days, so a site whose
+  // daily look falls in an even hour meets a block too (inbox c/025). No account holds it yet.
+  sentinelDaily: 'sentinel-b.lab.crawlmouse.com',
   // No account holds these either: the large lab, about 2,500 pages rendered by one function
   // (fixtures/qa-lab/api/large.mjs), on four hosts that answer fast, slowly, and throttled with and
   // without Retry-After. For the large-crawl design study (inbox 067).
@@ -44,6 +47,9 @@ export const QA_HOSTS = {
   largeSlow: 'large-slow.lab.crawlmouse.com',
   largeThrottle: 'large-throttle.lab.crawlmouse.com',
   largeThrottleBare: 'large-throttle-bare.lab.crawlmouse.com',
+  // No account holds this one either: 2,000 pages of about 100 links each, about 200,000 edges,
+  // rendered by one function (fixtures/qa-lab/api/dense.mjs), for the persist work (c/038).
+  dense: 'dense.lab.crawlmouse.com',
 } as const;
 
 /** Where the person's work lives: their own account, a second (agency) account, or a seat on one. */

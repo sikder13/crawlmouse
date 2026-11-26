@@ -12,10 +12,25 @@ import styles from './ProofScreen.module.css';
  * and no orange element. A before-and-after pair is two columns, one under the other on a phone.
  * Built from the design system's pieces: no locked artboard draws this page.
  */
-export function ProofScreen({ data }: { data: ProofView }) {
+export function ProofScreen({
+  data,
+  back,
+}: {
+  data: ProofView;
+  /**
+   * A member's way back to the page the report was opened from (QA dashboard walk D-28): the
+   * signed-in reader of `/reports/<id>` had none. A client's share link passes none.
+   */
+  back?: { href: string; label: string };
+}) {
   return (
     <div className={shell.shell} data-v2-shell="" data-v2-proof="">
       <main className={`${layout.wrap} ${styles.main}`}>
+        {back ? (
+          <p className={styles.line} data-v2-proof-back="">
+            <a href={back.href}>{back.label}</a>
+          </p>
+        ) : null}
         <header className={styles.head}>
           <Heading level={1} size="l">
             {data.title}

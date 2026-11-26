@@ -70,6 +70,9 @@ export const SITE_COPY = {
     copy: 'Copy link',
     capped: 'You have made today’s links. Try again tomorrow.',
     notFinished: 'Only a finished check can be published.',
+    /** The row when the latest check is partial, which a link cannot publish (D-14). */
+    partialLatest:
+      'The latest check is partial, and only a finished check can be published. A link can be made from a later check that finishes.',
     failed: 'The link could not be made. Try again.',
     signedOut: 'Your session has ended. Sign in again to make a link.',
   },
@@ -147,6 +150,14 @@ export const SITE_CHANGES: CopyChange[] = [
     locked: 'Crawler 25 Oct',
     rendered: 'Crawler 24 Oct',
     source: ZONE,
+  },
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked: '26 27 28 Thu 29 Fri 30',
+    rendered: '26 Oct 27 Oct 28 Oct 29 Oct 30 Oct',
+    source:
+      'V2R register, F-288 (QA dashboard walk D-25): every check’s column head in one form, its day and month in the account’s zone, with its time where two checks share a day (checkLabels)',
   },
   {
     screen: 'site',

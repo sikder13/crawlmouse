@@ -6,7 +6,7 @@
  * an unknown since is ignored, as if that filter were not set. A site the account does not hold is
  * ignored too, and the page says so (F-130), in the same words whether or not the id exists.
  */
-import { instant, type Change } from '@crawlmouse/types/v2';
+import { instant, type Change, type Check } from '@crawlmouse/types/v2';
 import { CHANGES_LOG_COPY as COPY } from '../copy/changes-log';
 import { findCheck } from '../fixtures';
 import { dayDate, hourMinuteZoned } from '../format';
@@ -20,7 +20,8 @@ import {
 } from './account';
 import { accountShellView, newChanges, type ShellView } from './account-shell';
 import { listedChanges } from './listed-changes';
-import { rowOf, type ChangeRowView } from './segment/changes';
+import { everySectionMeasured } from './section-measured';
+import { firstSeenOf, rowOf, TRIGGERS, type ChangeRowView } from './segment/changes';
 
 const DAY_MS = 86_400_000;
 
@@ -84,11 +85,16 @@ export function accountChanges(v: AccountView): Change[] {
     .sort((a, b) => instant(b.detected_at) - instant(a.detected_at) || a.id.localeCompare(b.id));
 }
 
-/** One row of the log: a change, or everything one site's first audit found (`findings`). */
-interface LogEntry {
-  change: Change;
-  findings: number | null;
-}
+/**
+ * One row of the log: a change, everything one site's first audit found (`findings`), or a re-check
+ * that recorded no change (`quiet`, F-214).
+ */
+type LogEntry =
+  | { change: Change; findings: number | null; quiet: null }
+  | { change: null; findings: null; quiet: Check };
+
+const checkIdOf = (e: LogEntry) => (e.change ? e.change.check_id : e.quiet.id);
+const timeOf = (e: LogEntry) => (e.change ? e.change.detected_at : e.quiet.finished_at!);
 
 /**
  * The log's rows (F-100). What a site's first audit found was not a change: nothing came before it.
@@ -105,7 +111,7 @@ function logEntries(changes: readonly Change[]): LogEntry[] {
   const entries: LogEntry[] = [];
   for (const c of changes) {
     if (!isFinding(c)) {
-      entries.push({ change: c, findings: null });
+      entries.push({ change: c, findings: null, quiet: null });
     } else if (!placed.has(c.check_id)) {
       placed.add(c.check_id);
       const group = found.get(c.check_id)!;
@@ -118,10 +124,40 @@ function logEntries(changes: readonly Change[]): LogEntry[] {
         grade_deltas: [],
         notified: group.find((g) => g.notified)?.notified ?? null,
       };
-      entries.push({ change, findings: group.length });
+      entries.push({ change, findings: group.length, quiet: null });
     }
   }
   return entries;
+}
+
+/**
+ * The log's entries with a row for each re-check that recorded no change (F-214): a finished or
+ * partial check that has a check before it and no change row of its own. Newest first.
+ */
+function withQuietChecks(v: AccountView, changes: readonly Change[]): LogEntry[] {
+  const found = new Set(changes.map((c) => c.check_id));
+  const quiet: LogEntry[] = v.d.checks
+    .filter(
+      (c) =>
+        (c.status === 'finished' || c.status === 'partial') &&
+        c.previous_check_id !== null &&
+        !found.has(c.id),
+    )
+    .map((c) => ({ change: null, findings: null, quiet: c }));
+  // At one instant a change comes before a re-check, and entries of one kind keep their order:
+  // changes by id (accountChanges), re-checks by check id.
+  const rank = (e: LogEntry) => (e.change ? 0 : 1);
+  const tie = (e: LogEntry) => (e.change ? '' : e.quiet.id);
+  return [...logEntries(changes), ...quiet]
+    .map((e, i) => ({ e, i }))
+    .sort(
+      (a, b) =>
+        instant(timeOf(b.e)) - instant(timeOf(a.e)) ||
+        rank(a.e) - rank(b.e) ||
+        tie(a.e).localeCompare(tie(b.e)) ||
+        a.i - b.i,
+    )
+    .map(({ e }) => e);
 }
 
 export function changesLogView(
@@ -138,46 +174,52 @@ export function changesLogView(
   );
   const hostOf = new Map(sites.map((s) => [s.id, s.host]));
   const siteOfCheck = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
-  const all = logEntries(accountChanges(v));
+  const all = withQuietChecks(v, accountChanges(v));
   const site = query.site && hostOf.has(query.site) ? query.site : null;
   const kind = KIND_ORDER.find((k) => k === query.kind) ?? null;
   // The kinds the account's changes hold, and the one asked for even when none has it yet.
-  const kinds = KIND_ORDER.filter((k) => k === kind || all.some((e) => e.change.kind === k));
+  const kinds = KIND_ORDER.filter((k) => k === kind || all.some((e) => e.change?.kind === k));
   const since = CHANGES_LOG_SINCE.find((s) => s.key === query.since) ?? CHANGES_LOG_SINCE[0];
   const set = { site, kind, since: since.key as SinceKey };
 
   const from = since.days === null ? null : instant(v.now) - since.days * DAY_MS;
   const shown = all
-    .filter((e) => site === null || siteOfCheck.get(e.change.check_id) === site)
-    .filter((e) => kind === null || e.change.kind === kind)
-    .filter((e) => from === null || instant(e.change.detected_at) >= from);
+    .filter((e) => site === null || siteOfCheck.get(checkIdOf(e)) === site)
+    // A re-check that recorded no change is not a change of any kind.
+    .filter((e) => kind === null || e.change?.kind === kind)
+    .filter((e) => from === null || instant(timeOf(e)) >= from);
 
   const clock = (ts: string) => `${dayDate(ts, zone)} ${hourMinuteZoned(ts, zone)}`;
-  const rows = shown.map(({ change: c, findings }) => ({
-    ...rowOf(
-      c,
-      findCheck(v.d, c.check_id),
-      clock,
-      v.d.checks.find((x) => x.id === c.previous_check_id) ?? null,
-      v.d.fix_events,
-    ),
-    ...(findings === null
-      ? {}
-      : {
-          summary: COPY.firstAudit(findings),
-          subject: null,
-          where: COPY.firstAuditWhere,
-          pages: null,
-          effect: 'none',
-          verdict: null,
-          cause:
-            resultChecks(v, siteOfCheck.get(c.check_id)!).length > 1
-              ? COPY.firstAuditCauseLater
-              : COPY.firstAuditCause,
-          diff: [],
-        }),
-    site: hostOf.get(siteOfCheck.get(c.check_id)!)!,
-  }));
+  const rows: ChangeRowView[] = shown.map((e) => {
+    if (e.change === null) return quietRow(v, e.quiet, clock, hostOf.get(e.quiet.site_id)!);
+    const { change: c, findings } = e;
+    return {
+      ...rowOf(
+        c,
+        findCheck(v.d, c.check_id),
+        clock,
+        firstSeenOf(v.d, c, clock),
+        v.d.checks.find((x) => x.id === c.previous_check_id) ?? null,
+        v.d.fix_events,
+      ),
+      ...(findings === null
+        ? {}
+        : {
+            summary: COPY.firstAudit(findings),
+            subject: null,
+            where: COPY.firstAuditWhere,
+            pages: null,
+            effect: 'none',
+            verdict: null,
+            cause:
+              resultChecks(v, siteOfCheck.get(c.check_id)!).length > 1
+                ? COPY.firstAuditCauseLater
+                : COPY.firstAuditCause,
+            diff: [],
+          }),
+      site: hostOf.get(siteOfCheck.get(c.check_id)!)!,
+    };
+  });
 
   const href = (next: Partial<typeof set>) => {
     const q = { ...set, ...next };
@@ -196,8 +238,8 @@ export function changesLogView(
   ];
   const fresh = newChanges(v).length;
   // A first audit is an entry in the log and not a change: the headline counts changes only.
-  const changesShown = shown.filter((e) => e.findings === null);
-  const sitesChanged = new Set(changesShown.map((e) => siteOfCheck.get(e.change.check_id))).size;
+  const changesShown = shown.filter((e) => e.change !== null && e.findings === null);
+  const sitesChanged = new Set(changesShown.map((e) => siteOfCheck.get(checkIdOf(e)))).size;
   // With no change to show, the headline counts the sites audited: a clean first audit has no row.
   const audited = sites.map((s) => resultChecks(v, s.id).length).filter((n) => n > 0);
   const anyRechecked = audited.some((n) => n > 1);
@@ -210,7 +252,7 @@ export function changesLogView(
           rows.length,
           all.length,
           named,
-          all.some((e) => e.findings !== null),
+          all.some((e) => e.change === null || e.findings !== null),
         )
       : rows.length
         ? changesShown.length === 0
@@ -253,5 +295,33 @@ export function changesLogView(
     notice: query.site && site === null ? COPY.siteNotHere : null,
     empty: rows.length ? null : filtered ? COPY.noMatch : COPY.noChanges,
     tableLabel: COPY.table,
+  };
+}
+
+/** A re-check that recorded no change, as a row (F-214): what ran, and what it was compared with. */
+function quietRow(
+  v: AccountView,
+  check: Check,
+  clock: (ts: string) => string,
+  site: string,
+): ChangeRowView {
+  const previous = v.d.checks.find((c) => c.id === check.previous_check_id);
+  const measured =
+    previous !== undefined && everySectionMeasured(check) && everySectionMeasured(previous);
+  return {
+    key: `check-${check.id}`,
+    site,
+    when: clock(check.finished_at!),
+    kind: 'checked',
+    pill: { state: 'neutral', label: COPY.quietPill },
+    summary: COPY.quiet(TRIGGERS[check.trigger], measured),
+    subject: null,
+    where: COPY.firstAuditWhere,
+    pages: null,
+    effect: 'none',
+    verdict: null,
+    cause: COPY.quietCause(previous?.finished_at ? clock(previous.finished_at) : null),
+    diff: [],
+    told: 'nobody was notified',
   };
 }

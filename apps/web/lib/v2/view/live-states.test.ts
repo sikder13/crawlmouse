@@ -34,12 +34,13 @@ const noSites: FixtureDataset = {
 describe('dashboardView with no site: day 0', () => {
   const v = dashboardView(noSites, { accountId: ACCOUNT, now: bad.as_of });
 
-  it('asks for the site, with add-site as the one orange action and its address field', () => {
+  it('asks for the site, with add-site as the one orange action beside the sentence, and its address field', () => {
     expect(v.firstRun).toBe(true);
     expect(v.header.title).toBe('Add the site to watch');
     expect(v.header.line).toBe('Fri 30 Oct · 0 sites · trial ends Sat 7 Nov');
-    expect(v.header.actions).toHaveLength(1);
-    const add = v.header.actions[0]!;
+    // The action sits in the sites card, beside "Adding a site starts its first check …".
+    expect(v.header.actions).toEqual([]);
+    const add = v.sites.add!;
     expect(add).toMatchObject({ route: '/api/sites', method: 'post', primary: true });
     expect(add.label).toBe('Add a site · 0 of 5 on Pro');
     expect(add.inputs).toEqual([
@@ -81,7 +82,7 @@ describe('dashboardView with no site: day 0', () => {
     };
     const f = dashboardView(free, { accountId: ACCOUNT, now: bad.as_of });
     expect(f.header.line).toBe('Fri 30 Oct · 0 sites');
-    expect(f.header.actions[0]!.label).toBe('Add a site · 0 of 1 on Free');
+    expect(f.sites.add!.label).toBe('Add a site · 0 of 1 on Free');
     expect(f.startPro?.start.route).toBe('/api/billing/pro-trial/start');
   });
 });
@@ -356,6 +357,7 @@ describe('the controls a seat can use (round 1, item 7)', () => {
       );
       expect(v.header.title).toBe('No site here yet');
       expect(v.header.actions).toEqual([]);
+      expect(v.sites.add).toBeNull();
       expect(v.sites.foot).toMatch(/^Sites are added by the account’s owner/);
       expect(JSON.stringify(v)).not.toMatch(/Add the site to watch|Adding a site starts/);
     }

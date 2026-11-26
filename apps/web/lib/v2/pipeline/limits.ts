@@ -20,9 +20,9 @@ export { FAILURE_REASONS, type FailureReason } from '../../../../../inngest/chec
 /**
  * Of the run's finish timeout, what render, build, persist and finalize keep after the last batch. Render
  * takes at most RENDER_SHARE_S of it (`steps/time.ts` `renderEndsAt`), and renders nothing while its
- * two caps are unset. Persist is one step whatever
- * persistBuiltCheck sends inside it (Q11: staged chunks, then the finishing RPC); its duration at the
- * page cap is not measured against this reserve yet.
+ * two caps are unset. Persist is one step for a check of at most 50 pieces of rows, and one more for
+ * each further 50 (F-330: persist.ts PieceCut, inngest/check.ts persistAll); its duration at the page
+ * cap is not measured against this reserve yet.
  */
 export const RESERVE_S = 180;
 /**
@@ -66,7 +66,10 @@ export const MAX_PAGE_CAP = 2000;
 export const LARGE_CRAWL_S_PER_PAGE = 1.7;
 /**
  * A large check's reserve after the last batch: building a 2,000-page check measured 45 to 62 s
- * in-process (#165's harness, 24 Nov); persisting it is one database transaction, not measured.
+ * in-process (#165's harness, 24 Nov). Persisting it is the row pieces, then one transaction: the
+ * first production 2,000 (fc947155) spent 14.5 s in its edge inserts (10,689 ms), stages (337 ms)
+ * and finishing call (3,460 ms). A denser site takes more persist steps, each its own share of
+ * this reserve, which is not measured yet.
  */
 export const LARGE_RESERVE_S = 300;
 

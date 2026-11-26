@@ -77,7 +77,11 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
-    'apps/web/lib/v2/pipeline/persist.ts :: out.push(chunk.slice(i, i + maxRows) as LinkEdge[]);',
+    'apps/web/lib/v2/monitor/alert-rules.ts :: .slice(0, k)',
+    "ARRAY slice of a fix's events in time order, up to the one that reopened it, to find the last marking done before it (F-254); no string is cut.",
+  ],
+  [
+    'apps/web/lib/v2/pipeline/persist.ts :: out.push(chunk.slice(i, i + maxRows) as T[]);',
     'array slice \u2014 cannot split a surrogate pair',
   ],
   [

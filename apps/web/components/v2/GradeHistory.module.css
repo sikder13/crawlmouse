@@ -27,7 +27,8 @@
   display: block;
   width: 100%;
   min-width: 520px;
-  height: 194px;
+  /* The drawing's height plus the top padding, set on the element (GradeHistory.tsx). */
+  height: var(--v2-chart-h);
   padding: 8px 8px 0;
   box-sizing: border-box;
 }
@@ -65,4 +66,58 @@
 
 .marker {
   fill: var(--v2-bad);
+}
+
+/* Notes written under the chart, shown only where a phone fits it (below). */
+.phoneNotes {
+  display: none;
+}
+
+/* `fitOnPhone`: the chart fits a phone's card instead of scrolling. Scaled from the 640-unit
+   viewBox to about 356px (0.56), the axis lettering is drawn at 15 units, so it reads at about
+   8.5px. A check's time sits on a second line under its day, so the widest line is "24 Nov" (6
+   characters, about 56 units at 0.62 em); between six checks there are 118 units, and the end
+   labels are anchored inward; the time line sits 18 units under the day, 1.2 times the lettering.
+   GradeHistory.axis.test.tsx measures both. Every tick label stays: "100", the widest, spans 28
+   units from x 8, inside the 40 before the plot. The note and the marker's words, which would sit
+   on the lines at that size, are written in the list under the chart, where a phone shows them;
+   their copies in the drawing (aria-hidden, like all of it) are made transparent there, not taken
+   out of the page (owner ruling 2026-11-08: a phone keeps every text; layout.spec.ts). */
+@media (max-width: 760px) {
+  .fit .chart {
+    min-width: 0;
+    height: auto;
+  }
+
+  .fit .ticks text {
+    font-size: 15px;
+  }
+
+  .fit .chart .note {
+    opacity: 0;
+  }
+
+  .fit .phoneNotes {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 4px 0 0;
+    padding: 0 16px;
+    list-style: none;
+    color: var(--v2-fg2);
+    font-size: var(--v2-text-micro);
+  }
+
+  .fit .phoneNotes li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .phoneMarker {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    background: var(--v2-bad);
+  }
 }

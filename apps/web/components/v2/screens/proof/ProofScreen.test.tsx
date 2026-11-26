@@ -360,3 +360,22 @@ describe('the previews', () => {
     ]).toEqual(['B+', '80', 'B', '79']);
   });
 });
+
+describe('a member’s way back from a report (QA dashboard walk D-28)', () => {
+  const data = proofPreview('/v2-preview/screens/proof');
+
+  it('links back to Reports when the page passes one', () => {
+    const doc = new JSDOM(
+      renderToStaticMarkup(
+        <ProofScreen data={data} back={{ href: '/reports', label: 'Back to Reports' }} />,
+      ),
+    ).window.document;
+    const a = doc.querySelector('[data-v2-proof-back] a')!;
+    expect([a.getAttribute('href'), a.textContent]).toEqual(['/reports', 'Back to Reports']);
+  });
+
+  it('shows a client’s share link none', () => {
+    const doc = new JSDOM(renderToStaticMarkup(<ProofScreen data={data} />)).window.document;
+    expect(doc.querySelector('[data-v2-proof-back]')).toBeNull();
+  });
+});

@@ -84,6 +84,18 @@
   width: 120px;
 }
 
+/* A crawler's name is one word that must not run into its markers ("Claude-SearchBot▲"): it keeps
+   to one line, so the column takes the longest name's width (an auto-layout table sizes a column to
+   its widest unbreakable content). The 12px between name and markers is the markers' own margin,
+   so every cell keeps the locked 4px 0 padding (layout.spec.ts, the by-check rows). */
+.byCheck .byCheckTable tbody th {
+  white-space: nowrap;
+}
+
+.byCheck .byCheckTable tbody td > * {
+  margin-left: 12px;
+}
+
 .legendItem {
   display: inline-flex;
   align-items: center;
@@ -180,6 +192,113 @@
 
 .earlierList a {
   color: var(--v2-fg);
+}
+
+/* A piece of a host or a last-check line ("example-outfitter.", "check queued"): the line breaks
+   only at the <wbr> between pieces, after a dot or a " · ", never after the hyphen inside one. */
+.whole {
+  white-space: nowrap;
+}
+
+/* A part longer than a line can hold (DashboardScreen LONG_PART): it may break anywhere. */
+.longPart {
+  overflow-wrap: anywhere;
+}
+
+/* A sites-table cell's column name, drawn only where a phone stacks the row (below). */
+.cellName {
+  display: none;
+}
+
+/* Day 0 with no site: the sentence that says what adding a site starts, and the action beside it. */
+.empty {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.empty p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--v2-fg2);
+}
+
+@media (max-width: 760px) {
+  /* "What changed, by site" on a phone: each change is one column (pill, then its words, then its
+     actions, which wrap), so nothing sits past the card's edge and the words keep the full width. */
+  .changedTable table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--v2-line2);
+  }
+
+  .changedTable table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .changedTable table tbody td,
+  .changedTable table tbody td[data-v2-numeric] {
+    min-width: 0;
+    padding: 0;
+    border-bottom: 0;
+    text-align: left;
+  }
+
+  .changedTable .rowActions {
+    display: flex;
+    flex-wrap: wrap;
+    white-space: normal;
+    column-gap: 4px;
+  }
+
+  /* The sites table on a phone: each site is a block, its name across the top and each value under
+     its column's name in two columns, so every column is on screen without a sideways scroll. The
+     header row is read, not drawn: the names are drawn in each cell instead (.cellName). */
+  .sitesTable table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sitesTable table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--v2-line2);
+  }
+
+  .sitesTable table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .sitesTable table tbody th,
+  .sitesTable table tbody td,
+  .sitesTable table tbody td[data-v2-numeric] {
+    min-width: 0;
+    padding: 0;
+    border-bottom: 0;
+    text-align: left;
+  }
+
+  .sitesTable table tbody th {
+    grid-column: 1 / -1;
+  }
+
+  .sitesTable .cellName {
+    display: block;
+    color: var(--v2-mut);
+    font-family: var(--v2-font-body);
+    font-size: var(--v2-text-micro);
+  }
 }
 
 /* The blocked-crawlers card (D-09): the crawler and its verdict share a cell and wrap on a phone. */

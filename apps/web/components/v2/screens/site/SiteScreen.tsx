@@ -94,6 +94,7 @@ export function SiteScreen({
         </div>
         <div className={styles.grid}>
           <Table
+            shade
             label="Crawler access by check"
             rowHeader
             columns={[
@@ -134,6 +135,7 @@ export function SiteScreen({
         </CardHead>
         {fixes.rows.length ? (
           <Table
+            shade
             label="Fixes"
             columns={[
               { header: FIX_PLACE_HEADER, mono: true, muted: true },
@@ -208,9 +210,12 @@ export function SiteScreen({
         <Card as="section" className={shared.panel} id={SITE_SETTINGS_ANCHOR}>
           <CardHead title="Settings for this site" />
           <Table
+            shade
             label="Site settings"
             headersHidden
             rowHeader
+            // A phone lays each row out as a flex line: the roles keep it read as a table.
+            roles
             className={styles.settings}
             columns={[
               { header: 'Setting' },
@@ -249,6 +254,7 @@ export function SiteScreen({
           <CardHead title="Alerts for this site" />
           {alerts.rows.length ? (
             <Table
+              shade
               label="Alert rules"
               headersHidden
               rowHeader

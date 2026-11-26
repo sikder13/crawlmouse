@@ -50,7 +50,10 @@ export default async function ReportProofPage({ params }: { params: Promise<{ id
   return (
     <>
       {theme ? <SeatTheme theme={theme} /> : null}
-      <ProofScreen data={proofView(proof.doc)} />
+      <ProofScreen
+        data={proofView(proof.doc)}
+        back={{ href: '/reports', label: 'Back to Reports' }}
+      />
     </>
   );
 }

@@ -14,7 +14,7 @@ import {
   calendarDays,
   dayDate,
   dayMonth,
-  dayOfMonth,
+  hourMinute,
   hourMinuteZoned,
   nextWeekly,
   weekday,
@@ -64,21 +64,27 @@ export function move(from: number, to: number): string {
 }
 
 /**
- * The history axis: the first label carries its month ("24 Oct"), as does a label in a new month
- * ("1 Nov"); the others are the day ("26"). The last two carry their weekday ("Thu 29", "Fri 30")
- * unless they carry their month.
+ * A history's labels, one form at every check (QA dashboard walk D-25): the day and month in the
+ * account's zone ("24 Oct"), and, where two of the checks fall on one day there, each check's time
+ * as well ("24 Nov", "02:39"). Day and time are kept apart so a narrow axis can set them on two
+ * lines. What this does not tell apart: two checks in one minute, the hour repeated when clocks go
+ * back, and the same day a year apart (no year is shown).
  */
+export function checkLabels(
+  checks: readonly Check[],
+  zone: string,
+): { date: string; time: string | null }[] {
+  const days = checks.map((c) => dayMonth(c.finished_at!, zone));
+  const sameDay = new Set(days).size < days.length;
+  return checks.map((c, i) => ({
+    date: days[i]!,
+    time: sameDay ? hourMinute(c.finished_at!, zone) : null,
+  }));
+}
+
+/** A history's labels on one line each: "24 Oct", or "24 Nov 02:39" (`checkLabels`). */
 export function axisLabels(checks: readonly Check[], zone: string): string[] {
-  return checks.map((c, i) => {
-    const ts = c.finished_at!;
-    const prev = checks[i - 1]?.finished_at;
-    const newMonth =
-      !prev || dayMonth(prev, zone).split(' ')[1] !== dayMonth(ts, zone).split(' ')[1];
-    const day = newMonth ? dayMonth(ts, zone) : dayOfMonth(ts, zone);
-    return i >= checks.length - 2 && checks.length > 1 && !newMonth
-      ? `${weekday(ts, zone)} ${day}`
-      : day;
-  });
+  return checkLabels(checks, zone).map((l) => (l.time ? `${l.date} ${l.time}` : l.date));
 }
 
 /** Search engines first, then the AI crawlers, in the order the check lists them. */
