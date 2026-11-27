@@ -154,6 +154,21 @@ describe('Reports, every time names its zone (D-17)', () => {
   // QA's B1 on #218: the sweep above reads each preview at its fixture's moment, so it never reached a
   // trial's last day, when the rail's trial card shows a time ("ends today at"). bad-site's trial ends
   // 8 Nov 02:41Z, Sat 7 Nov 21:41 EST in its zone; this reads Reports at 10:00 EST that day.
+  // F-336's last string: a compare of two checks of one day shows each check's time (D-28), and
+  // each names its zone. bad-site's compare covers checks 1 and 5; the second is moved to 25 Oct
+  // 03:30Z, Sat 24 Oct 23:30 EDT, the day of the first (22:34 EDT).
+  it('home, with a compare of two checks of one day', () => {
+    const sameDay = structuredClone(fixture('bad-site'));
+    sameDay.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000005')!.finished_at =
+      '2026-10-25T03:30:00Z';
+    const html = renderToStaticMarkup(
+      <ReportsScreen data={reportsView(sameDay, ACCOUNT_VIEWERS.home(), {}, REPORTS_PATHS.home)} />,
+    );
+    const { unzoned, text } = unzonedTimes(html);
+    expect(text).toContain('Sat 24 Oct 22:34 EDT vs Sat 24 Oct 23:30 EDT');
+    expect(unzoned).toEqual([]);
+  });
+
   it('home, on the trial’s last day, when the rail’s trial card shows a time', () => {
     const bad = fixture('bad-site');
     expect(bad.accounts[0]!.trial_ends_at).toBe('2026-11-08T02:41:00Z');

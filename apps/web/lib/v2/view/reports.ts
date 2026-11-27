@@ -27,15 +27,7 @@ import {
   SHARE_LINK_DAYS,
 } from '../copy/reports';
 import { findCheck } from '../fixtures';
-import {
-  calendarDays,
-  dayDate,
-  dayMonth,
-  dayOfMonth,
-  hourMinute,
-  hourMinuteZoned,
-  weekday,
-} from '../format';
+import { calendarDays, dayDate, dayMonth, dayOfMonth, hourMinuteZoned, weekday } from '../format';
 import {
   PLAN_NAMES,
   primarySite,
@@ -222,12 +214,12 @@ export function reportsView(
     .filter((r) => r.kind !== 'public_link' && (r.status === 'ready' || r.status === 'sent'))
     .sort((a, b) => at(b.created_at) - at(a.created_at) || a.id.localeCompare(b.id));
   // Two checks of one day are told apart by their times: "Tue 24 Nov vs Tue 24 Nov" said nothing
-  // (QA dashboard walk D-28).
+  // (QA dashboard walk D-28). Each time names its zone (D-17, F-336).
   const pairOf = (a: string, b: string) =>
     dayDate(a, zone) === dayDate(b, zone)
       ? COPY.vs(
-          `${dayDate(a, zone)} ${hourMinute(a, zone)}`,
-          `${dayDate(b, zone)} ${hourMinute(b, zone)}`,
+          `${dayDate(a, zone)} ${hourMinuteZoned(a, zone)}`,
+          `${dayDate(b, zone)} ${hourMinuteZoned(b, zone)}`,
         )
       : COPY.vs(dayDate(a, zone), dayDate(b, zone));
   const coversOf = (r: Report): string => {
