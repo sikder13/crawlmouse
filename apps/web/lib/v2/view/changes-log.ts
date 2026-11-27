@@ -19,6 +19,7 @@ import {
   type Viewer,
 } from './account';
 import { accountShellView, newChanges, type ShellView } from './account-shell';
+import { listedChanges } from './listed-changes';
 import { everySectionMeasured } from './section-measured';
 import { firstSeenOf, rowOf, TRIGGERS, type ChangeRowView } from './segment/changes';
 
@@ -79,7 +80,7 @@ export function asSentBy(c: Change, now: string): Change {
 
 /** The account's changes at `now`, newest first; ties in the order of their ids. */
 export function accountChanges(v: AccountView): Change[] {
-  return v.d.changes
+  return listedChanges(v.d.changes)
     .map((c) => asSentBy(c, v.now))
     .sort((a, b) => instant(b.detected_at) - instant(a.detected_at) || a.id.localeCompare(b.id));
 }
@@ -199,6 +200,7 @@ export function changesLogView(
         clock,
         firstSeenOf(v.d, c, clock),
         v.d.checks.find((x) => x.id === c.previous_check_id) ?? null,
+        v.d.fix_events,
       ),
       ...(findings === null
         ? {}

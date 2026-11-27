@@ -22,6 +22,7 @@ import {
   groupSum,
   NO_EFFECT,
   NO_EFFECT_SHORT,
+  aiUnmeasured,
   makesReadable,
   pagesReadable,
 } from '../effect-headline';
@@ -133,8 +134,10 @@ export function proPoints(f: Fix, all: readonly Fix[]): string {
   if (aiSigned) parts.push(`${aiSigned} AI readability`);
   if (seoSigned) parts.push(`${seoSigned} Technical SEO`);
   const head =
-    parts.join(', ') || (h.kind === 'no_effect' ? NO_EFFECT_SHORT : 'no estimated effect');
-  const waits = f.effect.ai_readability_pending_on
+    parts.join(', ') ||
+    (h.kind === 'no_effect' ? NO_EFFECT_SHORT : h.kind === 'none' ? '' : 'no estimated effect');
+  // An AI effect that waits on an unmeasured part waits on no fix either (F-274).
+  const waits = (aiUnmeasured(f) ? [] : f.effect.ai_readability_pending_on)
     .map((fp) => all.find((x) => x.fingerprint === fp)?.number)
     .filter((n): n is number => n !== undefined);
   return f.effect.ai_readability === null && waits.length
@@ -163,7 +166,7 @@ export function groupPoints(fixes: readonly Fix[]): string {
   const ai = groupSum(fixes.map((f) => f.effect.ai_readability ?? 0));
   const aiNull = fixes.filter((f) => f.effect.ai_readability === null);
   // a fix headed by the pages it makes readable is not said to wait (effect-headline.ts)
-  const pending = aiNull.filter((f) => !makesReadable(f)).length;
+  const pending = aiNull.filter((f) => !makesReadable(f) && !aiUnmeasured(f)).length;
   const seoPending = fixes.filter((f) => f.effect.technical_seo === null).length;
   const seoShown = seoPending < fixes.length;
   const estimated = seoShown || aiNull.length < fixes.length;
@@ -180,7 +183,7 @@ export function groupPoints(fixes: readonly Fix[]): string {
   const pages = pagesReadable(fixes);
   const head = parts.length
     ? `${parts.join(', ')} together`
-    : pages !== null
+    : pages !== null || fixes.every(aiUnmeasured)
       ? null
       : estimated
         ? NO_EFFECT_SHORT
@@ -201,6 +204,7 @@ export function effectOf(
   if (h.kind === 'seo') return { points: h.signed, unit: 'Technical SEO, estimated' };
   if (h.kind === 'no_effect') return { points: '—', unit: NO_EFFECT };
   if (h.kind === 'pages_readable') return { points: '—', unit: h.text };
+  if (h.kind === 'none') return { points: '', unit: '' };
   return h.kind === 'waiting'
     ? { points: '—', unit: h.sentence }
     : { points: '—', unit: 'Technical SEO, not estimated' };

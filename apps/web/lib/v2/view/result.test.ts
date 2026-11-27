@@ -405,7 +405,8 @@ describe('the tables’ labels', () => {
       shell = d.fixes.find((f) => f.type === 'client_rendered_template');
       for (const f of d.fixes) {
         f.effect.ai_readability = null;
-        f.effect.ai_readability_pending_on = ['readable_unmeasured'];
+        // A reason missing for this check: an unmeasured part says nothing (F-274).
+        f.effect.ai_readability_pending_on = ['too_few_crawlers_measured'];
         f.effect.technical_seo = null;
         f.effect.technical_seo_pending_on = ['grade_refused'];
       }

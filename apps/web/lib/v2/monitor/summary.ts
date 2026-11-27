@@ -15,6 +15,7 @@ import type { UnsubscribeLinks } from '../mail/links';
 import { send, type MailDeps } from '../mail/send';
 import { sendEach, type SeatOutcome } from './alerts';
 import { weeklySummaryTemplate, type SummarySite } from '../mail/templates/weekly-summary';
+import { listedChanges } from '../view/listed-changes';
 
 export interface SummaryDue {
   accountId: string;
@@ -107,9 +108,10 @@ export async function sendSummary(deps: SummaryDeps, due: SummaryDue): Promise<S
   if (account === null) return { skip: 'no_account' };
   if (account.marked) return { skip: 'marked' };
   const since = weekBefore(due.weekStart, account.zone);
-  const sites = (await deps.store.sites(due.accountId, since, due.weekStart)).filter(
-    (s) => s.changes.length > 0,
-  );
+  // The changes a reader is shown and counted (F-302): a week of letter-held grade rows only is empty.
+  const sites = (await deps.store.sites(due.accountId, since, due.weekStart))
+    .map((s) => ({ ...s, changes: listedChanges(s.changes) }))
+    .filter((s) => s.changes.length > 0);
   if (sites.length === 0) return { skip: 'empty' };
   if (deps.linkSecret === null) {
     deps.log('summary.no_link_secret', { account: due.accountId });

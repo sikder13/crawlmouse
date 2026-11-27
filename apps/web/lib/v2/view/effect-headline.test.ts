@@ -192,8 +192,24 @@ describe('the waiting sentence, chosen from the first pending entry', () => {
     return { unit: open.unit, row: rowOf(d, 'challenged-site', f.id) };
   };
 
-  it.each(WithheldReasonSchema.options)('%s heads the fix with its own sentence', (reason) => {
-    const { unit, row } = waitingWith([reason, 'too_few_crawlers_measured']);
+  // The three unmeasured parts head the fix with nothing (F-274, effect-unmeasured.test.ts).
+  const MISSING_FOR_THIS_CHECK = WithheldReasonSchema.options.filter(
+    (r) => !['readable_unmeasured', 'quotable_unmeasured', 'signals_unmeasured'].includes(r),
+  );
+  it('leaves four reasons that head the fix with a sentence', () => {
+    expect(MISSING_FOR_THIS_CHECK).toEqual([
+      'too_few_crawlers_measured',
+      'blocked_by_choice',
+      'crawler_too_few_pages',
+      'check_not_scored',
+    ]);
+  });
+
+  it.each(MISSING_FOR_THIS_CHECK)('%s heads the fix with its own sentence', (reason) => {
+    // Its partner is a fix's own reason, which a reason listed first leads (a site reason would lead
+    // whatever its place: effect-unmeasured.test.ts).
+    const partner = reason === 'check_not_scored' ? 'crawler_too_few_pages' : 'check_not_scored';
+    const { unit, row } = waitingWith([reason, partner]);
     expect(unit).toBe(AI_WAITING[reason]);
     expect(row).toBe('AI not yet estimated');
   });

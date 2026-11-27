@@ -14,6 +14,8 @@ import { LinksScreen } from '../../../../components/v2/screens/segment/LinksScre
 import { NoJsScreen } from '../../../../components/v2/screens/segment/NoJsScreen';
 import { SignalsScreen } from '../../../../components/v2/screens/segment/SignalsScreen';
 import { StructureScreen } from '../../../../components/v2/screens/segment/StructureScreen';
+import { SeatTheme } from '../../../../components/v2/SeatTheme';
+import { sessionTheme } from '../../../../lib/v2/account/session-theme';
 import { findCheck } from '../../../../lib/v2/fixtures';
 import { supportMailto } from '../../../../lib/v2/support/mailto';
 import { emailDeveloperAction } from '../../../../lib/v2/view/account-actions';
@@ -74,7 +76,14 @@ export function SegmentBody({ read, segment }: { read: ReadyCheck; segment: Segm
 }
 
 export async function SegmentPage({ id, segment }: { id: string; segment: SegmentKey }) {
-  return <SegmentBody read={await readyAudit(id)} segment={segment} />;
+  // The theme is read beside the audit, and never fails the page (session-theme.ts).
+  const [read, theme] = await Promise.all([readyAudit(id), sessionTheme()]);
+  return (
+    <>
+      {theme ? <SeatTheme theme={theme} /> : null}
+      <SegmentBody read={read} segment={segment} />
+    </>
+  );
 }
 
 /**
@@ -146,10 +155,15 @@ export async function FixPage({
   fixId: string;
   notice?: NoticeView | null;
 }) {
-  const read = await readyAudit(id);
+  const [read, theme] = await Promise.all([readyAudit(id), sessionTheme()]);
   const found = fixOf(read, fixId);
   if (!found) notFound();
-  return <FixBody read={read} found={found} notice={notice} />;
+  return (
+    <>
+      {theme ? <SeatTheme theme={theme} /> : null}
+      <FixBody read={read} found={found} notice={notice} />
+    </>
+  );
 }
 
 /** The link map of a ready check in `scope`; the hubs scope draws the stored drawing. */
@@ -188,5 +202,11 @@ export function MapBody({ read, scope }: { read: ReadyCheck; scope: 'hubs' | 'al
 }
 
 export async function MapPage({ id, scope }: { id: string; scope: 'hubs' | 'all' }) {
-  return <MapBody read={await readyAudit(id)} scope={scope} />;
+  const [read, theme] = await Promise.all([readyAudit(id), sessionTheme()]);
+  return (
+    <>
+      {theme ? <SeatTheme theme={theme} /> : null}
+      <MapBody read={read} scope={scope} />
+    </>
+  );
 }

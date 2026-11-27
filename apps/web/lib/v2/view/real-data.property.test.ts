@@ -28,6 +28,7 @@ import { partialNotice } from './result';
 import { datasetOfBuilds } from './test-support/built-dataset';
 import { everyView } from './test-support/every-view';
 import { inputOf, recheckInputOf, siteShape } from './test-support/generated-check';
+import { lettersUnmoved } from './segment/changes';
 
 /** What the runs met, by a name the last test reads. */
 const met = new Map<string, number>();
@@ -106,7 +107,10 @@ describe('each view renders a generated measured check', () => {
         const second = buildCheck(recheckInputOf(b, first));
         const again = render(input, [first, second]);
         expect(again.views.changes.state).toBe('changes');
-        expect(again.views.changes.rows).toHaveLength(again.d.changes.length);
+        // A grade row whose letters held is not listed as a change (F-302).
+        expect(again.views.changes.rows).toHaveLength(
+          again.d.changes.filter((c) => !lettersUnmoved(c)).length,
+        );
       }),
       { numRuns: 120, seed: 20261110 },
     );

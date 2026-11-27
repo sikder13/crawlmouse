@@ -12,10 +12,10 @@ import { GATES } from '../../entitlement-v2';
 import { FIX_PROOF_COPY } from '../copy/fix-proof';
 import type { Check, CrawlerResult, Fix } from '@crawlmouse/types/v2';
 import { instant } from '@crawlmouse/types/v2';
-import { findCheck, fixesAsOf, siteOf } from '../fixtures';
+import { findCheck, siteOf } from '../fixtures';
 import { dayTimeUtc, listOf, percent } from '../format';
 import { count, numberWord, plural } from '../words';
-import { freeFixes, type FixPlan } from './free-fixes';
+import { freeFixes, placeOrder, type FixPlan } from './free-fixes';
 import { noPacketLine } from './no-packet';
 import { noPacketReason } from './packet-reason';
 import { ACCOUNT_NAV } from './account-actions';
@@ -542,7 +542,8 @@ export function fixView(
   if (instant(findCheck(d, fix.first_seen_check_id).queued_at) > instant(check.queued_at)) {
     throw new Error(`Fix ${fixId} was not seen yet at check ${checkId}`);
   }
-  const live = fixesAsOf(d, check);
+  // Its place is the one the site table gives it (F-276): open fixes first, then by rank.
+  const live = placeOrder(d, check, plan);
   // a pending AI effect names fixes of this site by fingerprint, resolved or not
   const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const at = live.findIndex((x) => x.id === fixId);
@@ -555,13 +556,10 @@ export function fixView(
     domain: siteOf(d, check).host,
     overview: hrefs.overview,
     section: { title: SEGMENTS[segment].title, href: hrefs.segment(segment) },
-    // The fix's own number, and where it stands in the audit's order when that differs from it.
+    // The fix's name, then where it stands in the audit's order, always apart, so the name never
+    // reads as a place (F-276, CTO 081).
     position:
-      at < 0
-        ? `Fix ${bare.number}, resolved`
-        : bare.number === at + 1
-          ? `Fix ${bare.number} of ${live.length}`
-          : `Fix ${bare.number} · ${at + 1} of ${live.length}`,
+      at < 0 ? `Fix ${bare.number}, resolved` : `Fix ${bare.number} · ${at + 1} of ${live.length}`,
     keptUntil: keptUntil === null ? null : dayTimeUtc(keptUntil),
     keepHref,
     tabs: [
@@ -574,7 +572,9 @@ export function fixView(
         ? null
         : following
           ? {
-              label: `Next fix: ${following.title} · ${points(following, siteFixes)}`,
+              label: [`Next fix: ${following.title}`, points(following, siteFixes)]
+                .filter(Boolean)
+                .join(' · '),
               href: hrefs.fix?.(following.id) ?? '#',
             }
           : { label: 'Back to overview', href: hrefs.overview },

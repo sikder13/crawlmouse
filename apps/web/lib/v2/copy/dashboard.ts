@@ -168,6 +168,10 @@ const competitorsOf = (n: number) => `${numberWord(n)} ${plural(n, 'competitor',
 const SLACK = 'Slack';
 const STAGING = 'a staging URL';
 
+/** F-276: a row's place in rank order, and the fix's stored number as its name. */
+const PLACE_SOURCE =
+  'V2R register, F-276 (CTO 081): the first column is the row’s place in rank order, 1 first; the fix’s stored number is its name (“Fix 9”), never its order; the button names the first fix by place, then by name';
+
 export const SETUP_COPY = {
   slack: {
     subject: SLACK,
@@ -188,6 +192,12 @@ export const SETUP_COPY = {
   schedule: (host: string, when: string) =>
     `Choose the day and hour ${host} is checked weekly (now ${when})`,
 };
+
+/**
+ * The set-up table's Done column, one pill per row (F-304): "done" in the OK pill, "not done" in a
+ * neutral one, both on screen.
+ */
+export const SETUP_STATE = { done: 'done', notDone: 'not done' } as const;
 
 // ── Where the dashboards differ from their locked HTML ─────────────────────────────────────
 // Applied in order by the lock comparison (__tests__/v2/dashboard.test.tsx). The rail's rows are
@@ -364,6 +374,34 @@ const DAY0: CopyChange[] = [
     rendered: '',
     source:
       'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov)',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Start with fix 1',
+    rendered: 'Start with the first fix · Fix 1',
+    source: PLACE_SOURCE,
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: '1 Let GPTBot',
+    rendered: '1 Fix 1 · Let GPTBot',
+    source: PLACE_SOURCE,
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: '2 Server-render the product template',
+    rendered: '2 Fix 2 · Server-render the product template',
+    source: PLACE_SOURCE,
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: '3 Link the 7 orphan pages',
+    rendered: '3 Fix 3 · Link the 7 orphan pages',
+    source: PLACE_SOURCE,
   },
   {
     screen: 'dashboard-day0',

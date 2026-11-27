@@ -26,6 +26,7 @@ import {
   rowText,
   type MailChange,
 } from './alert';
+import { listedChanges } from '../../view/listed-changes';
 import { mailOrigin } from '../links';
 
 /** The rows one site lists before it says how many more there are. */
@@ -56,7 +57,11 @@ export interface GradeMovement {
   toScore: number;
 }
 
-/** Each grade's move over the week: its first delta's start to its last delta's end, by time. */
+/**
+ * Each grade's move over the week: its first delta's start to its last delta's end, by time. Listed
+ * only when its letter moved over the week (N9, CTO ruling): a letter held in a row, or one that
+ * moved and came back, is left out.
+ */
 export function gradeMovement(changes: readonly SummaryChange[]): GradeMovement[] {
   const timed = [...changes].sort((a, b) => Date.parse(a.detected_at) - Date.parse(b.detected_at));
   const out = new Map<GradeName, GradeMovement>();
@@ -72,7 +77,9 @@ export function gradeMovement(changes: readonly SummaryChange[]): GradeMovement[
       });
     }
   }
-  return (['technical_seo', 'ai_readability'] as const).flatMap((g) => out.get(g) ?? []);
+  return (['technical_seo', 'ai_readability'] as const)
+    .flatMap((g) => out.get(g) ?? [])
+    .filter((m) => m.from !== m.to);
 }
 
 export const SUMMARY_COPY = {
@@ -96,7 +103,10 @@ const siteOrder = (a: SummarySite, b: SummarySite) =>
   a.host.localeCompare(b.host);
 
 export const weeklySummaryTemplate: Template<WeeklySummaryInput> = (input): RenderedMail => {
-  const sites = input.sites.filter((s) => s.changes.length > 0);
+  // The changes a reader is shown and counted (F-302), whoever built the input.
+  const sites = input.sites
+    .map((s) => ({ ...s, changes: listedChanges(s.changes) }))
+    .filter((s) => s.changes.length > 0);
   if (sites.length === 0) throw new RangeError('a weekly summary with no change');
   const ordered = [...sites].sort(siteOrder);
   const total = sites.reduce((n, s) => n + s.changes.length, 0);

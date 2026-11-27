@@ -2,33 +2,16 @@
 
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { useLive } from './screens/account/LiveActions';
+import { THEME_STORE, applyTheme as apply, storedTheme as stored } from './theme-apply';
 import { THEME_CHOICES, type ThemeChoice } from './theme-choices';
 import styles from './ThemeControl.module.css';
 
 const LABELS: Record<ThemeChoice, string> = { system: 'System', light: 'Light', dark: 'Dark' };
-const STORE = 'crawlmouse-theme';
-
 export interface ThemeControlProps {
   /** The signed-in seat's saved theme. */
   initial: ThemeChoice;
   /** Where the choice is saved (PATCH /api/me {theme}); the form names the verb in `_method`. */
   action: string;
-}
-
-/** Light and Dark set `data-theme` on the page; System removes it, so the device decides. */
-function apply(choice: ThemeChoice) {
-  const root = document.documentElement;
-  if (choice === 'system') delete root.dataset.theme;
-  else root.dataset.theme = choice;
-}
-
-function stored(): ThemeChoice | null {
-  try {
-    const v = window.localStorage.getItem(STORE);
-    return v === 'system' || v === 'light' || v === 'dark' ? v : null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -52,7 +35,7 @@ export function ThemeControl({ initial, action }: ThemeControlProps) {
     setChoice(next);
     apply(next);
     try {
-      window.localStorage.setItem(STORE, next);
+      window.localStorage.setItem(THEME_STORE, next);
     } catch {
       // private windows and blocked storage: the choice still applies to this page
     }

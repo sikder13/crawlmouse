@@ -51,7 +51,7 @@ describe('the client page', () => {
 
   it('gives the site page’s two grades and their moves, without the parts under each', () => {
     expect(view.grades.cards.map((c) => [c.label, c.letter, c.score, c.move])).toEqual([
-      ['Technical SEO', 'C+', 66, '−1 since Sat'],
+      ['Technical SEO', 'C+', 66, '−1 since Sat 24 Oct'],
       ['AI readability', null, null, null],
     ]);
     expect(view.grades.cards.map((c) => c.parts)).toEqual([null, null]);

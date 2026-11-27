@@ -33,7 +33,7 @@ import { aiWithheldSummary } from '../sentences';
 
 /** The verdicts "blocked" names (FACTS I2), the ones the crawler alert fires on. */
 const BLOCKING_VERDICTS: Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
-import { capitalise, count, numberWord, plural } from '../words';
+import { capitalise, count, numberWord, ordinalWord, plural } from '../words';
 import {
   PLAN_NAMES,
   primarySite,
@@ -54,12 +54,13 @@ import {
   nextCheck,
   scheduleCell,
   seoOf,
+  sinceDay,
   whenAgo,
   zoneOf,
 } from './checks';
 import { action, type ActionInput, type ActionView } from './account-actions';
 import { accountShellView, type ShellView } from './account-shell';
-import { isFreeFix } from './free-fixes';
+import { isFreeFix, placeOrder } from './free-fixes';
 import { points } from './result';
 import { CAUSE_SHORT } from './segment/access';
 import { groupPoints, packetPrompt } from './segment/fixes';
@@ -95,7 +96,12 @@ export interface CrawlerGridRowView {
 
 export interface FixRowView {
   key: string;
+  /** The fix's stored number (F-276): its name, never its order. */
   number: number;
+  /** "Fix 9": the stored number as the fix's name. */
+  name: string;
+  /** The row's place in this list, 1 first, in rank order (F-276, CTO 081). */
+  place: number;
   title: string;
   /** First seen at the latest result. */
   isNew: boolean;
@@ -220,7 +226,7 @@ function checksLine(checks: readonly Check[], site: Site, zone: string): string 
   return parts.join(', ');
 }
 
-function seoCard(c: Check, prev: Check | null, zone: string): GradeCardView {
+function seoCard(c: Check, prev: Check | null, zone: string, now: string): GradeCardView {
   const g = seoOf(c);
   const was = prev ? seoOf(prev) : null;
   const t = c.technical_seo;
@@ -236,14 +242,16 @@ function seoCard(c: Check, prev: Check | null, zone: string): GradeCardView {
     score: g?.score ?? null,
     tone: g?.tone ?? 'default',
     move:
-      g && was ? `${move(was.score, g.score)} since ${weekday(prev!.finished_at!, zone)}` : null,
+      g && was
+        ? `${move(was.score, g.score)} since ${sinceDay(prev!.finished_at!, c.finished_at!, now, zone)}`
+        : null,
     parts: parts.length ? parts.join(' · ') : null,
     withheld: g ? null : 'Technical SEO was not graded at this check.',
     verdicts: [],
   };
 }
 
-function aiCard(c: Check, prev: Check | null, zone: string): GradeCardView {
+function aiCard(c: Check, prev: Check | null, zone: string, now: string): GradeCardView {
   const g = aiOf(c);
   const was = prev ? aiOf(prev) : null;
   const { blocked, of, verdicts } = blockedOf(c);
@@ -259,7 +267,9 @@ function aiCard(c: Check, prev: Check | null, zone: string): GradeCardView {
     score: g?.score ?? null,
     tone: g?.tone ?? 'default',
     move:
-      g && was ? `${move(was.score, g.score)} since ${weekday(prev!.finished_at!, zone)}` : null,
+      g && was
+        ? `${move(was.score, g.score)} since ${sinceDay(prev!.finished_at!, c.finished_at!, now, zone)}`
+        : null,
     parts: parts.join(' · '),
     withheld: c.ai_readability?.withheld
       ? aiWithheldSummary(c, scoredCrawlersMeasured(c.crawlers))
@@ -323,12 +333,20 @@ function noteOf(v: AccountView, f: Fix): string | null {
   return null;
 }
 
-function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): FixRowView {
+function fixRow(
+  v: AccountView,
+  result: Check,
+  f: Fix,
+  all: readonly Fix[],
+  place: number,
+): FixRowView {
   const isNew = f.first_seen_check_id === result.id && result.previous_check_id !== null;
   const pro = lockedFix(v, result, f);
   return {
     key: f.id,
     number: f.number,
+    name: `Fix ${f.number}`,
+    place,
     title: titleAmong(f, all),
     isNew,
     newLabel: isNew ? `new ${weekday(result.finished_at!, zoneOf(v))}` : null,
@@ -353,6 +371,9 @@ function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): Fix
     fixType: f.type,
   };
 }
+
+/** "Open fix 2 · +1 SEO", or the label alone when the fix has no effect to name (F-274). */
+const withPoints = (label: string, pts: string) => (pts ? `${label} · ${pts}` : label);
 
 /** A fix this account's tier does not open: on a tier with every fix, none is. */
 const lockedFix = (v: AccountView, result: Check, f: Fix) =>
@@ -533,23 +554,25 @@ export function siteView(
   const target = fresh.filter(doable).sort(byRank)[0] ?? fixes.filter(doable).sort(byRank)[0];
   const openLatest = (primary: boolean) =>
     action('openAudit', 'Open the latest audit', { checkId: result.id }, { primary });
-  const targetLabel = target
-    ? target.section === 'crawler_access' && target.crawler_uas.length
-      ? `Open the ${listOf(target.crawler_uas)} packet · ${points(target, fixes)}`
-      : `Open fix ${target.number} · ${points(target, fixes)}`
-    : null;
-
   // ── fixes table ──
   const byNumber = [...fixes].sort((a, b) => a.number - b.number);
   const withPackets = byNumber.filter((f) => todo(f) && f.packet !== null);
   // The fixes this tier opens first, so open and locked rows do not alternate, and each in the
   // engine's order of impact, as the dashboard and the main button read them (F-099). A single fix
   // past the fold is shown, not folded into a row of one.
-  const inTable = [...byNumber].sort(
-    (a, b) => Number(lockedFix(v, result, a)) - Number(lockedFix(v, result, b)) || byRank(a, b),
-  );
+  const inTable = placeOrder(v.d, result, v.gates.fixesVisible === 'all' ? 'pro' : 'free');
+  // The button names the row it opens by its place, then the fix by its name (F-276, CTO 081), so
+  // "fix 2" cannot read as the second row.
+  const targetLabel = target
+    ? target.section === 'crawler_access' && target.crawler_uas.length
+      ? withPoints(`Open the ${listOf(target.crawler_uas)} packet`, points(target, fixes))
+      : withPoints(
+          `Open the ${ordinalWord(inTable.indexOf(target) + 1)} fix · Fix ${target.number}`,
+          points(target, fixes),
+        )
+    : null;
   const shownFixes = allFixes || fixes.length <= SHOWN_FIXES + 1 ? fixes.length : SHOWN_FIXES;
-  const rows = inTable.slice(0, shownFixes).map((f) => fixRow(v, result, f, fixes));
+  const rows = inTable.slice(0, shownFixes).map((f, i) => fixRow(v, result, f, fixes, i + 1));
   const rest = inTable.slice(shownFixes);
   const sections = Object.entries(
     rest.reduce<Record<string, number>>((m, f) => {
@@ -616,7 +639,7 @@ export function siteView(
     grades: {
       title: `Grades, ${numberWord(shown.length)} ${plural(shown.length, 'check', 'checks')}`,
       sub: checksLine(shown, site, zone),
-      cards: [seoCard(result, prev, zone), aiCard(result, prev, zone)],
+      cards: [seoCard(result, prev, zone, v.now), aiCard(result, prev, zone, v.now)],
       actions: v.gates.exports
         ? [
             // A link, not a request: the Reports page's compare card names the two checks, and says
@@ -673,7 +696,7 @@ export function siteView(
       rows,
       rest: rest.length
         ? {
-            numbers: numberRanges(rest.map((f) => f.number)),
+            numbers: numberRanges(rest.map((_, i) => shownFixes + i + 1)),
             count: rest.length,
             title: `${capitalise(numberWord(rest.length))} more: ${listOf(sections.map(([k, n]) => `${n} in ${k}`))}`,
             effect: groupPoints(rest),

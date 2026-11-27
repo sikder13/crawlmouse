@@ -41,7 +41,9 @@ export type EffectHeadline =
   /** `text` is `pagesReadableText(pages)`. */
   | { kind: 'pages_readable'; pages: number; text: string }
   /** `sentence` heads the card, the open fix and the fix page; `short` the table. */
-  | { kind: 'waiting'; sentence: string; short: string };
+  | { kind: 'waiting'; sentence: string; short: string }
+  /** No figure to give: the AI effect waits on an unmeasured part and Technical SEO adds nothing. */
+  | { kind: 'none' };
 
 /** The sections whose fixes move AI readability. */
 export const AI_SECTIONS: ReadonlySet<FixSection> = new Set([
@@ -135,6 +137,41 @@ export const groupSum = (points: readonly number[]): number =>
   points.reduce((sum, n) => sum + Math.max(0, n), 0);
 
 const NOT_YET = 'AI not yet estimated';
+
+/**
+ * The reasons an AI effect waits on a part of the grade no check measures yet, the same for every
+ * fix (F-274): not this check's, nor another fix's. A fix whose `ai_readability_pending_on` holds one
+ * has no AI value to show, so its effect says nothing of AI.
+ */
+const UNMEASURED: ReadonlySet<string> = new Set<WithheldReason>([
+  'readable_unmeasured',
+  'quotable_unmeasured',
+  'signals_unmeasured',
+]);
+
+/**
+ * The reasons the site's own state gives, which withhold the grade itself (too few scored crawlers
+ * measured, the site's robots.txt keeping them out). They outrank an unmeasured part: each is true
+ * and something the owner can act on, whatever else is unmeasured. A fix's own reasons and a wait on
+ * another fix do not: while a part is unmeasured, neither can end the wait.
+ */
+const SITE_WITHHELD: ReadonlySet<string> = new Set<WithheldReason>([
+  'too_few_crawlers_measured',
+  'blocked_by_choice',
+]);
+
+/**
+ * Whether `f`'s AI effect waits on a part no check measures yet (`UNMEASURED`) with no reason that
+ * outranks it (`SITE_WITHHELD`) co-pending.
+ */
+export const aiUnmeasured = (f: Pick<Fix, 'effect'>): boolean => {
+  const pending = f.effect.ai_readability_pending_on;
+  return (
+    f.effect.ai_readability === null &&
+    pending.some((p) => UNMEASURED.has(p)) &&
+    !pending.some((p) => SITE_WITHHELD.has(p))
+  );
+};
 const REASONS: readonly string[] = WithheldReasonSchema.options;
 const isReason = (p: string): p is WithheldReason => REASONS.includes(p);
 
@@ -169,7 +206,10 @@ function waiting(
       };
     }
   }
-  const reason = pending.find(isReason);
+  // A reason the site's own state gives is said before any other (SITE_WITHHELD).
+  const reason =
+    pending.find((p): p is WithheldReason => isReason(p) && SITE_WITHHELD.has(p)) ??
+    pending.find(isReason);
   return {
     kind: 'waiting',
     sentence: reason ? AI_WAITING[reason] : 'AI effect not yet estimated',
@@ -187,6 +227,15 @@ export function effectHeadline(f: Headed, siteFixes: readonly Numbered[]): Effec
       pages: f.affected_pages,
       text: pagesReadableText(f.affected_pages, f.last_state === 'detected'),
     };
+  }
+  if (aiUnmeasured(f)) {
+    // An AI-section fix's value is its AI effect, and it is never headed by a Technical SEO figure
+    // (owner ruling, 2026-11-05). Any other fix's value is its Technical SEO effect: its figure,
+    // or, when that is missing for this check, "SEO not estimated".
+    if (AI_SECTIONS.has(f.section)) return { kind: 'none' };
+    if (seo === null) return { kind: 'seo_not_estimated' };
+    const seoSigned = formatPoints(seo);
+    return seoSigned === null ? { kind: 'none' } : { kind: 'seo', points: seo, signed: seoSigned };
   }
   if (ai === null && (AI_SECTIONS.has(f.section) || (seo !== null && seo <= 0))) {
     return waiting(f, siteFixes);

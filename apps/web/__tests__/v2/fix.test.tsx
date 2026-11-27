@@ -201,7 +201,7 @@ describe('the fix page agrees with the Result and the segment', () => {
 
   it('counts the audit’s live fixes in its crumb as the Result counts them', () => {
     const result = RESULT_PREVIEWS['bad-site']() as ResultView;
-    expect(fixPreview('bad-site').frame.position).toBe(`Fix 2 of ${result.fixes!.total}`);
+    expect(fixPreview('bad-site').frame.position).toBe(`Fix 2 · 2 of ${result.fixes!.total}`);
     const d = fixture('bad-site');
     expect(findCheck(d, FIX_SOURCES['bad-site'].check).id).toBe(FIX_SOURCES.locked.check);
   });

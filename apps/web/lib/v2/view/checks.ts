@@ -12,10 +12,12 @@ import {
 } from '@crawlmouse/types/v2';
 import {
   calendarDays,
+  dayDate,
   dayMonth,
   hourMinute,
   hourMinuteZoned,
   nextWeekly,
+  weekday,
   weekdayTimeZoned,
 } from '../format';
 import { toneOf } from '../letters';
@@ -172,3 +174,27 @@ export function whenAgo(ts: string, v: AccountView): string {
 }
 
 export const byFinish = (a: Check, b: Check) => instant(a.finished_at!) - instant(b.finished_at!);
+
+/**
+ * A weekday names the earlier check only when it cannot mean another: the check is under a week
+ * before now, and the newest result (when it is a different check) fell on another weekday.
+ */
+export function weekdayAmbiguous(
+  prev: string,
+  newest: string | null,
+  now: string,
+  zone: string,
+): boolean {
+  return (
+    calendarDays(prev, now, zone) >= 7 ||
+    (newest !== null && weekday(newest, zone) === weekday(prev, zone))
+  );
+}
+
+/**
+ * "Thu", or "Thu 29 Oct" when a weekday could be read as another day (`weekdayAmbiguous`): how a
+ * grade's move names the check it is measured from (F-302).
+ */
+export function sinceDay(prev: string, newest: string | null, now: string, zone: string): string {
+  return weekdayAmbiguous(prev, newest, now, zone) ? dayDate(prev, zone) : weekday(prev, zone);
+}
