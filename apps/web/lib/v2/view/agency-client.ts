@@ -150,6 +150,7 @@ export function agencyClientView(
   const result = resultChecks(v, site.id).at(-1)!;
   const open = fixesAsOf(v.d, result).filter((f) => TO_RAISE.has(f.status));
   const openIds = new Set(open.map((f) => f.id));
+  // Each row keeps the site table's place, the one place a fix has on every surface (F-276).
   const rows = s.fixes.rows.filter((r) => openIds.has(r.key));
   const more = open.length - rows.length;
   const sitePageOf = (label: string) => action('sitePage', label, { id: site.id });

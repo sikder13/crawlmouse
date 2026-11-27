@@ -15,6 +15,14 @@ export const FIX_CHANGES: CopyChange[] = [
   },
   {
     screen: 'fix',
+    kind: 'ruling',
+    locked: 'Fix 2 of 13',
+    rendered: 'Fix 2 · 2 of 13',
+    source:
+      'V2R register, F-276 (CTO 081): the fix’s name and its place in the audit’s order are given apart, also where they agree, so the name never reads as a place',
+  },
+  {
+    screen: 'fix',
     kind: 'facts',
     locked: '+22 AI visibility, estimated',
     rendered: '+22 AI readability, estimated',

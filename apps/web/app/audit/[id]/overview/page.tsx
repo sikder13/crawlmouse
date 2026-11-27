@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { SeatTheme } from '@/components/v2/SeatTheme';
+import { sessionTheme } from '@/lib/v2/account/session-theme';
 import { readAudit } from '../_lib/access';
 import { CheckPage } from '../_lib/CheckPage';
 import { auditHrefs } from '../_lib/hrefs';
@@ -19,7 +21,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
  */
 export default async function AuditOverviewPage({ params }: { params: Params }) {
   if (!checksPublicEnabled()) return notFound();
-  const read = await readAudit((await params).id);
+  // The theme is read beside the audit, and never fails the page (session-theme.ts).
+  const [read, theme] = await Promise.all([readAudit((await params).id), sessionTheme()]);
   if (read === null) notFound();
-  return <CheckPage read={read} />;
+  return <CheckPage read={read} theme={theme ? <SeatTheme theme={theme} /> : null} />;
 }

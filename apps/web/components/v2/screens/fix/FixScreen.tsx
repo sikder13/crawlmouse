@@ -128,7 +128,8 @@ export function FixScreen({
             {head.title}
           </Heading>
           <span className={`${layout.row} ${styles.effect}`}>
-            <span className={styles.points}>{head.points}</span>
+            {/* A fix with no effect to name draws none (F-274). */}
+            {head.points ? <span className={styles.points}>{head.points}</span> : null}
             {head.unit}
             <RecommendationTag r={head.recommendation} />
           </span>

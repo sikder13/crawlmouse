@@ -127,7 +127,8 @@ describe('the client page against Final-Ag-Client', () => {
         for (const pill of cell.querySelectorAll('[data-v2-pill]')) pill.remove();
         return cell.textContent!.trim();
       });
-    expect(rows.map(heads)).toEqual(fixes.map((f) => [f.title]));
+    // The fix's name leads its title (F-276, CTO 081).
+    expect(rows.map(heads)).toEqual(fixes.map((f) => [`${f.name} · ${f.title}`]));
     // The rank stays the row's first cell, as the locked screen draws it, and is not the header.
     expect(
       rows.map((tr) => [tr.firstElementChild!.tagName, tr.firstElementChild!.textContent]),

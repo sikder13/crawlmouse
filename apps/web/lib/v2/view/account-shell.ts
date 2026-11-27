@@ -7,6 +7,7 @@
  * badge and, outside a trial, its plan card. A person with seats on several accounts gets the
  * switcher: the account acted in and the others, each a POST to `/api/seats/switch`.
  */
+import { listedChanges } from './listed-changes';
 import { instant, type Change, type Site } from '@crawlmouse/types/v2';
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { checksPublicEnabled } from '../../auth/flags';
@@ -119,7 +120,7 @@ export const FREE_SCHEDULE = { monthly_first_site_only: 'monthly', weekly: 'week
 export function siteWindow(v: AccountView, site: Site): Change[] {
   const check = resultChecks(v, site.id).at(-1);
   if (!check) return [];
-  return v.d.changes
+  return listedChanges(v.d.changes)
     .filter((c) => c.check_id === check.id && c.previous_check_id !== null)
     .sort((a, b) => instant(a.detected_at) - instant(b.detected_at) || a.id.localeCompare(b.id));
 }

@@ -114,6 +114,62 @@ describe('the weekly summary (D6)', () => {
     ]);
   });
 
+  it('counts no letter-held grade row as a change, and renders none of only those (F-302)', () => {
+    const held = change({
+      subject: 'grade',
+      summary: 'Technical SEO A → A (90 → 91)',
+      where: 'all pages',
+      grade_deltas: seo(['A', 90], ['A', 91]),
+    });
+    expect(() =>
+      weeklySummaryTemplate(input([{ siteId: A, host: 'a.example', changes: [held] }])),
+    ).toThrow(RangeError);
+    const m = weeklySummaryTemplate(
+      input([{ siteId: A, host: 'a.example', changes: [change(), held] }]),
+    );
+    expect(m.subject).toBe('Your week on Crawlmouse: 1 change on 1 site');
+    expect(m.text).not.toContain('A → A');
+  });
+
+  it('lists a grade on the Grades line only when its letter moved (N9, CTO ruling)', () => {
+    const mixed = change({
+      subject: 'grade',
+      summary: 'Technical SEO A → A (90 → 91); AI readability D → F (41 → 22)',
+      where: 'all pages',
+      grade_deltas: [
+        ...seo(['A', 90], ['A', 91]),
+        {
+          grade: 'ai_readability' as const,
+          from_grade: 'D' as never,
+          from_score: 41,
+          to_grade: 'F' as never,
+          to_score: 22,
+        },
+      ],
+    });
+    expect(gradeMovement([mixed])).toEqual([
+      { grade: 'ai_readability', from: 'D', fromScore: 41, to: 'F', toScore: 22 },
+    ]);
+    // Over the week a letter that moved and came back did not move.
+    const down = change({
+      subject: 'grade',
+      summary: 'Technical SEO A → B (90 → 85)',
+      grade_deltas: seo(['A', 90], ['B', 85]),
+      detected_at: '2026-11-10T10:00:00Z',
+    });
+    const up = change({
+      subject: 'grade',
+      summary: 'Technical SEO B → A (85 → 91)',
+      grade_deltas: seo(['B', 85], ['A', 91]),
+      detected_at: '2026-11-12T10:00:00Z',
+    });
+    const m = weeklySummaryTemplate(
+      input([{ siteId: A, host: 'a.example', changes: [down, up, mixed] }]),
+    );
+    expect(m.text).toContain('Grades: AI readability D 41 → F 22');
+    expect(m.text).not.toContain('Technical SEO A 90 → A 91');
+  });
+
   it('is never rendered empty', () => {
     expect(() => weeklySummaryTemplate(input([]))).toThrow(RangeError);
     expect(() =>

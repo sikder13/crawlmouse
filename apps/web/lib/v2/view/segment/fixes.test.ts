@@ -203,7 +203,8 @@ describe('sectionFixes: a row that groups several fixes', () => {
         f.effect.technical_seo = null;
         f.effect.technical_seo_pending_on = ['grade_refused'];
         f.effect.ai_readability = null;
-        f.effect.ai_readability_pending_on = ['readable_unmeasured'];
+        // A reason missing for this check: an unmeasured part says nothing (F-274).
+        f.effect.ai_readability_pending_on = ['too_few_crawlers_measured'];
       }
     });
     const rest = sectionFixes(d, check, 'structure').pro.at(-1)!;

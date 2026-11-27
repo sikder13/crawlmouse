@@ -52,6 +52,12 @@ vi.mock('../../r/[slug]/page', async () => {
   };
 });
 
+// F-292 (D-29): a signed-in visitor whose seat is Dark. The public report must not wear it.
+vi.mock('@/lib/v2/account/session-theme', () => ({ sessionTheme: async () => 'dark' }));
+vi.mock('@/components/v2/SeatTheme', () => ({
+  SeatTheme: ({ theme }: { theme: string }) => <i data-seat-theme={theme} />,
+}));
+
 const route = await import('./page');
 
 const MINTED = '2026-11-12T18:00:00.000Z';
@@ -182,6 +188,21 @@ describe('app/v2-report/[slug]', () => {
       await expect(render()).rejects.toMatchObject({ digest: expect.stringContaining('404') });
     }
   });
+});
+
+describe('the visitor’s theme (F-292, D-29)', () => {
+  // The seat theme is carried to the signed-in pages only. A shared report follows the visitor's
+  // own device: it sets no data-theme, for a v2 snapshot and for v1’s page alike, with a Dark seat
+  // signed in.
+  it.each(['a v2 snapshot', 'no row, drawn by v1’s page'])(
+    '%s applies no seat theme',
+    async (kind) => {
+      store.row = kind === 'a v2 snapshot' ? rowWith(snapshotOf('bad-site')) : null;
+      const markup = await render();
+      expect(markup).not.toContain('data-seat-theme');
+      expect(markup).not.toContain('data-theme');
+    },
+  );
 });
 
 describe('generateMetadata', () => {

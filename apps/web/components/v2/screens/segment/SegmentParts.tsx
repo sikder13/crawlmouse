@@ -123,8 +123,13 @@ function OpenFix({ f, primary, ask }: { f: OpenFixView; primary: boolean; ask: s
           <RecommendationTag r={f.recommendation} />
         </span>
         <span className={`${layout.row} ${styles.effect}`}>
-          <span className={styles.effectPoints}>{f.points}</span> {f.unit}
-          {f.effort ? ` · ${f.effort}` : ''}
+          {/* A fix with no effect to name draws none, and no separator before its effort (F-274). */}
+          {f.points ? (
+            <>
+              <span className={styles.effectPoints}>{f.points}</span>{' '}
+            </>
+          ) : null}
+          {[f.unit, f.effort].filter(Boolean).join(' · ')}
         </span>
       </div>
       {f.packet === null || f.handoff === null || f.prompt === null ? (
@@ -195,7 +200,10 @@ export function SectionFixes({
           <div>
             <strong>{p.title}</strong>{' '}
             <span className={layout.mut}>
-              {p.scope ? `· ${p.scope} ` : ''}· {p.points}
+              {[p.scope, p.points]
+                .filter(Boolean)
+                .map((x) => `· ${x}`)
+                .join(' ')}
             </span>{' '}
             {p.recommendations.map((r) => (
               <RecommendationTag key={r.cls} r={r} count={p.count > 1 ? r.count : undefined} />

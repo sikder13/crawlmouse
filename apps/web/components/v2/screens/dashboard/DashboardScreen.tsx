@@ -7,7 +7,8 @@ import { Fragment, type ReactNode } from 'react';
 import { Table, type TableColumn } from '../../Table';
 import { VERDICTS } from '../../verdicts';
 import { VisuallyHidden } from '../../VisuallyHidden';
-import { TAGGED_UA_LINE } from '../../../../lib/v2/copy/site';
+import { SETUP_STATE } from '../../../../lib/v2/copy/dashboard';
+import { FIX_PLACE_HEADER, TAGGED_UA_LINE } from '../../../../lib/v2/copy/site';
 import type { DashboardView } from '../../../../lib/v2/view/dashboard';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
@@ -458,7 +459,7 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
         label="Top fixes"
         headersHidden
         columns={[
-          { header: 'No.', mono: true, muted: true },
+          { header: FIX_PLACE_HEADER, mono: true, muted: true },
           { header: 'Fix' },
           { header: 'Effect', numeric: true, mono: true },
           { header: 'Open', numeric: true },
@@ -466,8 +467,9 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
         rows={top.rows.map((r) => ({
           key: r.key,
           cells: [
-            String(r.number),
+            String(r.place),
             <span key="t">
+              {`${r.name} · `}
               {r.title}
               {r.effort ? (
                 // Data, so it shows on a phone too, where the locked page hides it (owner ruling
@@ -481,7 +483,7 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
             r.effect,
             <Button key="o" href={r.open.href} variant="quiet" size="sm">
               {r.open.label}
-              <VisuallyHidden>{` fix ${r.number}`}</VisuallyHidden>
+              <VisuallyHidden>{` ${r.name}`}</VisuallyHidden>
             </Button>,
           ],
         }))}
@@ -514,10 +516,12 @@ function Setup({ setup }: { setup: NonNullable<DashboardView['setup']> }) {
             cells: [
               i.done ? (
                 <StatusPill key="d" state="ok">
-                  done
+                  {SETUP_STATE.done}
                 </StatusPill>
               ) : (
-                <VisuallyHidden key="d">not done</VisuallyHidden>
+                <StatusPill key="d" state="neutral">
+                  {SETUP_STATE.notDone}
+                </StatusPill>
               ),
               i.label,
               i.action ? <ActionControl key="a" action={i.action} /> : '',

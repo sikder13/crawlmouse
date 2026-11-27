@@ -6,6 +6,7 @@
 import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
 import { count, plural } from '../words';
 import { formatPlanPrice } from './plan-price';
+import { FIX_PLACE_HEADER } from './site';
 
 /** The agency rail's plan card and the account switcher (the switcher is outside the artboards). */
 export const AGENCY_RAIL_COPY = {
@@ -113,7 +114,7 @@ export const CLIENT_COPY = {
   sitePage: 'Site page, all checks',
   fixesTitle: (n: number) => `Open fixes · ${count(n)} to raise`,
   fixesLabel: 'Open fixes',
-  fixColumns: { number: 'No.', fix: 'Fix', effect: 'Effect', packet: 'Packet' },
+  fixColumns: { place: FIX_PLACE_HEADER, fix: 'Fix', effect: 'Effect', packet: 'Packet' },
   more: (n: number) => `${count(n)} more on the site page`,
   noFixes: 'Nothing is open to raise with this client.',
   clientTitle: 'This client',
@@ -361,6 +362,14 @@ export const CLIENT_CHANGES: CopyChange[] = [
   },
   {
     screen: 'agency-client',
+    kind: 'ruling',
+    locked: '−1 since Sat AI readability',
+    rendered: '−1 since Sat 24 Oct AI readability',
+    source:
+      'V2R register, F-302 (CTO 080): a move measured from a check a week or more back names its date, so the weekday cannot read as another day',
+  },
+  {
+    screen: 'agency-client',
     kind: 'fixture',
     locked:
       'Open fixes · 4 to raise 0 Remove the ClaudeBot block from robots.txt new +19 AI Packet 1 Let GPTBot and PerplexityBot through Cloudflare +24 AI Packet 2 Server-render the product template +22 AI Packet 3 Link the 7 orphan pages +4 SEO Packet',
@@ -368,6 +377,14 @@ export const CLIENT_CHANGES: CopyChange[] = [
       "Open fixes · 1 to raise 1 Let AI crawlers past the edge's automation challenge AI not yet estimated Packet",
     source:
       'The fixture’s fixes of granitepeak.example still to do: fix 1, which a check could not verify (fix 2 is marked done)',
+  },
+  {
+    screen: 'agency-client',
+    kind: 'ruling',
+    locked: "1 Let AI crawlers past the edge's automation challenge",
+    rendered: "1 Fix 1 · Let AI crawlers past the edge's automation challenge",
+    source:
+      'V2R register, F-276 (CTO 081): the first column is the row’s place in rank order, 1 first; the fix’s stored number is its name (“Fix 9”), never its order',
   },
   {
     screen: 'agency-client',

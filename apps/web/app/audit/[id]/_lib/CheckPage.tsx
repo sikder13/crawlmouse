@@ -1,4 +1,5 @@
 import '../../../../styles/v2/tokens.css';
+import type { ReactNode } from 'react';
 import { AuditEvent, AuditPageProvider } from '../../../../components/v2/screens/result/AuditPage';
 import { ResultScreen } from '../../../../components/v2/screens/result/ResultScreen';
 import { AuditNotice } from '../../../../components/v2/screens/result/ResultStates';
@@ -54,7 +55,26 @@ export function noticeOf(read: Extract<CheckRead, { state: 'failed' | 'expired' 
  * A v2 check's overview (CC-22b D4), at `/audit/[id]/overview`: the crawl while it waits or runs,
  * the result once it is graded, and a notice for one that failed or expired.
  */
-export function CheckPage({ read }: { read: CheckRead }) {
+export function CheckPage({
+  read,
+  theme = null,
+}: {
+  read: CheckRead;
+  /** The signed-in seat's theme (`sessionTheme`), applied in every state; null for none. */
+  theme?: ReactNode;
+}) {
+  const body = checkBody(read);
+  return theme ? (
+    <>
+      {theme}
+      {body}
+    </>
+  ) : (
+    body
+  );
+}
+
+function checkBody(read: CheckRead) {
   if (read.state === 'waiting') return <LiveCrawl checkId={read.checkId} host={read.host} />;
   if (read.state !== 'ready') {
     return <AuditNotice domain={read.host} {...noticeOf(read)} action={NEW_AUDIT} />;

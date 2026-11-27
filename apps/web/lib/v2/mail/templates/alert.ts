@@ -12,6 +12,7 @@
 import type { Change, GradeLetter, GradeName } from '@crawlmouse/types/v2';
 import { dayDate } from '../../format';
 import { auditHrefs } from '../../view/audit-hrefs';
+import { onlyMoved } from '../../view/listed-changes';
 import { count, plural } from '../../words';
 import { html, oneLine } from '../escape';
 import { layout } from '../layout';
@@ -138,7 +139,9 @@ export function gradeMove(g: {
   return `${GRADE_NAMES[g.grade]} ${g.from_grade} ${g.from_score} → ${g.to_grade} ${g.to_score}`;
 }
 
-export function rowText(c: MailChange): RowText {
+export function rowText(row: MailChange): RowText {
+  // Only the letters that moved, in the line (CTO ruling on QA N1).
+  const c = onlyMoved(row);
   const pages = `${count(c.pages_affected)} ${plural(c.pages_affected, 'page', 'pages')}`;
   const ua = c.ua ? oneLine(c.ua, BOUNDS.ua) : '';
   const summary = oneLine(c.summary, BOUNDS.summary);
@@ -147,7 +150,8 @@ export function rowText(c: MailChange): RowText {
   const named =
     ua === '' || (summary.startsWith(ua) && /^(?:[\s:]|$)/.test(summary.slice(ua.length)));
   return {
-    label: isProblem(c) ? LABEL.opened : LABEL[c.kind],
+    // The label reads the row as stored, as the subject's problem count does (isProblem).
+    label: isProblem(row) ? LABEL.opened : LABEL[row.kind],
     line: named ? summary : `${ua}: ${summary}`,
     detail: [wherePhrase(c.where), pages, ...c.grade_deltas.map(gradeMove)].join(' · '),
     fix: null,

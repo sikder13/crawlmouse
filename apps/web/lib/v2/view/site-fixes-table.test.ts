@@ -50,8 +50,8 @@ describe('on Pro', () => {
     expect(t().rest!.status).toBe('open');
   });
 
-  it('names the numbers it folds', () => {
-    expect(t().rest).toMatchObject({ numbers: '4, 6–15', count: 11 });
+  it('names the places it folds (F-276: places, not the fixes’ numbers)', () => {
+    expect(t().rest).toMatchObject({ numbers: '6–16', count: 11 });
   });
 });
 
@@ -68,9 +68,9 @@ describe('on Free', () => {
     ]);
   });
 
-  it('names a folded set that is not one run', () => {
+  it('names the places it folds, one run after the rows shown (F-276)', () => {
     expect(view(onFree(sevenFirst(bad))).fixes.rest).toMatchObject({
-      numbers: '4–6, 8–15',
+      numbers: '6–16',
       count: 11,
       status: 'open · Pro',
     });

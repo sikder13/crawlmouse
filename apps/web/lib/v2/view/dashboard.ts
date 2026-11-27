@@ -55,15 +55,18 @@ import {
   readRuns,
   scheduleCell,
   seoOf,
+  weekdayAmbiguous,
   whenAgo,
   zoneOf,
   type GradeCell,
 } from './checks';
 import { points, type DoorView } from './result';
 import { auditHref } from './audit-hrefs';
+import { placeOrder } from './free-fixes';
+import { listedChanges } from './listed-changes';
 import { nextCheckLine, type NextChecks } from './site';
 import { titleAmong } from './fix-title';
-import { GRADES, PILL, SUBJECTS } from './segment/changes';
+import { GRADES, PILL, SUBJECTS, REOPENED, reopenedHere } from './segment/changes';
 import { effortText } from './segment/fixes';
 import {
   ACCOUNT_ACTIONS,
@@ -224,7 +227,12 @@ export interface SitesView {
 
 export interface TopFixRowView {
   key: string;
+  /** The fix's stored number (F-276): its name, never its order. */
   number: number;
+  /** "Fix 9". */
+  name: string;
+  /** The row's place, 1 first, in rank order (F-276, CTO 081). */
+  place: number;
   title: string;
   effort: string | null;
   effect: string;
@@ -336,21 +344,8 @@ const newestResult = (v: AccountView) =>
  * read as another check, when the earlier one is a week or more before now or falls on the same
  * weekday as the latest result; then its date ("Fri 23 Oct").
  */
-/**
- * A weekday names the earlier check only when it cannot mean another: the check is under a week
- * before now, and the newest result (when it is a different check) fell on another weekday.
- */
-export function weekdayAmbiguous(
-  prev: string,
-  newest: string | null,
-  now: string,
-  zone: string,
-): boolean {
-  return (
-    calendarDays(prev, now, zone) >= 7 ||
-    (newest !== null && weekday(newest, zone) === weekday(prev, zone))
-  );
-}
+/** Moved beside the other check helpers, so the site page shares it (F-302). */
+export { weekdayAmbiguous };
 
 function sinceName(
   v: AccountView,
@@ -583,7 +578,7 @@ function health(d: AccountDataset, viewer: Viewer, v: AccountView): HealthView {
 
 /** The grade moves recorded at a check, as "AI readability D → F" (FACTS row 98, Q12). */
 function gradeMoves(v: AccountView, checkId: string): string[] {
-  return v.d.changes
+  return listedChanges(v.d.changes)
     .filter((c) => c.check_id === checkId && c.subject === 'grade')
     .flatMap((c) => c.grade_deltas)
     .map((g) => `${GRADES[g.grade]} ${g.from_grade} → ${g.to_grade}`);
@@ -619,7 +614,12 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
   const openFix = fix && fix.status !== 'verified_resolved';
   return {
     key: c.id,
-    pill: { state: PILL[c.kind], label: blocked ? 'blocked' : c.kind },
+    // A fix that came back reads "reopened" before any other word, by its record (F-296), as on
+    // /changes.
+    pill: {
+      state: PILL[c.kind],
+      label: reopenedHere(c, v.d.fix_events) ? REOPENED : blocked ? 'blocked' : c.kind,
+    },
     verdicts: verdict ? [verdict] : [],
     title: c.summary,
     line: parts.filter(Boolean).join(' · '),
@@ -1109,7 +1109,10 @@ export function dashboardView(
           .map((c) => changeRow(v, s, c)),
       );
 
-  const fixes = result ? fixesAsOf(v.d, result) : [];
+  // In place order, as the site table numbers them (F-276).
+  const fixes = result
+    ? placeOrder(v.d, result, v.gates.fixesVisible === 'all' ? 'pro' : 'free')
+    : [];
   const first = fixes[0];
   const nextAt = accountNextCheck(v, next, (ts) => dayDate(ts, zone));
   // The live column's time is the scheduler's, whatever the saved cadence (on Free the first site
@@ -1151,7 +1154,7 @@ export function dashboardView(
               openAudit('Open the audit'),
               action(
                 'packet',
-                `Start with fix ${first.number}${effortText(first) ? ` · ${effortText(first)}` : ''}`,
+                `Start with the first fix · Fix ${first.number}${effortText(first) ? ` · ${effortText(first)}` : ''}`,
                 { checkId: result!.id, fixId: first.id },
                 { primary: true },
               ),
@@ -1288,9 +1291,11 @@ export function dashboardView(
       firstRun && result && fixes.length
         ? {
             title: COPY.topFixesTitle,
-            rows: fixes.slice(0, TOP_FIXES).map((f) => ({
+            rows: fixes.slice(0, TOP_FIXES).map((f, i) => ({
               key: f.id,
               number: f.number,
+              name: `Fix ${f.number}`,
+              place: i + 1,
               title: titleAmong(f, fixes),
               effort: effortText(f),
               effect: points(f, fixes),
